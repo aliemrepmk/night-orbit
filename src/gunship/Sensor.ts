@@ -25,6 +25,8 @@ export class Sensor {
   /** Current (animated) field of view. */
   fovDeg: number = WEAPONS['105'].fovDeg;
   private time = 0;
+  /** Current camera shake amplitude in degrees (decays exponentially). */
+  shakeDeg = 0;
 
   constructor(
     private readonly gunship: Gunship,
@@ -88,9 +90,16 @@ export class Sensor {
     this.constrainAim();
   }
 
-  /** Fixed-step update: zoom animation, gimbal limit (the orbit center may have moved). */
+  /** Adds camera shake (impacts, 105 mm recoil). Shakes don't stack beyond the strongest + 50%. */
+  addShake(deg: number): void {
+    this.shakeDeg = Math.max(this.shakeDeg, deg) + 0.5 * Math.min(this.shakeDeg, deg);
+  }
+
+  /** Fixed-step update: zoom animation, shake decay, gimbal limit (the orbit center may move). */
   update(dt: number): void {
     this.time += dt;
+    this.shakeDeg *= Math.exp(-dt / this.cfg.shakeTau);
+    if (this.shakeDeg < 1e-4) this.shakeDeg = 0;
     this.fovDeg = approach(this.fovDeg, this.targetFovDeg, dt, this.cfg.zoomTau);
     this.constrainAim();
   }
@@ -107,6 +116,13 @@ export class Sensor {
       const j = this.cfg.jitterDeg * DEG;
       cam.rotateY(j * (Math.sin(t * 1.7) + 0.5 * Math.sin(t * 4.3 + 1.1)));
       cam.rotateX(j * (Math.sin(t * 1.3 + 2.0) + 0.5 * Math.sin(t * 3.7)));
+    }
+    if (this.shakeDeg > 0) {
+      // Fast, irregular shake (incommensurate frequencies) that doesn't move the aim point.
+      const t = this.time;
+      const k = this.shakeDeg * DEG;
+      cam.rotateY(k * Math.sin(t * 61.0) * Math.cos(t * 23.3));
+      cam.rotateX(k * Math.sin(t * 53.7 + 1.3) * Math.cos(t * 31.1));
     }
 
     if (cam.fov !== this.fovDeg) {

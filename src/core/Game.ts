@@ -158,6 +158,7 @@ export class Game {
       grain: nv ? grain * CONFIG.nightVision.grainScale : grain,
       staticAmount: this.sensorFx.staticAmount,
       blurPx: this.sensorFx.blurPx,
+      whiteout: this.sensorFx.whiteout,
     };
   }
 

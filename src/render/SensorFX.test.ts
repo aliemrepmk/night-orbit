@@ -42,6 +42,18 @@ describe('SensorFX', () => {
     expect(fx.blurPx).toBe(0);
   });
 
+  it('whites out on a big blast and fades completely within whiteoutDuration', () => {
+    const fx = new SensorFX();
+    fx.triggerWhiteout(0.6);
+    expect(fx.whiteout).toBe(0.6);
+    fx.triggerWhiteout(0.2); // a weaker flash doesn't dim a stronger one
+    expect(fx.whiteout).toBe(0.6);
+    stepped(fx, cfg.whiteoutDuration * 0.5);
+    expect(fx.whiteout).toBeGreaterThan(0);
+    stepped(fx, cfg.whiteoutDuration * 0.6);
+    expect(fx.whiteout).toBe(0);
+  });
+
   it('restarts when switching again mid-effect', () => {
     const fx = new SensorFX();
     fx.triggerSwitch();

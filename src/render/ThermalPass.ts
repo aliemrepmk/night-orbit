@@ -12,6 +12,8 @@ export interface ThermalFrame {
   grain: number;
   staticAmount: number;
   blurPx: number;
+  /** 0–1 sensor saturation from a nearby blast (added to the raw value before the curve). */
+  whiteout: number;
 }
 
 /**
@@ -42,6 +44,7 @@ const ThermalShader = {
     uTint: { value: new Vector3(1, 1, 1) },
     uStatic: { value: 0 },
     uBlurPx: { value: 0 },
+    uWhiteout: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -69,6 +72,7 @@ const ThermalShader = {
     uniform vec3 uTint;
     uniform float uStatic;
     uniform float uBlurPx;
+    uniform float uWhiteout;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -96,6 +100,9 @@ const ThermalShader = {
       } else {
         h = heatAt(uv);
       }
+
+      // Blast whiteout saturates the sensor (goes black in black-hot, like the real thing).
+      h += uWhiteout;
 
       float v;
       if (uNightVision < 0.5) {
@@ -170,5 +177,6 @@ export class ThermalPass extends ShaderPass {
     u.uGrain.value = f.grain;
     u.uStatic.value = f.staticAmount;
     u.uBlurPx.value = f.blurPx;
+    u.uWhiteout.value = f.whiteout;
   }
 }

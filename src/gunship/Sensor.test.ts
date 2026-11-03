@@ -125,3 +125,31 @@ describe('Sensor aiming', () => {
     expect(sensor.depressionDeg).toBeCloseTo((Math.atan2(700, 900) * 180) / Math.PI, 0);
   });
 });
+
+describe('Sensor shake', () => {
+  it('decays to nothing within about a second', () => {
+    const { sensor } = setup();
+    sensor.addShake(0.25);
+    expect(sensor.shakeDeg).toBe(0.25);
+    for (let i = 0; i < 60; i++) sensor.update(DT);
+    expect(sensor.shakeDeg).toBeLessThan(0.25 * 0.05);
+    for (let i = 0; i < 60; i++) sensor.update(DT);
+    expect(sensor.shakeDeg).toBe(0);
+  });
+
+  it('stacks rapid impacts only partly (strongest + half the weaker)', () => {
+    const { sensor } = setup();
+    sensor.addShake(0.2);
+    sensor.addShake(0.1);
+    expect(sensor.shakeDeg).toBeCloseTo(0.25);
+  });
+
+  it('shakes the picture but never moves the aim point', () => {
+    const { sensor } = setup();
+    const before = sensor.aim.clone();
+    sensor.addShake(0.5);
+    sensor.update(DT);
+    sensor.syncCamera();
+    expect(sensor.aim.distanceTo(before)).toBeLessThan(1e-6);
+  });
+});

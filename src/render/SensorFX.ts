@@ -7,6 +7,8 @@ import { CONFIG, type SensorFxConfig } from '../config';
 export class SensorFX {
   /** Seconds since the last switch (starts "long ago" so nothing shows at startup). */
   private sinceSwitch = Infinity;
+  /** Current whiteout strength 0–1 (fades linearly over `whiteoutDuration`). */
+  whiteout = 0;
 
   constructor(private readonly cfg: SensorFxConfig = CONFIG.sensorFx) {}
 
@@ -15,8 +17,14 @@ export class SensorFX {
     this.sinceSwitch = 0;
   }
 
+  /** A blast saturates the sensor briefly. Keeps the stronger of the current and new flash. */
+  triggerWhiteout(amount: number): void {
+    this.whiteout = Math.min(1, Math.max(this.whiteout, amount));
+  }
+
   update(dt: number): void {
     this.sinceSwitch += dt;
+    this.whiteout = Math.max(0, this.whiteout - dt / this.cfg.whiteoutDuration);
   }
 
   /** 0–1: full static right after the switch, gone after `staticDuration`. */
