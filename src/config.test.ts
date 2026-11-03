@@ -18,6 +18,11 @@ describe('config sanity', () => {
     );
   });
 
+  it('keeps the render cost inside the GPU budget (2× pixels + 4× MSAA made aiming lag in M2)', () => {
+    expect(CONFIG.render.maxPixelRatio).toBeLessThanOrEqual(1.5);
+    expect(CONFIG.render.msaaSamples).toBe(0);
+  });
+
   it('orders weapons from narrowest to widest field of view', () => {
     const fovs = WEAPON_ORDER.map((id) => WEAPONS[id].fovDeg);
     expect([...fovs].sort((a, b) => a - b)).toEqual(fovs);

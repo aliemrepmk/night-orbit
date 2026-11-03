@@ -13,7 +13,8 @@ export interface HudData {
   /** Polarity label, e.g. "WHT HOT". */
   polarity: string;
   clock: number;
-  debug?: { fps: number; calls: number; triangles: number } | null;
+  /** `gpuMs` is null when the browser doesn't expose GPU timers. */
+  debug?: { fps: number; gpuMs: number | null; calls: number; triangles: number } | null;
 }
 
 const RETICLES: Record<WeaponId, string> = {
@@ -101,7 +102,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K`
+        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K`
         : '',
     );
   }

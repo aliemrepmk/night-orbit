@@ -125,7 +125,12 @@ export class Game {
       polarity: polarityLabel(this.polarity),
       clock: this.missionClock,
       debug: this.debug
-        ? { fps: this.fps, calls: this.renderer.drawCalls, triangles: this.renderer.triangles }
+        ? {
+            fps: this.fps,
+            gpuMs: this.renderer.gpuMs,
+            calls: this.renderer.drawCalls,
+            triangles: this.renderer.triangles,
+          }
         : null,
     });
   }

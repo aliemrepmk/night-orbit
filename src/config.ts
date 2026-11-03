@@ -76,8 +76,21 @@ export const CONFIG = {
     barrel: 0.04,
     /** Optional "night vision" tint as RGB multipliers; [1, 1, 1] = pure grayscale. */
     tint: [1, 1, 1] as readonly [number, number, number],
-    /** Render-target MSAA samples (the canvas' own antialias doesn't apply to post-processing). */
-    msaaSamples: 4,
+  },
+
+  render: {
+    /**
+     * Cap on device pixels per CSS pixel. Full Retina (2×) with the thermal chain cost ~23 ms of
+     * GPU per frame on a MacBook (over the 16.7 ms budget → laggy aim); 1.5× costs ~7 ms and still
+     * supersamples a little. The grainy thermal look hides the difference.
+     */
+    maxPixelRatio: 1.5,
+    /**
+     * Render-target MSAA samples. Off: on a half-float target it was the single biggest cost
+     * (~10 ms/frame at 2×), and grain + bloom hide aliasing. The canvas' own antialias flag
+     * doesn't apply to post-processing either way.
+     */
+    msaaSamples: 0,
   },
 
   sensorFx: {

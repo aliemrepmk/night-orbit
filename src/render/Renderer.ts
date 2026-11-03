@@ -11,6 +11,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { CONFIG } from '../config';
+import { GpuTimer } from './GpuTimer';
 import { ThermalPass, type ThermalFrame } from './ThermalPass';
 
 /**
@@ -23,23 +24,26 @@ export class Renderer {
   readonly scene = new Scene();
   private readonly composer: EffectComposer;
   private readonly thermal = new ThermalPass();
+  private readonly gpuTimer: GpuTimer;
 
   constructor(canvas: HTMLCanvasElement, camera: PerspectiveCamera) {
     const t = CONFIG.thermal;
+    const r = CONFIG.render;
     // The canvas itself only receives the final full-screen pass, so it needs no antialiasing.
     this.webgl = new WebGLRenderer({
       canvas,
       antialias: false,
       powerPreference: 'high-performance',
     });
-    this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, r.maxPixelRatio));
     // Several passes render per frame; count them all for the F1 stats.
     this.webgl.info.autoReset = false;
+    this.gpuTimer = new GpuTimer(this.webgl.getContext() as WebGL2RenderingContext);
 
     // Heat is stored linearly; setScalar writes the raw value (no color-space conversion).
     this.scene.background = new Color().setScalar(t.skyHeat);
 
-    const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: t.msaaSamples });
+    const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: r.msaaSamples });
     this.composer = new EffectComposer(this.webgl, target);
     this.composer.addPass(new RenderPass(this.scene, camera));
     this.composer.addPass(
@@ -59,7 +63,9 @@ export class Renderer {
   render(frame: ThermalFrame): void {
     this.webgl.info.reset();
     this.thermal.setFrame(frame);
+    this.gpuTimer.begin();
     this.composer.render();
+    this.gpuTimer.end();
   }
 
   get drawCalls(): number {
@@ -68,5 +74,10 @@ export class Renderer {
 
   get triangles(): number {
     return this.webgl.info.render.triangles;
+  }
+
+  /** Smoothed GPU time per frame in ms, or null if the browser doesn't expose GPU timers. */
+  get gpuMs(): number | null {
+    return this.gpuTimer.ms;
   }
 }
