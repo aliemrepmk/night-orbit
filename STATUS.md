@@ -10,12 +10,13 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                        | State                                                                             |
-| -------------------------------- | --------------------------------------------------------------------------------- |
-| **M0** Project setup             | ✅ Done                                                                           |
-| **M1** Gunship, sensor & terrain | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                 |
-| **M2** Thermal look              | ✅ Code done, automated tests pass. ⏳ **Waiting for your manual look test** (§3) |
-| M3 – M10                         | ⬜ Not started                                                                    |
+| Milestone                           | State                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| **M0** Project setup                | ✅ Done                                                                |
+| **M1** Gunship, sensor & terrain    | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)      |
+| **M2** Thermal look                 | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
+| M3 Weapons, ballistics & explosions | ⬜ Next                                                                |
+| M4 – M10                            | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **88 tests in 13 files**).
 `npm run build` works (≈572 kB JS, 146 kB gzipped).
@@ -86,7 +87,7 @@ Mouse = slew sensor · `1`/`2`/`3` = 25/40/105 mm zoom · `Q` or wheel = cycle w
 
 ---
 
-## 3. What to test now (M2 manual sign-off)
+## 3. M2 manual checklist (passed 2026-11-03; reuse for later visual changes)
 
 Run `npm run dev`, open the URL, click to begin. M1's checklist passed (§6); this is the M2 look test.
 Thermal tuning lives in `CONFIG.thermal` / `CONFIG.sensorFx` (`src/config.ts`) and heat values in
@@ -128,10 +129,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **Finish M2 sign-off** using the checklist above; tune `config.ts` if needed.
-2. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
+1. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
    added, move drag-to-aim off the left button (§5, decision 6).
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -183,6 +183,7 @@ _(Fill in after testing.)_
 | 2026-11-03 | M1 manual checklist      | User reported everything works                                          | None; M1 signed off                                                                  |
 | 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong | Added dark HUD outline; softened soil patches                                        |
 | 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                      | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
+| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                 | None; M2 signed off                                                                  |
 
 ---
 
