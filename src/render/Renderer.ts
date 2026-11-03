@@ -12,12 +12,14 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { CONFIG } from '../config';
 import { GpuTimer } from './GpuTimer';
+import { ThermalMaterial } from './ThermalMaterial';
 import { ThermalPass, type ThermalFrame } from './ThermalPass';
 
 /**
- * Owns the WebGL renderer, the scene and the thermal post-processing chain:
- * scene (raw heat, half-float) → bloom → ThermalPass (sensor image) → screen.
- * There are no lights or fog: every object uses ThermalMaterial, which outputs heat directly.
+ * Owns the WebGL renderer, the scene and the sensor post-processing chain:
+ * scene (raw heat or NV light, half-float) → bloom → ThermalPass (sensor image) → screen.
+ * There are no three.js lights or fog: every object uses ThermalMaterial, which outputs the
+ * active sensor's value directly.
  */
 export class Renderer {
   readonly webgl: WebGLRenderer;
@@ -25,6 +27,7 @@ export class Renderer {
   private readonly composer: EffectComposer;
   private readonly thermal = new ThermalPass();
   private readonly gpuTimer: GpuTimer;
+  private readonly background = new Color();
 
   constructor(canvas: HTMLCanvasElement, camera: PerspectiveCamera) {
     const t = CONFIG.thermal;
@@ -40,8 +43,8 @@ export class Renderer {
     this.webgl.info.autoReset = false;
     this.gpuTimer = new GpuTimer(this.webgl.getContext() as WebGL2RenderingContext);
 
-    // Heat is stored linearly; setScalar writes the raw value (no color-space conversion).
-    this.scene.background = new Color().setScalar(t.skyHeat);
+    // Values are stored linearly; setScalar writes the raw value (no color-space conversion).
+    this.scene.background = this.background;
 
     const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: r.msaaSamples });
     this.composer = new EffectComposer(this.webgl, target);
@@ -62,6 +65,9 @@ export class Renderer {
 
   render(frame: ThermalFrame): void {
     this.webgl.info.reset();
+    const nv = frame.mode === 'nv';
+    ThermalMaterial.setNightVision(nv);
+    this.background.setScalar(nv ? CONFIG.nightVision.skyBackground : CONFIG.thermal.skyHeat);
     this.thermal.setFrame(frame);
     this.gpuTimer.begin();
     this.composer.render();

@@ -78,6 +78,30 @@ export const CONFIG = {
     tint: [1, 1, 1] as readonly [number, number, number],
   },
 
+  /** The night-vision (image-intensifier) sensor: sees reflected starlight, not heat. */
+  nightVision: {
+    /** Direction *toward* the moon (normalized in the shader). */
+    moonDir: [-0.4, 0.8, 0.3] as readonly [number, number, number],
+    /** Light from the moon on a surface facing it, and from the whole sky (stars, airglow). */
+    moonLight: 0.3,
+    skyLight: 0.45,
+    /** Brightness of the night sky itself (glows in NV), and of the haze distant things fade to. */
+    skyBackground: 0.3,
+    hazeLight: 0.28,
+    /** NV scatters more than thermal, so haze builds up faster with distance. */
+    hazeDensity: 0.00025,
+    /** Relative surface brightness variation (multiplies light by 1 ± noise/2). */
+    surfaceNoise: 0.3,
+    /** Display curve: light × gain, clamped, then gamma. */
+    gain: 1.5,
+    gamma: 0.9,
+    /** Image-intensifier scintillation: thermal grain × this. */
+    grainScale: 1.8,
+    vignette: 0.6,
+    /** Green phosphor color (RGB multipliers on the final brightness). */
+    phosphor: [0.5, 1.0, 0.42] as readonly [number, number, number],
+  },
+
   render: {
     /**
      * Cap on device pixels per CSS pixel. Full Retina (2×) with the thermal chain cost ~23 ms of

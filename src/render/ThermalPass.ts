@@ -1,12 +1,13 @@
 import { Vector2, Vector3 } from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { CONFIG } from '../config';
-import type { Polarity } from './thermalMath';
+import type { SensorMode } from './thermalMath';
 
 /** Per-frame inputs to the sensor image. */
 export interface ThermalFrame {
   time: number;
-  polarity: Polarity;
+  mode: SensorMode;
+  /** Display gamma (per weapon in thermal, fixed in NV). */
   gamma: number;
   grain: number;
   staticAmount: number;
@@ -14,10 +15,11 @@ export interface ThermalFrame {
 }
 
 /**
- * Turns the rendered heat (+ bloom) into the sensor feed, in this order:
- * barrel distortion → refocus blur → contrast curve → polarity → grain → scanlines + rolling
- * band → vignette → static burst → tint.
- * The curve and polarity mirror `thermalMath.ts` (`displayValue`); keep them in sync.
+ * Turns the rendered value (heat in thermal, light in NV, + bloom) into the sensor feed:
+ * barrel distortion → refocus blur → display curve (thermal: contrast curve then polarity;
+ * NV: gain + gamma) → grain → scanlines + rolling band → vignette → static burst → tint
+ * (gray for thermal, green phosphor for NV).
+ * The curves mirror `thermalMath.ts` (`displayValue`, `nvCurve`); keep them in sync.
  */
 const ThermalShader = {
   name: 'ThermalShader',
@@ -27,6 +29,8 @@ const ThermalShader = {
     uPixelRatio: { value: 1 },
     uTime: { value: 0 },
     uPolarity: { value: 0 },
+    uNightVision: { value: 0 },
+    uNvGain: { value: 1 },
     uLevels: { value: new Vector2(0, 1) },
     uGamma: { value: 1 },
     uGrain: { value: 0 },
@@ -52,6 +56,8 @@ const ThermalShader = {
     uniform float uPixelRatio;
     uniform float uTime;
     uniform float uPolarity;
+    uniform float uNightVision;
+    uniform float uNvGain;
     uniform vec2 uLevels;
     uniform float uGamma;
     uniform float uGrain;
@@ -91,9 +97,15 @@ const ThermalShader = {
         h = heatAt(uv);
       }
 
-      // Contrast curve, then polarity (same as thermalMath.displayValue).
-      float v = pow(clamp((h - uLevels.x) / (uLevels.y - uLevels.x), 0.0, 1.0), uGamma);
-      v = mix(v, 1.0 - v, uPolarity);
+      float v;
+      if (uNightVision < 0.5) {
+        // Contrast curve, then polarity (same as thermalMath.displayValue).
+        v = pow(clamp((h - uLevels.x) / (uLevels.y - uLevels.x), 0.0, 1.0), uGamma);
+        v = mix(v, 1.0 - v, uPolarity);
+      } else {
+        // Image intensifier: gain, then gamma (same as thermalMath.nvCurve).
+        v = pow(clamp(h * uNvGain, 0.0, 1.0), uGamma);
+      }
 
       // Animated sensor grain (new pattern every frame).
       vec2 px = gl_FragCoord.xy / uPixelRatio;
@@ -116,7 +128,7 @@ const ThermalShader = {
         v = mix(v, snow, uStatic * 0.85) + tear * uStatic * 0.3;
       }
 
-      // Outside the distorted image: black border in both polarities.
+      // Outside the distorted image: black border in every mode.
       if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) v = 0.0;
 
       gl_FragColor = vec4(clamp(v, 0.0, 1.0) * uTint, 1.0);
@@ -133,9 +145,8 @@ export class ThermalPass extends ShaderPass {
     u.uScanlines.value = t.scanlines;
     u.uRollBand.value = t.rollBand;
     u.uRollSpeed.value = t.rollSpeed;
-    u.uVignette.value = t.vignette;
     u.uBarrel.value = t.barrel;
-    (u.uTint.value as Vector3).set(...t.tint);
+    u.uNvGain.value = CONFIG.nightVision.gain;
   }
 
   /** `width`/`height` in device pixels. */
@@ -150,7 +161,11 @@ export class ThermalPass extends ShaderPass {
   setFrame(f: ThermalFrame): void {
     const u = this.uniforms;
     u.uTime.value = f.time;
-    u.uPolarity.value = f.polarity === 'black' ? 1 : 0;
+    const nv = f.mode === 'nv';
+    u.uNightVision.value = nv ? 1 : 0;
+    u.uPolarity.value = f.mode === 'black' ? 1 : 0;
+    u.uVignette.value = nv ? CONFIG.nightVision.vignette : CONFIG.thermal.vignette;
+    (u.uTint.value as Vector3).set(...(nv ? CONFIG.nightVision.phosphor : CONFIG.thermal.tint));
     u.uGamma.value = f.gamma;
     u.uGrain.value = f.grain;
     u.uStatic.value = f.staticAmount;

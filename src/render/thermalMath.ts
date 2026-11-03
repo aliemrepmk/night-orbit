@@ -1,17 +1,22 @@
 /**
- * Pure versions of the thermal display math. `ThermalPass`'s fragment shader implements the
- * same formulas in GLSL; keep the two in sync (these tests are the spec).
+ * Pure versions of the sensor display math. The shaders implement the same formulas in GLSL
+ * (`ThermalMaterial` for NV surface light, `ThermalPass` for the display curves); keep them in
+ * sync (these tests are the spec).
  */
 
 export type Polarity = 'white' | 'black';
 
-export function togglePolarity(p: Polarity): Polarity {
-  return p === 'white' ? 'black' : 'white';
+/** Sensor modes, in the order the `F` key cycles through them. */
+export type SensorMode = 'white' | 'black' | 'nv';
+export const SENSOR_MODES: readonly SensorMode[] = ['white', 'black', 'nv'];
+
+export function nextSensorMode(m: SensorMode): SensorMode {
+  return SENSOR_MODES[(SENSOR_MODES.indexOf(m) + 1) % SENSOR_MODES.length];
 }
 
-/** HUD label for a polarity. */
-export function polarityLabel(p: Polarity): string {
-  return p === 'white' ? 'WHT HOT' : 'BLK HOT';
+/** HUD label for a sensor mode. */
+export function sensorModeLabel(m: SensorMode): string {
+  return m === 'white' ? 'WHT HOT' : m === 'black' ? 'BLK HOT' : 'NV';
 }
 
 /** White-hot shows heat as brightness; black-hot inverts it. */
@@ -40,6 +45,33 @@ export function contrastCurve(h: number, levels: Levels, gamma: number): number 
  */
 export function displayValue(h: number, p: Polarity, levels: Levels, gamma: number): number {
   return applyPolarity(contrastCurve(h, levels, gamma), p);
+}
+
+export interface NvLighting {
+  readonly skyLight: number;
+  readonly moonLight: number;
+}
+
+/**
+ * Light a surface sends to the NV sensor: its albedo × (sky light, only slightly stronger on
+ * surfaces facing up, so sides of trees and walls aren't black + moonlight by angle), plus its glow.
+ * `normalY` is the surface normal's up component, `moonDot` = max(0, normal · toward-moon).
+ */
+export function nvSurfaceLight(
+  albedo: number,
+  glow: number,
+  normalY: number,
+  moonDot: number,
+  l: NvLighting,
+): number {
+  const sky = l.skyLight * (0.8 + 0.2 * Math.max(0, normalY));
+  return albedo * (sky + l.moonLight * Math.max(0, moonDot)) + glow;
+}
+
+/** NV display curve: light × gain, clamped to 0–1, then gamma. No polarity in NV. */
+export function nvCurve(light: number, gain: number, gamma: number): number {
+  const c = Math.min(1, Math.max(0, light * gain));
+  return Math.pow(c, gamma);
 }
 
 /**

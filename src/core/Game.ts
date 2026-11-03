@@ -3,7 +3,12 @@ import { Gunship } from '../gunship/Gunship';
 import { Sensor } from '../gunship/Sensor';
 import { Renderer } from '../render/Renderer';
 import { SensorFX } from '../render/SensorFX';
-import { grainForFov, polarityLabel, togglePolarity, type Polarity } from '../render/thermalMath';
+import {
+  grainForFov,
+  nextSensorMode,
+  sensorModeLabel,
+  type SensorMode,
+} from '../render/thermalMath';
 import { WEAPONS, WEAPON_ORDER } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import { PlaceholderWorld } from '../world/PlaceholderWorld';
@@ -23,7 +28,7 @@ export class Game {
   private readonly gunship = new Gunship();
   private readonly sensor: Sensor;
   private readonly sensorFx = new SensorFX();
-  private polarity: Polarity = 'white';
+  private sensorMode: SensorMode = 'white';
   private readonly input: Input;
   private readonly hud: HUD;
   private readonly stepper = new FixedStepper(CONFIG.loop.step, CONFIG.loop.maxFrame);
@@ -104,7 +109,11 @@ export class Game {
     if (wheel !== 0) this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
     if (this.sensor.weapon !== weaponBefore) this.sensorFx.triggerSwitch();
 
-    if (this.input.wasPressed('KeyF')) this.polarity = togglePolarity(this.polarity);
+    // F cycles WHT HOT → BLK HOT → NV; switching sensors flashes static like an optic switch.
+    if (this.input.wasPressed('KeyF')) {
+      this.sensorMode = nextSensorMode(this.sensorMode);
+      this.sensorFx.triggerSwitch();
+    }
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
     // With pointer lock the browser handles Esc (and we get a lock-change event); in drag mode we must.
     if (this.input.dragMode && this.input.wasPressed('Escape')) this.setState('paused');
@@ -122,7 +131,7 @@ export class Game {
       aimZ: s.aim.z,
       fov: s.fovDeg,
       weapon: s.weapon,
-      polarity: polarityLabel(this.polarity),
+      sensorMode: sensorModeLabel(this.sensorMode),
       clock: this.missionClock,
       debug: this.debug
         ? {
@@ -135,16 +144,18 @@ export class Game {
     });
   }
 
-  /** Per-frame inputs to the thermal post-processing. `time` is real time (grain keeps moving when paused). */
+  /** Per-frame inputs to the sensor post-processing. `time` is real time (grain keeps moving when paused). */
   private thermalFrame(time: number) {
     const t = CONFIG.thermal;
+    const nv = this.sensorMode === 'nv';
     const narrow = WEAPONS[WEAPON_ORDER[0]].fovDeg;
     const wide = WEAPONS[WEAPON_ORDER[WEAPON_ORDER.length - 1]].fovDeg;
+    const grain = grainForFov(this.sensor.fovDeg, narrow, wide, t.grainNarrow, t.grainWide);
     return {
       time,
-      polarity: this.polarity,
-      gamma: t.gamma[this.sensor.weapon],
-      grain: grainForFov(this.sensor.fovDeg, narrow, wide, t.grainNarrow, t.grainWide),
+      mode: this.sensorMode,
+      gamma: nv ? CONFIG.nightVision.gamma : t.gamma[this.sensor.weapon],
+      grain: nv ? grain * CONFIG.nightVision.grainScale : grain,
       staticAmount: this.sensorFx.staticAmount,
       blurPx: this.sensorFx.blurPx,
     };

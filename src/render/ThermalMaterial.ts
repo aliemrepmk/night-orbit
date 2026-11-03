@@ -1,32 +1,52 @@
-import { ShaderMaterial } from 'three';
+import { ShaderMaterial, Vector3 } from 'three';
 import { CONFIG } from '../config';
+import type { Signature } from '../fx/Light';
 
 /**
- * Where an object's heat comes from:
- * - `uniform`: one heat for the whole mesh (`heat` option, change via `setHeat`)
- * - `vertex`: a per-vertex `heat` attribute (terrain painted with fields)
- * - `instance`: a per-instance `instanceHeat` attribute on an InstancedMesh
+ * Where an object's signature (heat, NV albedo, NV glow) comes from:
+ * - `uniform`: one signature for the whole mesh (`signature` option; change heat via `setHeat`)
+ * - `vertex`: a per-vertex vec3 `signature` attribute (terrain painted with fields)
+ * - `instance`: a per-instance vec3 `instanceSignature` attribute on an InstancedMesh
  *   (every soldier / tree can have its own heat and cool independently)
  */
-export type HeatSource = 'uniform' | 'vertex' | 'instance';
+export type SignatureSource = 'uniform' | 'vertex' | 'instance';
 
 export interface ThermalMaterialOptions {
-  heat?: number;
-  source?: HeatSource;
-  /** Scales the world-space surface noise (0 = perfectly flat heat). */
+  signature?: Signature;
+  source?: SignatureSource;
+  /** Scales the world-space surface noise (0 = perfectly flat). */
   noise?: number;
 }
 
+/**
+ * Uniforms shared by every material (the same objects are referenced by all of them), so one
+ * write switches the whole world between thermal and NV.
+ */
+const shared = (() => {
+  const t = CONFIG.thermal;
+  const nv = CONFIG.nightVision;
+  return {
+    uNightVision: { value: 0 },
+    uHazeHeat: { value: t.hazeHeat },
+    uHazeDensity: { value: t.hazeDensity },
+    uMoonDir: { value: new Vector3(...nv.moonDir).normalize() },
+    uMoonLight: { value: nv.moonLight },
+    uSkyLight: { value: nv.skyLight },
+    uHazeLight: { value: nv.hazeLight },
+    uNvHazeDensity: { value: nv.hazeDensity },
+  };
+})();
+
 const vertexShader = /* glsl */ `
-  uniform float uHeat;
-  #ifdef HEAT_VERTEX
-    attribute float heat;
+  uniform vec3 uSignature;
+  #ifdef SIGNATURE_VERTEX
+    attribute vec3 signature;
   #endif
-  #ifdef HEAT_INSTANCE
-    attribute float instanceHeat;
+  #ifdef SIGNATURE_INSTANCE
+    attribute vec3 instanceSignature;
   #endif
 
-  varying float vHeat;
+  varying vec3 vSignature; // (heat, albedo, glow)
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vDepth;
@@ -42,12 +62,12 @@ const vertexShader = /* glsl */ `
     vWorldPos = world.xyz;
     vNormal = normalize(mat3(modelMatrix) * n);
 
-    #if defined(HEAT_VERTEX)
-      vHeat = heat;
-    #elif defined(HEAT_INSTANCE)
-      vHeat = instanceHeat;
+    #if defined(SIGNATURE_VERTEX)
+      vSignature = signature;
+    #elif defined(SIGNATURE_INSTANCE)
+      vSignature = instanceSignature;
     #else
-      vHeat = uHeat;
+      vSignature = uSignature;
     #endif
 
     vec4 view = viewMatrix * world;
@@ -58,10 +78,17 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform float uNoise;
+  uniform float uNvNoise;
+  uniform float uNightVision;
   uniform float uHazeHeat;
   uniform float uHazeDensity;
+  uniform vec3 uMoonDir;
+  uniform float uMoonLight;
+  uniform float uSkyLight;
+  uniform float uHazeLight;
+  uniform float uNvHazeDensity;
 
-  varying float vHeat;
+  varying vec3 vSignature;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vDepth;
@@ -81,47 +108,64 @@ const fragmentShader = /* glsl */ `
   }
 
   void main() {
+    vec3 nrm = normalize(vNormal);
     // Surface variation in world space (walls use height too, so they aren't streaked).
     vec2 p = vWorldPos.xz + vec2(vWorldPos.y * 0.7, -vWorldPos.y * 0.4);
     float n = 0.65 * valueNoise(p * 0.05) + 0.35 * valueNoise(p * 0.4);
-    // Tops catch a little more residual warmth than sides.
-    float facing = 0.85 + 0.15 * clamp(normalize(vNormal).y, 0.0, 1.0);
-    float h = vHeat * facing + (n - 0.5) * uNoise;
-    // Atmospheric haze: far things fade toward the air's heat.
-    float haze = 1.0 - exp(-vDepth * uHazeDensity);
-    h = mix(h, uHazeHeat, haze);
-    gl_FragColor = vec4(vec3(h), 1.0);
+    float v;
+
+    if (uNightVision < 0.5) {
+      // Thermal: heat. Tops catch a little more residual warmth than sides.
+      float facing = 0.85 + 0.15 * clamp(nrm.y, 0.0, 1.0);
+      v = vSignature.x * facing + (n - 0.5) * uNoise;
+      v = mix(v, uHazeHeat, 1.0 - exp(-vDepth * uHazeDensity));
+    } else {
+      // NV: reflected sky + moon light, plus glow (same as thermalMath.nvSurfaceLight).
+      float sky = uSkyLight * (0.8 + 0.2 * max(nrm.y, 0.0));
+      float moon = uMoonLight * max(dot(nrm, uMoonDir), 0.0);
+      v = vSignature.y * (sky + moon) * (1.0 + (n - 0.5) * uNvNoise) + vSignature.z;
+      v = mix(v, uHazeLight, 1.0 - exp(-vDepth * uNvHazeDensity));
+    }
+    gl_FragColor = vec4(vec3(v), 1.0);
   }
 `;
 
 /**
- * The one shared thermal shader: outputs raw heat (not a color). `ThermalPass` turns heat into
- * the final sensor image. See PLAN.md §7.5.
+ * The one shared sensor shader. It outputs a raw value, not a color: heat in thermal mode,
+ * received light in NV mode. `ThermalPass` turns that into the final image. See PLAN.md §7.5.
  */
 export class ThermalMaterial extends ShaderMaterial {
-  constructor({ heat = 0.2, source = 'uniform', noise = 1 }: ThermalMaterialOptions = {}) {
-    const t = CONFIG.thermal;
+  constructor({
+    signature = { heat: 0.2, albedo: 0.3, glow: 0 },
+    source = 'uniform',
+    noise = 1,
+  }: ThermalMaterialOptions = {}) {
     super({
       vertexShader,
       fragmentShader,
       defines: {
-        ...(source === 'vertex' ? { HEAT_VERTEX: '' } : {}),
-        ...(source === 'instance' ? { HEAT_INSTANCE: '' } : {}),
+        ...(source === 'vertex' ? { SIGNATURE_VERTEX: '' } : {}),
+        ...(source === 'instance' ? { SIGNATURE_INSTANCE: '' } : {}),
       },
       uniforms: {
-        uHeat: { value: heat },
-        uNoise: { value: t.surfaceNoise * noise },
-        uHazeHeat: { value: t.hazeHeat },
-        uHazeDensity: { value: t.hazeDensity },
+        ...shared,
+        uSignature: { value: new Vector3(signature.heat, signature.albedo, signature.glow) },
+        uNoise: { value: CONFIG.thermal.surfaceNoise * noise },
+        uNvNoise: { value: CONFIG.nightVision.surfaceNoise * noise },
       },
     });
   }
 
+  /** Switches every ThermalMaterial between thermal (heat) and night vision (light). */
+  static setNightVision(on: boolean): void {
+    shared.uNightVision.value = on ? 1 : 0;
+  }
+
   get heat(): number {
-    return this.uniforms.uHeat.value as number;
+    return (this.uniforms.uSignature.value as Vector3).x;
   }
 
   setHeat(heat: number): void {
-    this.uniforms.uHeat.value = heat;
+    (this.uniforms.uSignature.value as Vector3).x = heat;
   }
 }

@@ -14,6 +14,7 @@ import {
 } from 'three';
 import { createRng, range, type Rng } from '../core/rng';
 import { HEAT } from '../fx/Heat';
+import { ALBEDO, GLOW, groundAlbedo, signature, type Signature } from '../fx/Light';
 import { ThermalMaterial } from '../render/ThermalMaterial';
 import { createGroundHeat } from './groundHeat';
 import type { Terrain } from './Terrain';
@@ -24,7 +25,8 @@ const MAX_CHIMNEYS = 40;
 /**
  * TEMPORARY content so there is something to aim at: a cluster of houses, a farm,
  * tree lines and a few moving "dummy" targets. M6 replaces this with the handcrafted map.
- * Every object has a heat value from the table in PLAN.md §7.5 (see `fx/Heat.ts`).
+ * Every object has a signature: heat for thermal (`fx/Heat.ts`, PLAN.md §7.5) and near-IR
+ * albedo + glow for night vision (`fx/Light.ts`).
  */
 export class PlaceholderWorld {
   readonly root = new Group();
@@ -39,14 +41,22 @@ export class PlaceholderWorld {
   }[] = [];
   private time = 0;
 
-  private readonly wallMat = new ThermalMaterial({ heat: HEAT.wall });
-  private readonly roofMat = new ThermalMaterial({ heat: HEAT.roof });
-  private readonly windows = new InstancedHeat(
+  private readonly wallMat = new ThermalMaterial({
+    signature: signature(HEAT.wall, ALBEDO.wall),
+  });
+  private readonly roofMat = new ThermalMaterial({
+    signature: signature(HEAT.roof, ALBEDO.roof),
+  });
+  private readonly windows = new InstancedSignature(
     new BoxGeometry(1.2, 1.1, 0.3),
     MAX_WINDOWS,
     0.4, // windows are small: little surface noise
   );
-  private readonly chimneys = new InstancedHeat(new BoxGeometry(0.9, 2.2, 0.9), MAX_CHIMNEYS, 0.5);
+  private readonly chimneys = new InstancedSignature(
+    new BoxGeometry(0.9, 2.2, 0.9),
+    MAX_CHIMNEYS,
+    0.5,
+  );
 
   constructor(private readonly terrain: Terrain) {
     const rng = createRng(2024);
@@ -54,9 +64,13 @@ export class PlaceholderWorld {
     const geo = terrain.buildGeometry();
     const groundHeat = createGroundHeat(4242);
     const pos = geo.getAttribute('position');
-    const heat = new Float32Array(pos.count);
-    for (let k = 0; k < pos.count; k++) heat[k] = groundHeat(pos.getX(k), pos.getZ(k));
-    geo.setAttribute('heat', new BufferAttribute(heat, 1));
+    const sig = new Float32Array(pos.count * 3); // (heat, albedo, glow) per vertex
+    for (let k = 0; k < pos.count; k++) {
+      const heat = groundHeat(pos.getX(k), pos.getZ(k));
+      sig[k * 3] = heat;
+      sig[k * 3 + 1] = groundAlbedo(heat);
+    }
+    geo.setAttribute('signature', new BufferAttribute(sig, 3));
     this.root.add(new Mesh(geo, new ThermalMaterial({ source: 'vertex' })));
 
     this.addHouses(rng, 0, 0, 25, 130); // village
@@ -114,15 +128,24 @@ export class PlaceholderWorld {
           const wx = ((i + 0.5) / n - 0.5) * w * 0.7;
           local.makeTranslation(wx, windowY, side * (d / 2 + 0.05));
           const lit = rng() < 0.7;
-          const heat = lit ? HEAT.window + range(rng, -0.05, 0.08) : HEAT.wall + 0.06;
-          this.windows.add(world.multiplyMatrices(house.matrix, local), heat);
+          const sig = lit
+            ? signature(
+                HEAT.window + range(rng, -0.05, 0.08),
+                ALBEDO.window,
+                GLOW.litWindow * range(rng, 0.8, 1),
+              )
+            : signature(HEAT.wall + 0.06, ALBEDO.window);
+          this.windows.add(world.multiplyMatrices(house.matrix, local), sig);
         }
       }
 
       // Half the houses have a warm chimney.
       if (rng() < 0.5) {
         local.makeTranslation(w * 0.25, wallH + 1.6, 0);
-        this.chimneys.add(world.multiplyMatrices(house.matrix, local), HEAT.chimney);
+        this.chimneys.add(
+          world.multiplyMatrices(house.matrix, local),
+          signature(HEAT.chimney, ALBEDO.chimney),
+        );
       }
     }
   }
@@ -130,7 +153,7 @@ export class PlaceholderWorld {
   private addTrees(rng: Rng): void {
     const lines = 14;
     const perLine = 45;
-    const trees = new InstancedHeat(
+    const trees = new InstancedSignature(
       new ConeGeometry(3, 10, 6).translate(0, 5, 0),
       lines * perLine,
       1.5, // foliage is noisy
@@ -150,7 +173,10 @@ export class PlaceholderWorld {
         const scale = range(rng, 0.7, 1.4);
         p.set(x + range(rng, -2, 2), this.terrain.heightAt(x, z) - 0.5, z + range(rng, -2, 2));
         s.set(scale, scale * range(rng, 0.8, 1.2), scale);
-        trees.add(m.compose(p, q, s), HEAT.tree + range(rng, -0.02, 0.02));
+        trees.add(
+          m.compose(p, q, s),
+          signature(HEAT.tree + range(rng, -0.02, 0.02), ALBEDO.tree * range(rng, 0.85, 1.1)),
+        );
       }
     }
     this.root.add(trees.finish());
@@ -158,9 +184,17 @@ export class PlaceholderWorld {
 
   /** Hot moving shapes: stand-ins for soldiers and vehicles to practice tracking. */
   private addDummies(rng: Rng): void {
-    const soldierMat = new ThermalMaterial({ heat: HEAT.soldier, noise: 0.3 });
-    const bodyMat = new ThermalMaterial({ heat: HEAT.vehicleBody });
-    const engineMat = new ThermalMaterial({ heat: HEAT.engine, noise: 0.3 });
+    const soldierMat = new ThermalMaterial({
+      signature: signature(HEAT.soldier, ALBEDO.soldier),
+      noise: 0.3,
+    });
+    const bodyMat = new ThermalMaterial({
+      signature: signature(HEAT.vehicleBody, ALBEDO.vehicleBody),
+    });
+    const engineMat = new ThermalMaterial({
+      signature: signature(HEAT.engine, ALBEDO.vehicleBody),
+      noise: 0.3,
+    });
     const soldierGeo = new CapsuleGeometry(0.45, 1.2, 3, 6);
     const truckGeo = new BoxGeometry(2.4, 2.4, 6);
     const engineGeo = new BoxGeometry(2.0, 0.6, 1.4);
@@ -199,10 +233,11 @@ export class PlaceholderWorld {
   }
 }
 
-/** An InstancedMesh where every instance carries its own heat (`instanceHeat`). */
-class InstancedHeat {
+/** An InstancedMesh where every instance carries its own signature (`instanceSignature`). */
+class InstancedSignature {
   private readonly mesh: InstancedMesh;
-  private readonly heat: Float32Array;
+  private readonly sig: Float32Array;
+  private readonly capacity: number;
   private n = 0;
 
   constructor(geometry: BoxGeometry | ConeGeometry, capacity: number, noise: number) {
@@ -211,14 +246,15 @@ class InstancedHeat {
       new ThermalMaterial({ source: 'instance', noise }),
       capacity,
     );
-    this.heat = new Float32Array(capacity);
-    geometry.setAttribute('instanceHeat', new InstancedBufferAttribute(this.heat, 1));
+    this.capacity = capacity;
+    this.sig = new Float32Array(capacity * 3);
+    geometry.setAttribute('instanceSignature', new InstancedBufferAttribute(this.sig, 3));
   }
 
-  add(matrix: Matrix4, heat: number): void {
-    if (this.n >= this.heat.length) return;
+  add(matrix: Matrix4, s: Signature): void {
+    if (this.n >= this.capacity) return;
     this.mesh.setMatrixAt(this.n, matrix);
-    this.heat[this.n] = heat;
+    this.sig.set([s.heat, s.albedo, s.glow], this.n * 3);
     this.n++;
   }
 

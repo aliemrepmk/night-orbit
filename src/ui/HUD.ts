@@ -10,8 +10,8 @@ export interface HudData {
   aimZ: number;
   fov: number;
   weapon: WeaponId;
-  /** Polarity label, e.g. "WHT HOT". */
-  polarity: string;
+  /** Sensor mode label: "WHT HOT", "BLK HOT" or "NV". */
+  sensorMode: string;
   clock: number;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: { fps: number; gpuMs: number | null; calls: number; triangles: number } | null;
@@ -83,7 +83,7 @@ export class HUD {
       `AZ ${sign(Math.round(d.azimuth))}${pad(Math.abs(Math.round(d.azimuth)), 3)}  EL -${pad(Math.round(d.depression), 2)}`,
     );
     this.set('coords', `TGT ${grid(d.aimX)} ${grid(-d.aimZ)}`);
-    this.set('pol', d.polarity);
+    this.set('pol', d.sensorMode);
     this.set('fov', `FOV ${d.fov.toFixed(1)}`);
     this.set('clock', clock(d.clock));
     this.set(
