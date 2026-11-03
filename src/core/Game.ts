@@ -2,6 +2,9 @@ import { CONFIG } from '../config';
 import { Gunship } from '../gunship/Gunship';
 import { Sensor } from '../gunship/Sensor';
 import { Renderer } from '../render/Renderer';
+import { SensorFX } from '../render/SensorFX';
+import { grainForFov, polarityLabel, togglePolarity, type Polarity } from '../render/thermalMath';
+import { WEAPONS, WEAPON_ORDER } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import { PlaceholderWorld } from '../world/PlaceholderWorld';
 import { Terrain } from '../world/Terrain';
@@ -19,6 +22,8 @@ export class Game {
   private readonly world: PlaceholderWorld;
   private readonly gunship = new Gunship();
   private readonly sensor: Sensor;
+  private readonly sensorFx = new SensorFX();
+  private polarity: Polarity = 'white';
   private readonly input: Input;
   private readonly hud: HUD;
   private readonly stepper = new FixedStepper(CONFIG.loop.step, CONFIG.loop.maxFrame);
@@ -34,12 +39,12 @@ export class Game {
     hudRoot: HTMLElement,
     private readonly screen: HTMLElement,
   ) {
-    this.renderer = new Renderer(canvas);
-    this.world = new PlaceholderWorld(this.terrain);
-    this.renderer.scene.add(this.world.root);
-
     this.gunship.snapTo(0, 0);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
+
+    this.renderer = new Renderer(canvas, this.sensor.camera);
+    this.world = new PlaceholderWorld(this.terrain);
+    this.renderer.scene.add(this.world.root);
 
     this.hud = new HUD(hudRoot);
     this.input = new Input(canvas);
@@ -70,7 +75,7 @@ export class Game {
     for (let i = 0; i < steps; i++) this.update(CONFIG.loop.step);
 
     this.sensor.syncCamera();
-    this.renderer.render(this.sensor.camera);
+    this.renderer.render(this.thermalFrame(now / 1000));
     this.updateHud();
     this.input.endFrame();
   }
@@ -81,6 +86,7 @@ export class Game {
     this.gunship.update(dt);
     this.sensor.update(dt);
     this.world.update(dt);
+    this.sensorFx.update(dt);
     if (this.state === 'playing') this.missionClock += dt;
   }
 
@@ -88,12 +94,17 @@ export class Game {
     const { dx, dy } = this.input.consumeMouse();
     this.sensor.slew(dx, dy, this.viewportHeight);
 
+    const weaponBefore = this.sensor.weapon;
+
     if (this.input.wasPressed('Digit1')) this.sensor.selectWeapon('25');
     if (this.input.wasPressed('Digit2')) this.sensor.selectWeapon('40');
     if (this.input.wasPressed('Digit3')) this.sensor.selectWeapon('105');
     if (this.input.wasPressed('KeyQ')) this.sensor.cycleWeapon(1);
     const wheel = this.input.consumeWheel();
     if (wheel !== 0) this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
+    if (this.sensor.weapon !== weaponBefore) this.sensorFx.triggerSwitch();
+
+    if (this.input.wasPressed('KeyF')) this.polarity = togglePolarity(this.polarity);
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
     // With pointer lock the browser handles Esc (and we get a lock-change event); in drag mode we must.
     if (this.input.dragMode && this.input.wasPressed('Escape')) this.setState('paused');
@@ -111,11 +122,27 @@ export class Game {
       aimZ: s.aim.z,
       fov: s.fovDeg,
       weapon: s.weapon,
+      polarity: polarityLabel(this.polarity),
       clock: this.missionClock,
       debug: this.debug
         ? { fps: this.fps, calls: this.renderer.drawCalls, triangles: this.renderer.triangles }
         : null,
     });
+  }
+
+  /** Per-frame inputs to the thermal post-processing. `time` is real time (grain keeps moving when paused). */
+  private thermalFrame(time: number) {
+    const t = CONFIG.thermal;
+    const narrow = WEAPONS[WEAPON_ORDER[0]].fovDeg;
+    const wide = WEAPONS[WEAPON_ORDER[WEAPON_ORDER.length - 1]].fovDeg;
+    return {
+      time,
+      polarity: this.polarity,
+      gamma: t.gamma[this.sensor.weapon],
+      grain: grainForFov(this.sensor.fovDeg, narrow, wide, t.grainNarrow, t.grainWide),
+      staticAmount: this.sensorFx.staticAmount,
+      blurPx: this.sensorFx.blurPx,
+    };
   }
 
   private setState(state: GameState): void {

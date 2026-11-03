@@ -1,44 +1,65 @@
 import {
   Color,
-  DirectionalLight,
-  Fog,
-  HemisphereLight,
+  HalfFloatType,
   Scene,
+  Vector2,
+  WebGLRenderTarget,
   WebGLRenderer,
   type PerspectiveCamera,
 } from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { CONFIG } from '../config';
+import { ThermalPass, type ThermalFrame } from './ThermalPass';
 
 /**
- * Owns the WebGL renderer and the scene.
- * M1 uses plain lit grayscale materials as a placeholder; M2 replaces this with the thermal look.
+ * Owns the WebGL renderer, the scene and the thermal post-processing chain:
+ * scene (raw heat, half-float) → bloom → ThermalPass (sensor image) → screen.
+ * There are no lights or fog: every object uses ThermalMaterial, which outputs heat directly.
  */
 export class Renderer {
   readonly webgl: WebGLRenderer;
   readonly scene = new Scene();
+  private readonly composer: EffectComposer;
+  private readonly thermal = new ThermalPass();
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, camera: PerspectiveCamera) {
+    const t = CONFIG.thermal;
+    // The canvas itself only receives the final full-screen pass, so it needs no antialiasing.
     this.webgl = new WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       powerPreference: 'high-performance',
     });
     this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Several passes render per frame; count them all for the F1 stats.
+    this.webgl.info.autoReset = false;
 
-    this.scene.background = new Color(0x0b0d0e);
-    this.scene.fog = new Fog(0x0b0d0e, 1600, 4200);
+    // Heat is stored linearly; setScalar writes the raw value (no color-space conversion).
+    this.scene.background = new Color().setScalar(t.skyHeat);
 
-    this.scene.add(new HemisphereLight(0xc8d0d4, 0x1a1c1c, 1.6));
-    const moon = new DirectionalLight(0xffffff, 1.4);
-    moon.position.set(-0.4, 1, 0.3);
-    this.scene.add(moon);
+    const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: t.msaaSamples });
+    this.composer = new EffectComposer(this.webgl, target);
+    this.composer.addPass(new RenderPass(this.scene, camera));
+    this.composer.addPass(
+      new UnrealBloomPass(new Vector2(1, 1), t.bloom.strength, t.bloom.radius, t.bloom.threshold),
+    );
+    this.composer.addPass(this.thermal);
   }
 
   setSize(width: number, height: number): void {
+    const ratio = this.webgl.getPixelRatio();
     this.webgl.setSize(width, height, false);
+    this.composer.setPixelRatio(ratio);
+    this.composer.setSize(width, height);
+    this.thermal.setPixelRatio(ratio);
   }
 
-  render(camera: PerspectiveCamera): void {
-    this.webgl.render(this.scene, camera);
+  render(frame: ThermalFrame): void {
+    this.webgl.info.reset();
+    this.thermal.setFrame(frame);
+    this.composer.render();
   }
 
   get drawCalls(): number {
