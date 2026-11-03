@@ -17,7 +17,7 @@ every session.
 | **M2** Thermal look              | ✅ Code done, automated tests pass. ⏳ **Waiting for your manual look test** (§3) |
 | M3 – M10                         | ⬜ Not started                                                                    |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **83 tests in 12 files**).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **88 tests in 13 files**).
 `npm run build` works (≈572 kB JS, 146 kB gzipped).
 
 **Git:** M0 + M1 committed as a baseline and pushed to `https://github.com/aliemrepmk/night-orbit`
@@ -63,6 +63,7 @@ src/
     ThermalPass.ts         post: barrel, refocus blur, curve, polarity, grain, scanlines, vignette, static
     thermalMath.ts (+test) pure polarity / contrast curve / grain-by-zoom (spec for the shader)
     SensorFX.ts (+test)    weapon-switch static burst + refocus blur envelopes
+    GpuTimer.ts (+test)    GPU ms per frame via WebGL timer query (F1 stats)
   ui/
     HUD.ts                 telemetry, reticles per weapon, weapon list, clock, F1 debug stats
     hud.css                HUD + title/pause screen styles
@@ -81,7 +82,7 @@ src/
 ### Controls (current)
 
 Mouse = slew sensor · `1`/`2`/`3` = 25/40/105 mm zoom · `Q` or wheel = cycle weapon ·
-`F` = white-hot / black-hot · `Esc` = pause · `F1` = FPS / draw calls / triangles. Add `?debug=1` to the URL to start with stats on.
+`F` = white-hot / black-hot · `Esc` = pause · `F1` = FPS / GPU ms / draw calls / triangles. Add `?debug=1` to the URL to start with stats on.
 
 ---
 
@@ -112,7 +113,10 @@ Thermal tuning lives in `CONFIG.thermal` / `CONFIG.sensorFx` (`src/config.ts`) a
 ### Readability and performance
 
 - [ ] HUD text and reticles are readable in **both** polarities (they have a dark outline now).
-- [ ] `F1`: FPS ~60, draw calls well under 150 (Claude measured 49 at 25 mm, 94 at 105 mm).
+- [ ] **Aiming no longer lags** (fixed after your report, see §6). `F1`: FPS ~60, **GPU well under
+      16 ms** (Claude measured ~7.5–8 ms), draw calls well under 150 (49 at 25 mm, 90 at 105 mm).
+- [ ] Edges (roofs, tree lines) don't shimmer distractingly while the orbit turns (MSAA is off;
+      if they do, try `CONFIG.render.msaaSamples: 2` and check GPU ms in F1).
 - [ ] Aiming still feels like M1 (barrel distortion magnifies the center by ~7%; if slewing now
       feels fast, lower `CONFIG.thermal.barrel`).
 
@@ -157,12 +161,16 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 10. **Thermal order differs slightly from PLAN.md §7.5:** the contrast curve is applied _before_
     polarity (PLAN lists polarity first), so black-hot is an exact mirror of white-hot. A test
     protects this. The shader in `ThermalPass.ts` mirrors `thermalMath.ts`; change both together.
-11. **The scene renders raw heat**, not colors: a half-float render target with 4× MSAA (the
-    canvas' own antialias doesn't apply to post-processing). No lights, no fog; haze is in
+11. **The scene renders raw heat**, not colors, into a half-float render target. No lights, no fog; haze is in
     `ThermalMaterial`. `renderer.info.autoReset` is off so F1 counts calls across all passes.
 12. **Heat sources:** one material per heat value for unique meshes; per-vertex `heat` for the
     terrain; per-instance `instanceHeat` for instanced meshes (trees, windows, chimneys, later
     soldiers). Cooling curves in `fx/Heat.ts` are ready for M3/M4 (bodies, craters, wrecks).
+13. **⚠️ Render budget (`CONFIG.render`): pixel ratio capped at 1.5, MSAA off.** At 2× with 4×
+    MSAA the GPU needed ~23 ms/frame on a MacBook (budget 16.7 ms), which made aiming lag even
+    though FPS still read 60: frames queue behind the GPU. Measured GPU ms (2940×1492 vs 2205×1119):
+    2×+MSAA4 ≈ 23, 2× no MSAA ≈ 13, 1.5×+MSAA4 ≈ 16, **1.5× no MSAA ≈ 7.5**. A config test guards
+    the cap. **Always check `GPU … MS` in F1 (not just FPS) after adding render work.**
 
 ---
 
@@ -170,10 +178,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 _(Fill in after testing.)_
 
-| Date       | Item                     | Result                                                                  | Action                                        |
-| ---------- | ------------------------ | ----------------------------------------------------------------------- | --------------------------------------------- |
-| 2026-11-03 | M1 manual checklist      | User reported everything works                                          | None; M1 signed off                           |
-| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong | Added dark HUD outline; softened soil patches |
+| Date       | Item                     | Result                                                                  | Action                                                                               |
+| ---------- | ------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 2026-11-03 | M1 manual checklist      | User reported everything works                                          | None; M1 signed off                                                                  |
+| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong | Added dark HUD outline; softened soil patches                                        |
+| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                      | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
 
 ---
 
