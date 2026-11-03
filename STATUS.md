@@ -10,15 +10,16 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                           | State                                                                  |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| **M0** Project setup                | ✅ Done                                                                |
-| **M1** Gunship, sensor & terrain    | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)      |
-| **M2** Thermal look                 | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
-| M3 Weapons, ballistics & explosions | ⬜ Next                                                                |
-| M4 – M10                            | ⬜ Not started                                                         |
+| Milestone                           | State                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| **M0** Project setup                | ✅ Done                                                                           |
+| **M1** Gunship, sensor & terrain    | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                 |
+| **M2** Thermal look                 | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)            |
+| **M2+** Night-vision sensor         | ✅ Code done, tests pass, checked by Claude in Chrome. ⏳ **Your look test** (§3) |
+| M3 Weapons, ballistics & explosions | ⬜ Next                                                                           |
+| M4 – M10                            | ⬜ Not started                                                                    |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **88 tests in 13 files**).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **99 tests in 14 files**).
 `npm run build` works (≈572 kB JS, 146 kB gzipped).
 
 **Git:** M0 + M1 committed as a baseline and pushed to `https://github.com/aliemrepmk/night-orbit`
@@ -54,15 +55,16 @@ src/
     weaponDefs.ts (+test)  weapon ids + FOV per weapon (fire stats come in M3)
   fx/
     Heat.ts (+test)        heat table (PLAN §7.5) + cooling curves: bodies, craters, fire, wrecks
+    Light.ts (+test)       NV table: near-IR albedo + glow per object, ground albedo from heat
   world/
     Terrain.ts (+test)     heightmap mesh + exact heightAt()
     groundHeat.ts (+test)  soil heat field (warm/cool field patches) within the soil range
     PlaceholderWorld.ts    TEMPORARY: houses (windows, chimneys), tree lines, hot moving dummies
   render/
     Renderer.ts            WebGLRenderer + composer: heat (half-float, MSAA) → bloom → ThermalPass
-    ThermalMaterial.ts     the one shader: outputs raw heat (uniform / vertex / instance source)
+    ThermalMaterial.ts     the one shader: signature (heat, albedo, glow) → heat or NV light
     ThermalPass.ts         post: barrel, refocus blur, curve, polarity, grain, scanlines, vignette, static
-    thermalMath.ts (+test) pure polarity / contrast curve / grain-by-zoom (spec for the shader)
+    thermalMath.ts (+test) pure sensor modes, polarity, curves, NV lighting, grain (spec for shaders)
     SensorFX.ts (+test)    weapon-switch static burst + refocus blur envelopes
     GpuTimer.ts (+test)    GPU ms per frame via WebGL timer query (F1 stats)
   ui/
@@ -83,7 +85,7 @@ src/
 ### Controls (current)
 
 Mouse = slew sensor · `1`/`2`/`3` = 25/40/105 mm zoom · `Q` or wheel = cycle weapon ·
-`F` = white-hot / black-hot · `Esc` = pause · `F1` = FPS / GPU ms / draw calls / triangles. Add `?debug=1` to the URL to start with stats on.
+`F` = sensor: white-hot → black-hot → night vision · `Esc` = pause · `F1` = FPS / GPU ms / draw calls / triangles. Add `?debug=1` to the URL to start with stats on.
 
 ---
 
@@ -105,6 +107,16 @@ Thermal tuning lives in `CONFIG.thermal` / `CONFIG.sensorFx` (`src/config.ts`) a
 - [ ] **Bloom:** soldiers glow a little, not a blur. Tune `CONFIG.thermal.bloom`.
 - [ ] **Sensor texture:** grain is visible and stronger at 25 mm than at 105 mm; scanlines,
       the slow rolling band, vignette and slight barrel distortion are subtle, not distracting.
+
+### Night vision (added after M2; press `F` until the HUD shows `NV`)
+
+- [ ] NV reads as a green image-intensifier feed, clearly different from thermal.
+- [ ] Tree lines and grass fields are bright, bare-soil fields darker (reverse of thermal);
+      lit windows glow with a small halo; soldiers are hard to pick out (thermal's job).
+- [ ] Grain is heavier than thermal but the image is still readable at 25 mm.
+- [ ] Switching sensors with `F` gives the same static burst as a weapon switch.
+- [ ] Tuning: `CONFIG.nightVision` (light, gain, gamma, grain, phosphor color) and albedos/glow in
+      `src/fx/Light.ts`.
 
 ### Weapon switch
 
@@ -129,9 +141,10 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
+1. **NV look test** (§3) — the user asked for NV before M3; record results in §6.
+2. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
    added, move drag-to-aim off the left button (§5, decision 6).
-2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -171,6 +184,15 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     though FPS still read 60: frames queue behind the GPU. Measured GPU ms (2940×1492 vs 2205×1119):
     2×+MSAA4 ≈ 23, 2× no MSAA ≈ 13, 1.5×+MSAA4 ≈ 16, **1.5× no MSAA ≈ 7.5**. A config test guards
     the cap. **Always check `GPU … MS` in F1 (not just FPS) after adding render work.**
+14. **Night-vision sensor (user request, not in PLAN.md):** a real third sensor mode, not a tint.
+    Every object carries a _signature_ (heat, near-IR albedo, glow) as a uniform, per-vertex or
+    per-instance vec3; one shared uniform switches all materials. NV light = albedo × (sky + moon
+    by angle) + glow (`thermalMath.nvSurfaceLight`, mirrored in the shader). `F` cycles
+    WHT → BLK → NV and triggers the switch static. Costs ~1–2 ms GPU over thermal (8–10 ms).
+    **For M3+:** new objects need albedo + glow too (muzzle flash / fire / explosions: `GLOW`);
+    **M4:** friendly IR strobes = blinking `GLOW.irStrobe` with ~0 heat, visible only in NV.
+15. **Keys pressed before pointer lock is granted are dropped** (state is still "title" for a
+    moment after the click). Harmless; noticed while testing NV.
 
 ---
 
@@ -178,12 +200,13 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 _(Fill in after testing.)_
 
-| Date       | Item                     | Result                                                                  | Action                                                                               |
-| ---------- | ------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 2026-11-03 | M1 manual checklist      | User reported everything works                                          | None; M1 signed off                                                                  |
-| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong | Added dark HUD outline; softened soil patches                                        |
-| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                      | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
-| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                 | None; M2 signed off                                                                  |
+| Date       | Item                     | Result                                                                                   | Action                                                                               |
+| ---------- | ------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 2026-11-03 | M1 manual checklist      | User reported everything works                                                           | None; M1 signed off                                                                  |
+| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                  | Added dark HUD outline; softened soil patches                                        |
+| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                                       | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
+| 2026-11-03 | NV look (Claude, Chrome) | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light) | Flattened sky term, rebalanced moon/sky and albedos; regression test added           |
+| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                                  | None; M2 signed off                                                                  |
 
 ---
 
