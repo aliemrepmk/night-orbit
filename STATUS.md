@@ -10,14 +10,14 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                           | State                                                                             |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| **M0** Project setup                | ✅ Done                                                                           |
-| **M1** Gunship, sensor & terrain    | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                 |
-| **M2** Thermal look                 | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)            |
-| **M2+** Night-vision sensor         | ✅ Code done, tests pass, checked by Claude in Chrome. ⏳ **Your look test** (§3) |
-| M3 Weapons, ballistics & explosions | ⬜ Next                                                                           |
-| M4 – M10                            | ⬜ Not started                                                                    |
+| Milestone                           | State                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| **M0** Project setup                | ✅ Done                                                                |
+| **M1** Gunship, sensor & terrain    | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)      |
+| **M2** Thermal look                 | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
+| **M2+** Night-vision sensor         | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
+| M3 Weapons, ballistics & explosions | 🔨 In progress                                                         |
+| M4 – M10                            | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **99 tests in 14 files**).
 `npm run build` works (≈572 kB JS, 146 kB gzipped).
@@ -141,10 +141,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **NV look test** (§3) — the user asked for NV before M3; record results in §6.
-2. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
+1. **Start M3: weapons, ballistics & explosions** (PLAN.md §7.6, §7.7, §10 M3). Before firing is
    added, move drag-to-aim off the left button (§5, decision 6).
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -207,6 +206,7 @@ _(Fill in after testing.)_
 | 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                                       | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
 | 2026-11-03 | NV look (Claude, Chrome) | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light) | Flattened sky term, rebalanced moon/sky and albedos; regression test added           |
 | 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                                  | None; M2 signed off                                                                  |
+| 2026-11-03 | NV look test (user)      | Approved ("mark it signed off")                                                          | None; NV signed off                                                                  |
 
 ---
 
