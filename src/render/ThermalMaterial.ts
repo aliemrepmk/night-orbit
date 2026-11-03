@@ -20,9 +20,10 @@ export interface ThermalMaterialOptions {
 
 /**
  * Uniforms shared by every material (the same objects are referenced by all of them), so one
- * write switches the whole world between thermal and NV.
+ * write switches the whole world between thermal and NV. Other sensor shaders (particles)
+ * include them too.
  */
-const shared = (() => {
+export const SENSOR_UNIFORMS = (() => {
   const t = CONFIG.thermal;
   const nv = CONFIG.nightVision;
   return {
@@ -148,7 +149,7 @@ export class ThermalMaterial extends ShaderMaterial {
         ...(source === 'instance' ? { SIGNATURE_INSTANCE: '' } : {}),
       },
       uniforms: {
-        ...shared,
+        ...SENSOR_UNIFORMS,
         uSignature: { value: new Vector3(signature.heat, signature.albedo, signature.glow) },
         uNoise: { value: CONFIG.thermal.surfaceNoise * noise },
         uNvNoise: { value: CONFIG.nightVision.surfaceNoise * noise },
@@ -158,7 +159,7 @@ export class ThermalMaterial extends ShaderMaterial {
 
   /** Switches every ThermalMaterial between thermal (heat) and night vision (light). */
   static setNightVision(on: boolean): void {
-    shared.uNightVision.value = on ? 1 : 0;
+    SENSOR_UNIFORMS.uNightVision.value = on ? 1 : 0;
   }
 
   get heat(): number {
@@ -167,5 +168,9 @@ export class ThermalMaterial extends ShaderMaterial {
 
   setHeat(heat: number): void {
     (this.uniforms.uSignature.value as Vector3).x = heat;
+  }
+
+  setSignature(heat: number, albedo: number, glow: number): void {
+    (this.uniforms.uSignature.value as Vector3).set(heat, albedo, glow);
   }
 }

@@ -46,6 +46,10 @@ export const CONFIG = {
     jitterDeg: 0.008,
     /** Forward slew is divided by sin(depression); never divide by less than this. */
     minDepressionSin: 0.2,
+    /** Time constant of camera shake decay after an impact or a 105 mm shot. */
+    shakeTau: 0.25,
+    /** Camera kick when the 105 mm fires (the whole aircraft recoils), in degrees. */
+    recoilDeg: 0.06,
     near: 10,
     far: 6000,
   },
@@ -124,6 +128,35 @@ export const CONFIG = {
     refocusDuration: 0.4,
     /** Blur radius at the start of the refocus, in pixels. */
     refocusBlurPx: 4,
+    /** How long an impact whiteout takes to fade, in seconds. */
+    whiteoutDuration: 0.35,
+  },
+
+  gunnery: {
+    /** Where shells leave the aircraft: meters below it and toward the orbit center (left side). */
+    muzzleDrop: 6,
+    muzzleSide: 12,
+    /** Tracer streak length behind each shell, in meters, and its sprite size. */
+    tracerLength: 30,
+    tracerSize: 0.9,
+  },
+
+  fx: {
+    /** Constant wind for the mission: smoke drifts with it (m/s). */
+    wind: [1.6, 0, -0.9] as readonly [number, number, number],
+    /** Particle pool sizes (PLAN.md §11 budget: ≤ 4,000 points). */
+    hotParticles: 2600,
+    smokeParticles: 900,
+    /** Ground craters kept at once; the oldest is recycled (PLAN.md §11: ≤ 60). */
+    maxCraters: 60,
+    craterAlbedo: 0.06,
+    shockwaveDuration: 0.45,
+    /** Shockwave ring grows to blastRadius × this. */
+    shockwaveScale: 1.6,
+    /** Camera shake fades to zero this many blast radii away from the aim point. */
+    shakeReach: 6,
+    /** Whiteout scales with how much of the view the blast fills (× this). */
+    whiteoutReach: 6,
   },
 } as const;
 
