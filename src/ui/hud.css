@@ -1,7 +1,7 @@
 :root {
   --hud: #f2f2f2;
   --hud-dim: rgba(242, 242, 242, 0.55);
-  --shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  --shadow: 0 0 1px #000, 0 0 2px #000, 0 0 5px rgba(0, 0, 0, 0.7);
   --font: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
@@ -85,7 +85,7 @@ body {
   fill: none;
   stroke: var(--hud);
   stroke-width: 1.4;
-  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
 }
 
 .reticle .fill {
@@ -97,7 +97,7 @@ body {
   position: absolute;
   top: 50%;
   right: 24px;
-  color: var(--hud-dim);
+  color: var(--hud);
 }
 
 /* ---------- Title / pause screen ---------- */
