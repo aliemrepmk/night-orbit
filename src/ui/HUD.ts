@@ -1,4 +1,5 @@
-import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
+import { WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
+import { gunLine, type GunReadout } from './hudFormat';
 
 export interface HudData {
   altitude: number;
@@ -10,11 +11,19 @@ export interface HudData {
   aimZ: number;
   fov: number;
   weapon: WeaponId;
+  /** Ammo / heat / reload state of every gun. */
+  guns: Readonly<Record<WeaponId, GunReadout>>;
   /** Sensor mode label: "WHT HOT", "BLK HOT" or "NV". */
   sensorMode: string;
   clock: number;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
-  debug?: { fps: number; gpuMs: number | null; calls: number; triangles: number } | null;
+  debug?: {
+    fps: number;
+    gpuMs: number | null;
+    calls: number;
+    triangles: number;
+    kills: number;
+  } | null;
 }
 
 const RETICLES: Record<WeaponId, string> = {
@@ -86,12 +95,7 @@ export class HUD {
     this.set('pol', d.sensorMode);
     this.set('fov', `FOV ${d.fov.toFixed(1)}`);
     this.set('clock', clock(d.clock));
-    this.set(
-      'weapons',
-      WEAPON_ORDER.map((id) =>
-        id === d.weapon ? `[${WEAPONS[id].label}]` : ` ${WEAPONS[id].label} `,
-      ).join(' '),
-    );
+    this.set('weapons', WEAPON_ORDER.map((id) => gunLine(d.guns[id], id === d.weapon)).join('\n'));
 
     if (this.reticleWeapon !== d.weapon) {
       this.reticleWeapon = d.weapon;
@@ -102,7 +106,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K`
+        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}`
         : '',
     );
   }

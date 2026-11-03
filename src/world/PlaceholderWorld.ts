@@ -13,33 +13,38 @@ import {
   Vector3,
 } from 'three';
 import { createRng, range, type Rng } from '../core/rng';
-import { HEAT } from '../fx/Heat';
+import type { Effects } from '../fx/Effects';
+import { FIRE, HEAT } from '../fx/Heat';
 import { ALBEDO, GLOW, groundAlbedo, signature, type Signature } from '../fx/Light';
 import { ThermalMaterial } from '../render/ThermalMaterial';
+import type { Collision } from './Collision';
+import { DummyTarget } from './DummyTarget';
 import { createGroundHeat } from './groundHeat';
 import type { Terrain } from './Terrain';
+
+/** A dummy plus the meshes/materials that draw it. */
+interface DummyView {
+  target: DummyTarget;
+  obj: Object3D;
+  body: ThermalMaterial;
+  engine?: ThermalMaterial;
+}
 
 const MAX_WINDOWS = 160;
 const MAX_CHIMNEYS = 40;
 
 /**
  * TEMPORARY content so there is something to aim at: a cluster of houses, a farm,
- * tree lines and a few moving "dummy" targets. M6 replaces this with the handcrafted map.
+ * tree lines and a few moving "dummy" targets you can shoot (M3). M4 replaces the dummies with
+ * real units and M6 replaces the rest with the handcrafted map.
  * Every object has a signature: heat for thermal (`fx/Heat.ts`, PLAN.md §7.5) and near-IR
  * albedo + glow for night vision (`fx/Light.ts`).
  */
 export class PlaceholderWorld {
   readonly root = new Group();
-  private readonly walkers: {
-    obj: Object3D;
-    lift: number;
-    cx: number;
-    cz: number;
-    r: number;
-    speed: number;
-    phase: number;
-  }[] = [];
-  private time = 0;
+  /** Everything the guns can hurt. */
+  readonly targets: DummyTarget[] = [];
+  private readonly dummies: DummyView[] = [];
 
   private readonly wallMat = new ThermalMaterial({
     signature: signature(HEAT.wall, ALBEDO.wall),
@@ -58,7 +63,10 @@ export class PlaceholderWorld {
     0.5,
   );
 
-  constructor(private readonly terrain: Terrain) {
+  constructor(
+    private readonly terrain: Terrain,
+    private readonly collision: Collision,
+  ) {
     const rng = createRng(2024);
 
     const geo = terrain.buildGeometry();
@@ -81,14 +89,28 @@ export class PlaceholderWorld {
     this.addDummies(rng);
   }
 
-  update(dt: number): void {
-    this.time += dt;
-    for (const w of this.walkers) {
-      const a = w.phase + (this.time * w.speed) / w.r;
-      const x = w.cx + Math.cos(a) * w.r;
-      const z = w.cz + Math.sin(a) * w.r;
-      w.obj.position.set(x, this.terrain.heightAt(x, z) + w.lift, z);
-      w.obj.rotation.y = -a; // local +z faces the direction of travel
+  update(dt: number, effects: Effects): void {
+    for (const d of this.dummies) {
+      const t = d.target;
+      t.update(dt);
+      d.obj.position.copy(t.position);
+      d.obj.rotation.set(0, t.heading, 0);
+      if (t.kind === 'infantry') {
+        // Death reaction: tumble while flung, then lie flat.
+        if (t.state === 'flung') d.obj.rotation.x = t.tumble;
+        if (t.state === 'down') d.obj.rotation.x = Math.PI / 2;
+        d.body.setHeat(t.heat);
+      } else {
+        const fire = t.burning ? (t.heat - FIRE.min) / (FIRE.max - FIRE.min) : 0;
+        d.body.setSignature(
+          t.heat,
+          t.alive ? ALBEDO.vehicleBody : 0.08,
+          t.burning ? 0.6 * fire : 0,
+        );
+        d.engine?.setHeat(t.alive ? HEAT.engine : t.heat);
+        if (t.burning) effects.fire(t.position, dt);
+        else if (t.smoking || !t.alive) effects.smokePuff(t.position, dt, t.alive ? 1 : 0.3);
+      }
     }
   }
 
@@ -119,6 +141,14 @@ export class PlaceholderWorld {
       roof.position.y = wallH + roof.scale.y / 2;
       house.add(roof);
       this.root.add(house);
+
+      // Collision box: walls plus most of the roof (shells land on roofs, not inside them).
+      const boxH = wallH + roof.scale.y * 0.6;
+      this.collision.addBox({
+        center: new Vector3(x, y + boxH / 2, z),
+        half: new Vector3(w / 2, boxH / 2, d / 2),
+        rotY: house.rotation.y,
+      });
 
       // Windows on the long walls; some rooms are dark (unheated).
       const windowY = 1.5 + h * 0.55;
@@ -182,54 +212,64 @@ export class PlaceholderWorld {
     this.root.add(trees.finish());
   }
 
-  /** Hot moving shapes: stand-ins for soldiers and vehicles to practice tracking. */
+  /** Hot moving targets: stand-ins for soldiers and trucks to practice leading shots. */
   private addDummies(rng: Rng): void {
-    const soldierMat = new ThermalMaterial({
-      signature: signature(HEAT.soldier, ALBEDO.soldier),
-      noise: 0.3,
-    });
-    const bodyMat = new ThermalMaterial({
-      signature: signature(HEAT.vehicleBody, ALBEDO.vehicleBody),
-    });
-    const engineMat = new ThermalMaterial({
-      signature: signature(HEAT.engine, ALBEDO.vehicleBody),
-      noise: 0.3,
-    });
+    const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
     const soldierGeo = new CapsuleGeometry(0.45, 1.2, 3, 6);
     const truckGeo = new BoxGeometry(2.4, 2.4, 6);
     const engineGeo = new BoxGeometry(2.0, 0.6, 1.4);
 
-    const spawn = (
-      obj: Object3D,
-      lift: number,
-      cx: number,
-      cz: number,
-      r: number,
-      speed: number,
-    ) => {
-      this.root.add(obj);
-      this.walkers.push({ obj, lift, cx, cz, r, speed, phase: range(rng, 0, Math.PI * 2) });
-    };
     for (let k = 0; k < 12; k++) {
-      const soldier = new Mesh(soldierGeo, soldierMat);
-      soldier.scale.setScalar(1.3); // 1.3× size so they read at 105 mm (M1 sign-off)
-      spawn(
-        soldier,
+      const target = new DummyTarget(
+        'infantry',
+        {
+          cx: range(rng, -120, 120),
+          cz: range(rng, -120, 120),
+          r: range(rng, 10, 40),
+          speed: range(rng, 1.2, 2.5),
+          phase: range(rng, 0, Math.PI * 2),
+        },
+        ground,
         1.1 * 1.3,
-        range(rng, -120, 120),
-        range(rng, -120, 120),
-        range(rng, 10, 40),
-        range(rng, 1.2, 2.5),
       );
+      // Each soldier has its own material so it can cool down on its own when killed.
+      const body = new ThermalMaterial({
+        signature: signature(HEAT.soldier, ALBEDO.soldier),
+        noise: 0.3,
+      });
+      const mesh = new Mesh(soldierGeo, body);
+      mesh.scale.setScalar(1.3); // 1.3× size so they read at 105 mm (M1 sign-off)
+      this.addDummy({ target, obj: mesh, body });
     }
+
     for (let k = 0; k < 2; k++) {
+      const target = new DummyTarget(
+        'vehicle',
+        { cx: 0, cz: 0, r: 180 + k * 60, speed: 9, phase: range(rng, 0, Math.PI * 2) },
+        ground,
+        1.2,
+        k + 1,
+      );
+      const body = new ThermalMaterial({
+        signature: signature(HEAT.vehicleBody, ALBEDO.vehicleBody),
+      });
+      const engine = new ThermalMaterial({
+        signature: signature(HEAT.engine, ALBEDO.vehicleBody),
+        noise: 0.3,
+      });
       const truck = new Group();
-      truck.add(new Mesh(truckGeo, bodyMat));
-      const engine = new Mesh(engineGeo, engineMat); // hot engine block under the hood
-      engine.position.set(0, 1.25, 2.1);
-      truck.add(engine);
-      spawn(truck, 1.2, 0, 0, 180 + k * 60, 9);
+      truck.add(new Mesh(truckGeo, body));
+      const block = new Mesh(engineGeo, engine); // hot engine block under the hood
+      block.position.set(0, 1.25, 2.1);
+      truck.add(block);
+      this.addDummy({ target, obj: truck, body, engine });
     }
+  }
+
+  private addDummy(d: DummyView): void {
+    this.dummies.push(d);
+    this.targets.push(d.target);
+    this.root.add(d.obj);
   }
 }
 

@@ -139,6 +139,13 @@ export const CONFIG = {
     /** Tracer streak length behind each shell, in meters, and its sprite size. */
     tracerLength: 30,
     tracerSize: 0.9,
+    /**
+     * Tracers aren't drawn within this distance of the sensor (it's focused on the ground ~1 km
+     * away), and never larger than `tracerMaxPx` device pixels. Without this, the first meters
+     * of each tracer filled the screen as huge white blobs.
+     */
+    tracerMinRange: 150,
+    tracerMaxPx: 7,
   },
 
   fx: {

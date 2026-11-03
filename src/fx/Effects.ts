@@ -43,7 +43,7 @@ export class Effects {
   readonly smoke: Particles;
   private readonly hotLayer: PointLayer;
   private readonly smokeLayer: PointLayer;
-  private readonly tracerLayer = new PointLayer(1024, true);
+  private readonly tracerLayer = new PointLayer(1024, true, CONFIG.gunnery.tracerMaxPx);
 
   private readonly craterMesh: InstancedMesh;
   private readonly craterSig: Float32Array;
@@ -176,14 +176,14 @@ export class Effects {
         life: range(rng, 8, 15),
         size0: fx.smokeSize * 0.35,
         size1: fx.smokeSize * range(rng, 0.9, 1.4),
-        heat0: 0.5,
-        heat1: 0.14,
+        heat0: 0.65, // warm plume that stays readable for seconds, then cools into the air
+        heat1: 0.18,
         glow0: 0,
         glow1: 0,
         albedo: 0.28,
         gravity: -0.15,
         drag: 0.35,
-        alpha: 0.5,
+        alpha: 0.65,
       });
     }
 
@@ -310,11 +310,12 @@ export class Effects {
 
   /**
    * Per rendered frame: refreshes the sprite buffers. `tracers` gives each visible shell's head
-   * position and flight direction.
+   * position and flight direction; `eye` is the sensor position (close tracer points are skipped).
    */
   sync(
     heightPx: number,
     fovDeg: number,
+    eye: Vector3,
     tracers: (emit: (head: Vector3, dir: Vector3) => void) => void,
   ): void {
     for (const layer of [this.hotLayer, this.smokeLayer, this.tracerLayer]) {
@@ -324,21 +325,20 @@ export class Effects {
     this.hotLayer.pushParticles(this.hot);
     this.smokeLayer.pushParticles(this.smoke);
 
-    const { tracerLength, tracerSize } = CONFIG.gunnery;
+    const { tracerLength, tracerSize, tracerMinRange } = CONFIG.gunnery;
+    const minSq = tracerMinRange * tracerMinRange;
     const segments = 6;
     tracers((head, dir) => {
       for (let k = 0; k < segments; k++) {
         const f = k / (segments - 1);
-        this.tracerLayer.push(
-          head.x - dir.x * tracerLength * f,
-          head.y - dir.y * tracerLength * f,
-          head.z - dir.z * tracerLength * f,
-          tracerSize * (1 - 0.6 * f),
-          1,
-          0,
-          1 - 0.7 * f,
-          1 - 0.8 * f,
-        );
+        const x = head.x - dir.x * tracerLength * f;
+        const y = head.y - dir.y * tracerLength * f;
+        const z = head.z - dir.z * tracerLength * f;
+        const dx = x - eye.x;
+        const dy = y - eye.y;
+        const dz = z - eye.z;
+        if (dx * dx + dy * dy + dz * dz < minSq) continue;
+        this.tracerLayer.push(x, y, z, tracerSize * (1 - 0.6 * f), 1, 0, 1 - 0.7 * f, 1 - 0.8 * f);
       }
     });
     for (const layer of [this.hotLayer, this.smokeLayer, this.tracerLayer]) layer.end();
@@ -351,6 +351,11 @@ export class Effects {
   /** Heat of crater slot `i` (for tests / debug). */
   craterHeat(i: number): number {
     return this.craterSig[i * 3];
+  }
+
+  /** Tracer sprites drawn in the last `sync` (for tests / debug). */
+  get tracerSprites(): number {
+    return this.tracerLayer.count;
   }
 
   get particleCount(): number {

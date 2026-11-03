@@ -56,4 +56,16 @@ describe('Effects', () => {
     }
     expect(fx.particleCount).toBeLessThanOrEqual(CONFIG.fx.hotParticles + CONFIG.fx.smokeParticles);
   });
+
+  it('does not draw tracers right next to the sensor (regression: huge white blobs)', () => {
+    const fx = new Effects(flat, createRng(6));
+    const eye = new Vector3(0, 700, 0);
+    const dir = new Vector3(1, -1, 0).normalize();
+    const near = eye.clone().addScaledVector(dir, 20);
+    const far = eye.clone().addScaledVector(dir, 800);
+    fx.sync(1000, 5, eye, (emit) => emit(near, dir));
+    expect(fx.tracerSprites).toBe(0);
+    fx.sync(1000, 5, eye, (emit) => emit(far, dir));
+    expect(fx.tracerSprites).toBe(6);
+  });
 });

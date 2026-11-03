@@ -15,13 +15,14 @@ const vertexShader = /* glsl */ `
   attribute vec3 aSig;   // (heat, albedo, glow)
   attribute float aAlpha;
   uniform float uScale;  // pixels per meter at 1 m distance
+  uniform float uMaxPx;  // largest allowed sprite, in device pixels
   varying vec3 vSig;
   varying float vAlpha;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
     // Never smaller than 2 px, so distant tracers and sparks stay visible.
-    gl_PointSize = max(2.0, aSize * uScale / -mv.z);
+    gl_PointSize = clamp(aSize * uScale / -mv.z, 2.0, uMaxPx);
     vSig = aSig;
     vAlpha = aAlpha;
   }
@@ -58,9 +59,11 @@ export class PointLayer {
   private readonly mat: ShaderMaterial;
   private n = 0;
 
+  /** `maxPx` caps sprite size on screen (tracers stay thin even right next to the camera). */
   constructor(
     readonly capacity: number,
     additive: boolean,
+    maxPx = 4096,
   ) {
     this.pos = new Float32Array(capacity * 3);
     this.size = new Float32Array(capacity);
@@ -77,7 +80,7 @@ export class PointLayer {
     this.mat = new ShaderMaterial({
       vertexShader,
       fragmentShader,
-      uniforms: { ...SENSOR_UNIFORMS, uScale: { value: 1 } },
+      uniforms: { ...SENSOR_UNIFORMS, uScale: { value: 1 }, uMaxPx: { value: maxPx } },
       transparent: true,
       depthWrite: false,
       blending: additive ? AdditiveBlending : NormalBlending,
