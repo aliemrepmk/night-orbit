@@ -1,0 +1,163 @@
+:root {
+  --hud: #f2f2f2;
+  --hud-dim: rgba(242, 242, 242, 0.55);
+  --shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  --font: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--hud);
+  font-family: var(--font);
+}
+
+#view {
+  position: fixed;
+  inset: 0;
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-size: clamp(11px, 1.15vw, 15px);
+  letter-spacing: 0.08em;
+  text-shadow: var(--shadow);
+  user-select: none;
+}
+
+.hud-row {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.hud-row.top {
+  top: 20px;
+}
+
+.hud-row.bottom {
+  bottom: 20px;
+  align-items: end;
+}
+
+.hud-block > div {
+  line-height: 1.5;
+}
+
+.hud-block.center {
+  text-align: center;
+}
+
+.hud-block.right {
+  text-align: right;
+}
+
+[data-k='weapons'] {
+  white-space: pre;
+}
+
+.reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(36vh, 360px);
+  height: min(36vh, 360px);
+  transform: translate(-50%, -50%);
+  fill: none;
+  stroke: var(--hud);
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+}
+
+.reticle .fill {
+  fill: var(--hud);
+  stroke: none;
+}
+
+.hud-debug {
+  position: absolute;
+  top: 50%;
+  right: 24px;
+  color: var(--hud-dim);
+}
+
+/* ---------- Title / pause screen ---------- */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  padding: 16px;
+}
+
+.panel {
+  text-align: center;
+  max-width: 520px;
+}
+
+.panel h1 {
+  margin: 0 0 8px;
+  font-size: clamp(32px, 7vw, 64px);
+  letter-spacing: 0.3em;
+  font-weight: 600;
+}
+
+.panel p {
+  margin: 0 0 24px;
+  color: var(--hud-dim);
+  letter-spacing: 0.15em;
+}
+
+.panel .cta {
+  color: var(--hud);
+  animation: blink 1.2s steps(2) infinite;
+}
+
+.controls {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--hud-dim);
+}
+
+.controls td {
+  padding: 3px 12px;
+  text-align: left;
+}
+
+.controls td:first-child {
+  color: var(--hud);
+  text-align: right;
+}
+
+.screen[data-state='title'] .only-paused,
+.screen[data-state='paused'] .only-title {
+  display: none;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}

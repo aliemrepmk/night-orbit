@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Night Orbit</title>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="hud" class="hidden"></div>
+    <div id="screen" class="screen" data-state="title">
+      <div class="panel">
+        <h1>NIGHT ORBIT</h1>
+        <p class="only-title">Gunship overwatch · Varesh Valley</p>
+        <p class="only-paused">PAUSED</p>
+        <p class="cta">
+          <span class="only-title">CLICK TO BEGIN</span>
+          <span class="only-paused">CLICK TO RESUME</span>
+        </p>
+        <table class="controls">
+          <tr>
+            <td>MOUSE</td>
+            <td>Slew sensor</td>
+          </tr>
+          <tr>
+            <td>1 / 2 / 3</td>
+            <td>25 mm / 40 mm / 105 mm</td>
+          </tr>
+          <tr>
+            <td>Q · WHEEL</td>
+            <td>Cycle weapon</td>
+          </tr>
+          <tr>
+            <td>ESC</td>
+            <td>Pause</td>
+          </tr>
+          <tr>
+            <td>F1</td>
+            <td>Debug stats</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
