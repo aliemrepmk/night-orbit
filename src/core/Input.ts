@@ -2,7 +2,8 @@
  * Mouse + keyboard input.
  *
  * Aiming uses Pointer Lock (raw mouse deltas, no cursor). If the browser refuses pointer lock,
- * we fall back to "drag mode": hold the left button and drag to aim.
+ * we fall back to "drag mode": hold the RIGHT button and drag to aim. The left button always
+ * fires (held = trigger held, each press = one click), so the two never conflict.
  *
  * Deltas and key presses accumulate between frames; the game consumes them once per frame.
  */
@@ -12,7 +13,11 @@ export class Input {
   private wheelSteps = 0;
   private readonly pressed = new Set<string>();
   private readonly held = new Set<string>();
-  private mouseHeld = false;
+  /** Left button: the trigger. */
+  private fireHeld = false;
+  private fireClicks = 0;
+  /** Right button: drag-to-aim in drag mode. */
+  private aimDragHeld = false;
 
   locked = false;
   dragMode = false;
@@ -27,16 +32,25 @@ export class Input {
     document.addEventListener('pointerlockerror', () => this.enableDragMode());
 
     window.addEventListener('mousemove', (e) => {
-      if (this.locked || (this.dragMode && this.mouseHeld)) {
+      if (this.locked || (this.dragMode && this.aimDragHeld)) {
         this.dx += e.movementX;
         this.dy += e.movementY;
       }
     });
     window.addEventListener('mousedown', (e) => {
-      if (e.button === 0) this.mouseHeld = true;
+      if (e.button === 0) {
+        this.fireHeld = true;
+        this.fireClicks++;
+      }
+      if (e.button === 2) this.aimDragHeld = true;
     });
     window.addEventListener('mouseup', (e) => {
-      if (e.button === 0) this.mouseHeld = false;
+      if (e.button === 0) this.fireHeld = false;
+      if (e.button === 2) this.aimDragHeld = false;
+    });
+    // The right button aims in drag mode; never open the browser's context menu over the game.
+    window.addEventListener('contextmenu', (e) => {
+      if (this.locked || this.dragMode) e.preventDefault();
     });
     window.addEventListener(
       'wheel',
@@ -56,7 +70,8 @@ export class Input {
     window.addEventListener('keyup', (e) => this.held.delete(e.code));
     window.addEventListener('blur', () => {
       this.held.clear();
-      this.mouseHeld = false;
+      this.fireHeld = false;
+      this.aimDragHeld = false;
     });
   }
 
@@ -98,8 +113,16 @@ export class Input {
     return this.held.has(code);
   }
 
-  get isMouseHeld(): boolean {
-    return this.mouseHeld;
+  /** True while the trigger (left button) is held down. */
+  get isFireHeld(): boolean {
+    return this.fireHeld;
+  }
+
+  /** Returns and clears the number of trigger presses since the last call. */
+  consumeFireClicks(): number {
+    const n = this.fireClicks;
+    this.fireClicks = 0;
+    return n;
   }
 
   /** Clears per-frame state that nobody consumed. */
@@ -110,7 +133,7 @@ export class Input {
   private enableDragMode(): void {
     if (this.dragMode) return;
     this.dragMode = true;
-    console.warn('[input] Pointer lock unavailable: hold the left mouse button and drag to aim.');
+    console.warn('[input] Pointer lock unavailable: hold the right mouse button and drag to aim.');
     this.onLockChange(true);
   }
 }
