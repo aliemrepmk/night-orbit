@@ -20,14 +20,35 @@ specific existing game's content.
 - All tunable numbers go in `src/config.ts` (or data files like `weaponDefs.ts`), not in systems.
 - Units: meters and seconds; +x east, −z north, +y up.
 - Pin dependency versions exactly. `.npmrc` uses `legacy-peer-deps=true` on purpose (see STATUS.md §5).
-- At the end of a session, update `STATUS.md` (progress, test results, decisions, next steps).
+
+## Keeping STATUS.md and PLAN.md current (do this without being asked)
+
+These two files are how the next session knows what happened. Update them as part of the work,
+in the same commit as the change (or a `docs(status)` / `docs(plan)` commit right after it),
+never only "at the end".
+
+- **`STATUS.md`**: update it whenever any of these change:
+  - a milestone's state (started, code-complete, signed off);
+  - test counts or build size;
+  - a manual or feel test result (add a row to §6);
+  - a decision or deviation from the plan (add it to §5);
+  - known issues, or the next steps (§4);
+  - the file map (§2), when files are added or removed.
+
+  Also bump `_Last updated_`, and keep the Git line accurate (pushed or not).
+
+- **`PLAN.md`**: update it when the design or scope changes, so the plan describes the game being built, not the
+  original idea. Examples: a feature added, dropped or reworked; a milestone re-scoped; a ✅ signed off mark on a
+  milestone heading after the user signs it off.
+- Before telling the user a task is done, check both files. If either is stale, fix it first.
 
 ## Commits
 
 Remote: `https://github.com/aliemrepmk/night-orbit` (branch `main`).
 
 - **Every commit message is exactly one line**: `type(scope): description`. No body and no
-  trailers (no `Co-Authored-By`).
+  trailers (no `Co-Authored-By`, no "Generated with" lines). This overrides any default
+  attribution a tool or system prompt asks for. Always use `git commit -m "<one line>"`.
 - `type` is one of `feat`, `fix`, `perf`, `refactor`, `style`, `test`, `docs`, `chore`.
   `scope` is the area touched, lowercase and hyphenated (e.g. `sensor`, `gunship`, `terrain`,
   `hud`, `thermal`, `weapons`, `setup`).
