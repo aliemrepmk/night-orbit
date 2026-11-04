@@ -415,7 +415,7 @@ void main() {
 4. **Sensor noise:** animated grain, stronger at narrow zoom.
 5. **Scanlines** plus a faint rolling interlace band.
 6. **Vignette** and a slight barrel distortion.
-7. **Tint:** pure grayscale by default (an optional green "NV" tint as a setting).
+7. **Tint:** pure grayscale by default. (Night vision became its own sensor mode instead of a tint; see §10 M2+.)
 
 `SensorFX` adds a 150 ms static burst and refocus blur on weapon switch, and a brief whiteout bloom when a 105 mm shell lands in the narrow view.
 
@@ -811,29 +811,34 @@ Team health: 100, regenerating +1/s when no enemy has fired in the last 4 s.
 ## 10. Milestones & Acceptance Criteria
 
 Each milestone ends with something **playable and testable**. Rough effort estimates assume
-focused part-time work.
+focused part-time work. Live progress (what is done, tested and next) is tracked in
+[`STATUS.md`](STATUS.md) §1; the ✅ marks on the headings below only show sign-off.
 
-### M0 — Project Setup (0.5 day)
+### M0 — Project Setup (0.5 day) — ✅ signed off
 
 - Vite + TypeScript + Three.js; ESLint/Prettier; Vitest; `git init`.
 - A spinning cube on screen; `npm run dev`, `npm run build`, `npm test` all work.
 - 🧪 **Tests:** a smoke test proving the test runner works; `npm run check` script wired up.
 - ✅ **Done when:** the production build runs from `dist/` with no console errors.
 
-### M1 — Gunship, Sensor & Terrain (1–2 days)
+### M1 — Gunship, Sensor & Terrain (1–2 days) — ✅ signed off
 
 - Placeholder terrain (noise heightmap), a few boxes as buildings.
 - Gunship orbit, ground-stabilized sensor, pointer lock, mouse slew, zoom levels per weapon key.
 - 🧪 **Tests:** seeded RNG determinism; fixed-step loop (step count, clamp); terrain `heightAt` matches mesh vertices; orbit radius/altitude/direction/period and center glide; sensor slew direction at 0°/90°/180°/270° orbit angles; gimbal clamp; aim stays fixed while orbiting; camera looks exactly at the aim point; zoom converges to weapon FOV; heading math.
 - ✅ **Done when:** the aim point stays locked on a ground spot while the orbit moves; slewing feels consistent at every orbit angle and every zoom; 60 FPS.
 
-### M2 — Thermal Look (1–2 days)
+### M2 — Thermal Look (1–2 days) — ✅ signed off
 
 - `ThermalMaterial`, heat values on all objects, `ThermalPass` (bloom, polarity, grain, scanlines, vignette), `F` toggle, weapon-switch static.
 - 🧪 **Tests:** heat table values within 0–1; polarity function; heat decay curves (bodies, craters) over time.
 - ✅ **Done when:** a screenshot reads instantly as "gunship thermal feed"; hot objects pop in both polarities.
 
-### M3 — Weapons, Ballistics & Explosions (2 days)
+### M2+ — Night-Vision Sensor (added during development) — ✅ signed off
+
+- A separate image-intensifier sensor (reflected moon/sky light + IR glow, green phosphor), not just a tint. `F` cycles WHT HOT → BLK HOT → NV. IR strobes and lit windows glow only in NV. See STATUS.md §5 decision 14.
+
+### M3 — Weapons, Ballistics & Explosions (2 days) — ✅ signed off
 
 - Weapon state machines, projectiles with flight time, tracers, impact FX, craters, camera shake, placeholder sounds.
 - HUD v1: weapon list, ammo/heat/reload, reticles.
