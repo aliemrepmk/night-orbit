@@ -1,6 +1,6 @@
 # NIGHT ORBIT — Project Status & Handoff
 
-_Last updated: 2026-11-03_
+_Last updated: 2026-11-04_
 
 This file says **where the project is right now**, **what needs testing**, and **what comes next**.
 The full design and milestone list are in [`PLAN.md`](PLAN.md). Update this file at the end of
@@ -10,24 +10,24 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                               | State                                                                               |
-| --------------------------------------- | ----------------------------------------------------------------------------------- |
-| **M0** Project setup                    | ✅ Done                                                                             |
-| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                   |
-| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)              |
-| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                               |
-| **M3** Weapons, ballistics & explosions | ✅ Code done, tests pass, checked by Claude in Chrome. ⏳ **Your feel test** (§3.1) |
-| M4 – M10                                | ⬜ Not started                                                                      |
+| Milestone                               | State                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------- |
+| **M0** Project setup                    | ✅ Done                                                                |
+| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)      |
+| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
+| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
+| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
+| M4 Infantry & friendlies                | ⬜ Next                                                                |
+| M5 – M10                                | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **174 tests in 26 files**).
 `npm run build` works (≈604 kB JS, 156 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M2 + NV are pushed; M3 is
-committed locally (push with `git push`). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). Everything through M3 is pushed. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
-≤ 100 draw calls) and by a scripted lead test in the real game (§6). Still needs your feel test.
+≤ 100 draw calls) and by a scripted lead test in the real game (§6). Feel test passed (user, 2026-11-04).
 
 ---
 
@@ -110,7 +110,7 @@ right button and drag** to aim. Add `?debug=1` to the URL to start with stats on
 
 ## 3. Manual checklists
 
-### 3.1 M3 feel test (now)
+### 3.1 M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
 
 Run `npm run dev`, open the URL, click to begin, press `F1`. Weapon numbers are in
 `src/gunship/weaponDefs.ts` (stats + impact effects); feedback/effects tuning in `CONFIG.sensor`
@@ -183,12 +183,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M3 feel test** (§3.1); tune `weaponDefs.ts` / `config.ts` from your notes.
-2. **Start M4: infantry & friendlies** (PLAN.md §7.8, §7.9, §10 M4): replace `DummyTarget` with real
+1. **Start M4: infantry & friendlies** (PLAN.md §7.8, §7.9, §10 M4): replace `DummyTarget` with real
    infantry (one InstancedMesh per pose, per-instance signature), the Ridgeback team with IR
    strobes (NV-only glow), friendly-fire and danger-close checks (`dangerClose` radii are already
    in `weaponDefs.ts`).
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -258,17 +257,18 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 _(Fill in after testing.)_
 
-| Date       | Item                     | Result                                                                                   | Action                                                                               |
-| ---------- | ------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 2026-11-03 | M1 manual checklist      | User reported everything works                                                           | None; M1 signed off                                                                  |
-| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                  | Added dark HUD outline; softened soil patches                                        |
-| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                                       | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1 |
-| 2026-11-03 | NV look (Claude, Chrome) | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light) | Flattened sky term, rebalanced moon/sky and albedos; regression test added           |
-| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                                  | None; M2 signed off                                                                  |
-| 2026-11-03 | NV look test (user)      | Approved ("mark it signed off")                                                          | None; NV signed off                                                                  |
-| 2026-11-03 | M3 tracers (Claude)      | First meters of each tracer drew as huge white blobs near the camera                     | Skip < 150 m from sensor, cap 7 px; regression test                                  |
-| 2026-11-03 | M3 smoke (Claude)        | 105 mm smoke too faint to read after the flash                                           | Warmer, more opaque plume                                                            |
-| 2026-11-03 | M3 lead test (scripted)  | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                 | Leading matters as intended; 105 mm led on a truck destroyed it (burning)            |
+| Date       | Item                     | Result                                                                                   | Action                                                                                                         |
+| ---------- | ------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 2026-11-03 | M1 manual checklist      | User reported everything works                                                           | None; M1 signed off                                                                                            |
+| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                  | Added dark HUD outline; softened soil patches                                                                  |
+| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                                       | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
+| 2026-11-03 | NV look (Claude, Chrome) | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light) | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
+| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                                  | None; M2 signed off                                                                                            |
+| 2026-11-03 | NV look test (user)      | Approved ("mark it signed off")                                                          | None; NV signed off                                                                                            |
+| 2026-11-03 | M3 tracers (Claude)      | First meters of each tracer drew as huge white blobs near the camera                     | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
+| 2026-11-03 | M3 smoke (Claude)        | 105 mm smoke too faint to read after the flash                                           | Warmer, more opaque plume                                                                                      |
+| 2026-11-03 | M3 lead test (scripted)  | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                 | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
+| 2026-11-04 | M3 feel test (user)      | "M3 seems to be working well"; signed off                                                | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
 
 ---
 
@@ -276,6 +276,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Here are my M3 test results: … Then let's start M4."
+> "Read STATUS.md and PLAN.md. Let's start M4."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
