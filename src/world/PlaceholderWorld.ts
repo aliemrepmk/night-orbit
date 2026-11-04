@@ -1,7 +1,6 @@
 import {
   BoxGeometry,
   BufferAttribute,
-  CapsuleGeometry,
   ConeGeometry,
   Group,
   InstancedBufferAttribute,
@@ -22,12 +21,12 @@ import { DummyTarget } from './DummyTarget';
 import { createGroundHeat } from './groundHeat';
 import type { Terrain } from './Terrain';
 
-/** A dummy plus the meshes/materials that draw it. */
+/** A dummy truck plus the meshes/materials that draw it. */
 interface DummyView {
   target: DummyTarget;
   obj: Object3D;
   body: ThermalMaterial;
-  engine?: ThermalMaterial;
+  engine: ThermalMaterial;
 }
 
 const MAX_WINDOWS = 160;
@@ -35,8 +34,8 @@ const MAX_CHIMNEYS = 40;
 
 /**
  * TEMPORARY content so there is something to aim at: a cluster of houses, a farm,
- * tree lines and a few moving "dummy" targets you can shoot (M3). M4 replaces the dummies with
- * real units and M6 replaces the rest with the handcrafted map.
+ * tree lines and two dummy trucks you can shoot. Soldiers are real units since M4
+ * (`units/`); M5 replaces the trucks and M6 replaces the rest with the handcrafted map.
  * Every object has a signature: heat for thermal (`fx/Heat.ts`, PLAN.md §7.5) and near-IR
  * albedo + glow for night vision (`fx/Light.ts`).
  */
@@ -95,22 +94,11 @@ export class PlaceholderWorld {
       t.update(dt);
       d.obj.position.copy(t.position);
       d.obj.rotation.set(0, t.heading, 0);
-      if (t.kind === 'infantry') {
-        // Death reaction: tumble while flung, then lie flat.
-        if (t.state === 'flung') d.obj.rotation.x = t.tumble;
-        if (t.state === 'down') d.obj.rotation.x = Math.PI / 2;
-        d.body.setHeat(t.heat);
-      } else {
-        const fire = t.burning ? (t.heat - FIRE.min) / (FIRE.max - FIRE.min) : 0;
-        d.body.setSignature(
-          t.heat,
-          t.alive ? ALBEDO.vehicleBody : 0.08,
-          t.burning ? 0.6 * fire : 0,
-        );
-        d.engine?.setHeat(t.alive ? HEAT.engine : t.heat);
-        if (t.burning) effects.fire(t.position, dt);
-        else if (t.smoking || !t.alive) effects.smokePuff(t.position, dt, t.alive ? 1 : 0.3);
-      }
+      const fire = t.burning ? (t.heat - FIRE.min) / (FIRE.max - FIRE.min) : 0;
+      d.body.setSignature(t.heat, t.alive ? ALBEDO.vehicleBody : 0.08, t.burning ? 0.6 * fire : 0);
+      d.engine.setHeat(t.alive ? HEAT.engine : t.heat);
+      if (t.burning) effects.fire(t.position, dt);
+      else if (t.smoking || !t.alive) effects.smokePuff(t.position, dt, t.alive ? 1 : 0.3);
     }
   }
 
@@ -212,39 +200,14 @@ export class PlaceholderWorld {
     this.root.add(trees.finish());
   }
 
-  /** Hot moving targets: stand-ins for soldiers and trucks to practice leading shots. */
+  /** Two trucks circling the village: moving targets until M5 brings real vehicles. */
   private addDummies(rng: Rng): void {
     const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
-    const soldierGeo = new CapsuleGeometry(0.45, 1.2, 3, 6);
     const truckGeo = new BoxGeometry(2.4, 2.4, 6);
     const engineGeo = new BoxGeometry(2.0, 0.6, 1.4);
 
-    for (let k = 0; k < 12; k++) {
-      const target = new DummyTarget(
-        'infantry',
-        {
-          cx: range(rng, -120, 120),
-          cz: range(rng, -120, 120),
-          r: range(rng, 10, 40),
-          speed: range(rng, 1.2, 2.5),
-          phase: range(rng, 0, Math.PI * 2),
-        },
-        ground,
-        1.1 * 1.3,
-      );
-      // Each soldier has its own material so it can cool down on its own when killed.
-      const body = new ThermalMaterial({
-        signature: signature(HEAT.soldier, ALBEDO.soldier),
-        noise: 0.3,
-      });
-      const mesh = new Mesh(soldierGeo, body);
-      mesh.scale.setScalar(1.3); // 1.3× size so they read at 105 mm (M1 sign-off)
-      this.addDummy({ target, obj: mesh, body });
-    }
-
     for (let k = 0; k < 2; k++) {
       const target = new DummyTarget(
-        'vehicle',
         { cx: 0, cz: 0, r: 180 + k * 60, speed: 9, phase: range(rng, 0, Math.PI * 2) },
         ground,
         1.2,

@@ -68,4 +68,19 @@ describe('Effects', () => {
     fx.sync(1000, 5, eye, (emit) => emit(far, dir));
     expect(fx.tracerSprites).toBe(6);
   });
+
+  it('draws a muzzle flash as one short-lived hot sprite', () => {
+    const fx = new Effects(flat, createRng(7));
+    fx.muzzleFlash(new Vector3(10, 1, 10));
+    expect(fx.particleCount).toBe(1);
+    step(fx, 0.2);
+    expect(fx.particleCount).toBe(0);
+  });
+
+  it('draws ground-fire tracers with their own (short) streak, all six segments', () => {
+    const fx = new Effects(flat, createRng(8));
+    const eye = new Vector3(0, 700, 900);
+    fx.sync(1000, 28, eye, (emit) => emit(new Vector3(), new Vector3(1, 0, 0), 5, 0.5));
+    expect(fx.tracerSprites).toBe(6);
+  });
 });

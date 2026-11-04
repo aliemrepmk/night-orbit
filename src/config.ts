@@ -148,6 +148,106 @@ export const CONFIG = {
     tracerMaxPx: 7,
   },
 
+  /** Soldiers of both sides (unit stats per type live in `units/unitDefs.ts`). */
+  infantry: {
+    /** Drawn 1.3× life size so soldiers read at 105 mm (M1 sign-off). */
+    scale: 1.3,
+    /** Height of the body's center above the ground while standing, and when lying dead. */
+    lift: 1.43,
+    downLift: 0.3,
+    /** Seconds a killed soldier flies before lying flat (PLAN.md §7.7: ~0.6 s arc). */
+    flingTime: 0.6,
+    /** Fastest fling speed (m/s) right at the impact; farther = gentler (30 / distance). */
+    flingMaxSpeed: 14,
+    /** Most soldiers alive or dead at once (PLAN.md §11: ≤ 120 live infantry); old bodies recycle. */
+    maxUnits: 128,
+    /** Soldiers closer than this push apart (separation steering). */
+    separation: 2.5,
+    separationStrength: 1.6,
+    /** How fast a soldier turns toward where it walks (radians per second). */
+    turnRate: 5,
+    /** Enemy decisions run this often, staggered (PLAN.md §7.11: 4 Hz). */
+    thinkInterval: 0.25,
+    /** Walk animation: vertical bob (m), forward lean (rad), and strides per meter walked. */
+    bobHeight: 0.09,
+    leanRad: 0.12,
+    stridesPerMeter: 0.7,
+  },
+
+  /** Enemy small-arms fire at Ridgeback (PLAN.md §7.8: no real bullets, damage to team health). */
+  enemyFire: {
+    /** Hit fraction at point-blank and at the shooter's maximum range (linear in between). */
+    accuracyNear: 0.6,
+    accuracyFar: 0.25,
+    /** Each enemy stops to shoot at a random fraction of its range. */
+    standoffMin: 0.6,
+    standoffMax: 0.95,
+    /** Seconds between visible bursts (tracers + muzzle flash) from one shooter. */
+    burstMin: 0.6,
+    burstMax: 1.8,
+  },
+
+  /** The Ridgeback recon team (PLAN.md §7.9). */
+  ridgeback: {
+    /** Shared team health, its regeneration, and the quiet time before it regenerates (§9). */
+    health: 100,
+    regenPerSecond: 1,
+    quietTime: 4,
+    /** Squad walking speed along its route, and how long it holds at each waypoint. */
+    speed: 2.2,
+    holdTime: 18,
+    /** Distance between members in the diamond formation. */
+    spacing: 5,
+    /** Friendlies shoot the nearest enemy within this range while holding, every few seconds. */
+    fireRange: 190,
+    fireIntervalMin: 1.5,
+    fireIntervalMax: 3.5,
+    hitChance: 0.3,
+    /** IR strobe: blink rate, fraction of each blink that is lit, sprite size (m). */
+    strobeHz: 2,
+    strobeDuty: 0.3,
+    strobeSize: 3,
+    /**
+     * Strobe heat in thermal. Real IR strobes only show in NV (glow); they're kept faintly
+     * visible in thermal too because they're the player's main friend-or-foe cue (§7.9).
+     * Set to 0 for NV-only strobes.
+     */
+    strobeThermalHeat: 0.5,
+    /** The orbit re-centers on the team once it walks this far from the orbit center. */
+    followDistance: 70,
+  },
+
+  /** Enemy and friendly tracers on the ground (short, purely visual). */
+  groundFire: {
+    tracerSpeed: 380,
+    tracerLength: 5,
+    tracerSize: 0.55,
+    /** At most this many ground tracers in flight (pooled). */
+    maxTracers: 160,
+  },
+
+  /** TEMPORARY M4 test scene (M7's mission script replaces it): waves attacking a moving team. */
+  testScene: {
+    /** Most enemies alive at once (M4 "done when": 60 enemies attacking a moving team). */
+    maxEnemies: 60,
+    /** Groups spawned at the start, then one more every `waveInterval` seconds. */
+    initialGroups: 3,
+    waveInterval: 8,
+    groupMin: 6,
+    groupMax: 10,
+    /** Groups appear this far from the team, scattered within `groupRadius`. */
+    spawnMin: 260,
+    spawnMax: 360,
+    groupRadius: 14,
+    /** PLAN.md §9: one in six enemies is a machine gunner. */
+    machineGunnerChance: 1 / 6,
+  },
+
+  hud: {
+    /** How long "DANGER CLOSE" stays up after a close impact (seconds). */
+    dangerCloseSeconds: 2.5,
+  },
+
   fx: {
     /** Constant wind for the mission: smoke drifts with it (m/s). */
     wind: [1.6, 0, -0.9] as readonly [number, number, number],

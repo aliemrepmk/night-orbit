@@ -1,5 +1,5 @@
 import { WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
-import { gunLine, type GunReadout } from './hudFormat';
+import { gunLine, teamLine, type GunReadout } from './hudFormat';
 
 export interface HudData {
   altitude: number;
@@ -16,6 +16,12 @@ export interface HudData {
   /** Sensor mode label: "WHT HOT", "BLK HOT" or "NV". */
   sensorMode: string;
   clock: number;
+  /** Ridgeback's shared health, its maximum, and whether enemies are shooting at it. */
+  team: number;
+  teamMax: number;
+  underFire: boolean;
+  /** An impact just landed danger close to a friendly. */
+  dangerClose: boolean;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
@@ -23,6 +29,7 @@ export interface HudData {
     calls: number;
     triangles: number;
     kills: number;
+    enemies: number;
   } | null;
 }
 
@@ -57,7 +64,7 @@ export class HUD {
           <div data-k="alt"></div>
           <div data-k="hdg"></div>
         </div>
-        <div class="hud-block center" data-k="obj">OBJ: SENSOR CALIBRATION</div>
+        <div class="hud-block center" data-k="obj">OBJ: COVER RIDGEBACK</div>
         <div class="hud-block right">
           <div data-k="pol">WHT HOT</div>
           <div data-k="rng"></div>
@@ -65,8 +72,12 @@ export class HUD {
         </div>
       </div>
       <svg class="reticle" viewBox="-100 -100 200 200" data-k="reticle"></svg>
+      <div class="hud-alert" data-k="alert"></div>
       <div class="hud-row bottom">
-        <div class="hud-block" data-k="weapons"></div>
+        <div class="hud-block">
+          <div class="hud-team" data-k="team"></div>
+          <div data-k="weapons"></div>
+        </div>
         <div class="hud-block center" data-k="coords"></div>
         <div class="hud-block right">
           <div data-k="fov"></div>
@@ -95,6 +106,8 @@ export class HUD {
     this.set('pol', d.sensorMode);
     this.set('fov', `FOV ${d.fov.toFixed(1)}`);
     this.set('clock', clock(d.clock));
+    this.set('team', teamLine(d.team, d.teamMax, d.underFire));
+    this.set('alert', d.dangerClose ? 'DANGER CLOSE' : '');
     this.set('weapons', WEAPON_ORDER.map((id) => gunLine(d.guns[id], id === d.weapon)).join('\n'));
 
     if (this.reticleWeapon !== d.weapon) {
@@ -106,7 +119,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}`
+        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}`
         : '',
     );
   }

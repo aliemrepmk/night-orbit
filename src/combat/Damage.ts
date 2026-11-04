@@ -12,12 +12,15 @@ export const ARMOR = {
   apc: { '25': 0.05, '40': 0.4, '105': 1 },
 } as const satisfies Record<string, Armor>;
 
-/** Anything a blast can hurt: soldiers, vehicles, (later) friendlies. */
+/** Who dealt damage: one of the gunship's weapons, or Ridgeback's return fire. */
+export type DamageSource = WeaponId | 'team';
+
+/** Anything a blast can hurt: soldiers, vehicles, friendlies. */
 export interface Damageable {
   readonly position: Vector3;
   readonly alive: boolean;
   readonly armor: Armor;
-  takeDamage(amount: number, weapon: WeaponId, from: Vector3): void;
+  takeDamage(amount: number, source: DamageSource, from: Vector3): void;
 }
 
 export interface Hit {

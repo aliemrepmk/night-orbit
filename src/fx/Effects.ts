@@ -43,7 +43,7 @@ export class Effects {
   readonly smoke: Particles;
   private readonly hotLayer: PointLayer;
   private readonly smokeLayer: PointLayer;
-  private readonly tracerLayer = new PointLayer(1024, true, CONFIG.gunnery.tracerMaxPx);
+  private readonly tracerLayer = new PointLayer(2048, true, CONFIG.gunnery.tracerMaxPx);
 
   private readonly craterMesh: InstancedMesh;
   private readonly craterSig: Float32Array;
@@ -191,6 +191,24 @@ export class Effects {
     if (onGround) this.crater(p, fx.craterRadius);
   }
 
+  /** A rifle / machine-gun burst on the ground: a tiny, very short hot flash. */
+  muzzleFlash(p: Vector3): void {
+    this.hot.spawn({
+      ...still(p.x, p.y + 0.4, p.z),
+      life: 0.09,
+      size0: 1.4,
+      size1: 0.8,
+      heat0: 1,
+      heat1: 0.8,
+      glow0: 0.9,
+      glow1: 0.3,
+      albedo: 0,
+      gravity: 0,
+      drag: 0,
+      alpha: 1,
+    });
+  }
+
   /** A burning wreck: call every tick while it burns (spawns flickering hot fire + dark smoke). */
   fire(p: Vector3, dt: number, intensity = 1): void {
     const rng = this.rng;
@@ -309,14 +327,15 @@ export class Effects {
   }
 
   /**
-   * Per rendered frame: refreshes the sprite buffers. `tracers` gives each visible shell's head
-   * position and flight direction; `eye` is the sensor position (close tracer points are skipped).
+   * Per rendered frame: refreshes the sprite buffers. `tracers` gives each visible tracer's head
+   * position and flight direction (plus streak length and sprite size; the gunship's tracers by
+   * default); `eye` is the sensor position (close tracer points are skipped).
    */
   sync(
     heightPx: number,
     fovDeg: number,
     eye: Vector3,
-    tracers: (emit: (head: Vector3, dir: Vector3) => void) => void,
+    tracers: (emit: (head: Vector3, dir: Vector3, length?: number, size?: number) => void) => void,
   ): void {
     for (const layer of [this.hotLayer, this.smokeLayer, this.tracerLayer]) {
       layer.setViewport(heightPx, fovDeg);
@@ -328,17 +347,17 @@ export class Effects {
     const { tracerLength, tracerSize, tracerMinRange } = CONFIG.gunnery;
     const minSq = tracerMinRange * tracerMinRange;
     const segments = 6;
-    tracers((head, dir) => {
+    tracers((head, dir, length = tracerLength, size = tracerSize) => {
       for (let k = 0; k < segments; k++) {
         const f = k / (segments - 1);
-        const x = head.x - dir.x * tracerLength * f;
-        const y = head.y - dir.y * tracerLength * f;
-        const z = head.z - dir.z * tracerLength * f;
+        const x = head.x - dir.x * length * f;
+        const y = head.y - dir.y * length * f;
+        const z = head.z - dir.z * length * f;
         const dx = x - eye.x;
         const dy = y - eye.y;
         const dz = z - eye.z;
         if (dx * dx + dy * dy + dz * dz < minSq) continue;
-        this.tracerLayer.push(x, y, z, tracerSize * (1 - 0.6 * f), 1, 0, 1 - 0.7 * f, 1 - 0.8 * f);
+        this.tracerLayer.push(x, y, z, size * (1 - 0.6 * f), 1, 0, 1 - 0.7 * f, 1 - 0.8 * f);
       }
     });
     for (const layer of [this.hotLayer, this.smokeLayer, this.tracerLayer]) layer.end();

@@ -19,17 +19,20 @@ import {
 } from '../render/thermalMath';
 import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
-import type { GunReadout } from '../ui/hudFormat';
+import { failReasonText, type GunReadout } from '../ui/hudFormat';
+import { InfantryRenderer } from '../units/InfantryRenderer';
+import { TEST_ROUTE, WaveSpawner } from '../units/TestScene';
+import { UnitManager } from '../units/UnitManager';
 import { Collision } from '../world/Collision';
 import { PlaceholderWorld } from '../world/PlaceholderWorld';
 import { Terrain } from '../world/Terrain';
 import { EventBus } from './EventBus';
-import type { GameEvents } from './events';
+import type { FailReason, GameEvents } from './events';
 import { FixedStepper } from './FixedStepper';
 import { Input } from './Input';
 import { createRng } from './rng';
 
-export type GameState = 'title' | 'playing' | 'paused';
+export type GameState = 'title' | 'playing' | 'paused' | 'failed';
 
 /** Owns every system and runs them in a fixed order (see PLAN.md §6). */
 export class Game {
@@ -45,6 +48,9 @@ export class Game {
   private readonly projectiles = new Projectiles();
   private readonly effects: Effects;
   private readonly explosions: Explosions;
+  private readonly units: UnitManager;
+  private readonly spawner = new WaveSpawner(createRng(5050));
+  private readonly infantryView = new InfantryRenderer();
   private readonly audio = new AudioEngine();
   private readonly spreadRng = createRng(31337);
   /** Trigger state gathered per frame, consumed by the next fixed step. */
@@ -63,32 +69,39 @@ export class Game {
   private lastFrame = performance.now();
   private debug = new URLSearchParams(location.search).has('debug');
   private fps = 60;
-  /** Kills so far (F1 stats; M7's mission stats take over later). */
+  /** Kills by the player's guns so far (F1 stats; M7's mission stats take over later). */
   private kills = 0;
+  /** Seconds the "DANGER CLOSE" warning stays on screen. */
+  private dangerCloseLeft = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     hudRoot: HTMLElement,
     private readonly screen: HTMLElement,
   ) {
-    this.gunship.snapTo(0, 0);
+    const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
+    this.units = new UnitManager(ground, this.bus, createRng(4040), TEST_ROUTE);
+    this.gunship.snapTo(this.units.teamPosition.x, this.units.teamPosition.z);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
 
     this.renderer = new Renderer(canvas, this.sensor.camera);
     this.world = new PlaceholderWorld(this.terrain, this.collision);
     this.renderer.scene.add(this.world.root);
+    for (const truck of this.world.targets) this.units.addTarget(truck);
+    this.renderer.scene.add(this.infantryView.root);
 
-    this.effects = new Effects((x, z) => this.terrain.heightAt(x, z), createRng(77));
+    this.effects = new Effects(ground, createRng(77));
     this.renderer.scene.add(this.effects.root);
-    this.explosions = new Explosions(
-      this.effects,
-      this.sensor,
-      this.sensorFx,
-      this.bus,
-      () => this.world.targets,
+    this.units.onMuzzleFlash = (p) => this.effects.muzzleFlash(p);
+    this.explosions = new Explosions(this.effects, this.sensor, this.sensorFx, this.bus, (c, r) =>
+      this.units.targetsNear(c, r),
     );
 
-    this.bus.on('unitKilled', () => this.kills++);
+    this.bus.on('unitKilled', (e) => {
+      if (e.by !== 'team') this.kills++;
+    });
+    this.bus.on('dangerClose', () => (this.dangerCloseLeft = CONFIG.hud.dangerCloseSeconds));
+    this.bus.on('missionFailed', (e) => this.fail(e.reason));
     // Placeholder sounds react to events; nobody else needs to know about audio.
     this.bus.on('shotFired', (e) => this.audio.play(`fire${e.weapon}`));
     this.bus.on('impact', (e) =>
@@ -97,9 +110,16 @@ export class Game {
 
     this.hud = new HUD(hudRoot);
     this.input = new Input(canvas);
-    this.input.onLockChange = (locked) => this.setState(locked ? 'playing' : 'paused');
+    this.input.onLockChange = (locked) => {
+      if (this.state !== 'failed') this.setState(locked ? 'playing' : 'paused');
+    };
 
     screen.addEventListener('click', () => {
+      // Retry = reload for now (M8 adds a proper restart that resets every system).
+      if (this.state === 'failed') {
+        location.reload();
+        return;
+      }
       this.audio.unlock(); // browsers allow audio only after a user gesture
       this.input.requestLock();
     });
@@ -136,6 +156,7 @@ export class Game {
   /** One fixed simulation step (PLAN.md §6 update order). */
   private update(dt: number): void {
     if (this.state === 'paused') return;
+    // After a failure the world keeps drifting behind the fail screen, but nobody fights.
     const playing = this.state === 'playing';
     this.gunship.update(dt);
     this.sensor.update(dt);
@@ -153,10 +174,25 @@ export class Game {
     this.projectiles.update(dt, (s) =>
       this.explosions.detonate(s.to, WEAPONS[s.weapon], s.hitKind === 'ground'),
     );
+    if (playing) {
+      this.spawner.update(dt, this.units);
+      this.units.update(dt);
+      this.followTeam();
+    }
     this.world.update(dt, this.effects);
     this.effects.update(dt);
     this.sensorFx.update(dt);
+    this.dangerCloseLeft = Math.max(0, this.dangerCloseLeft - dt);
     if (playing) this.missionClock += dt;
+  }
+
+  /** The orbit re-centers on Ridgeback once the team has walked away from the orbit center. */
+  private followTeam(): void {
+    const team = this.units.teamPosition;
+    const c = this.gunship.targetCenter;
+    if (Math.hypot(team.x - c.x, team.z - c.z) > CONFIG.ridgeback.followDistance) {
+      this.gunship.setFocus(team.x, team.z);
+    }
   }
 
   // Scratch vectors (no per-shot allocations in the hot path).
@@ -193,17 +229,26 @@ export class Game {
   private readonly tracerHead = new Vector3();
   private readonly tracerDir = new Vector3();
 
-  /** Per frame: particle/tracer sprite buffers for the current view. */
+  /** Per frame: soldiers, strobes and particle/tracer sprite buffers for the current view. */
   private syncEffects(): void {
     const heightPx = this.viewportHeight * this.renderer.webgl.getPixelRatio();
-    this.effects.sync(heightPx, this.sensor.fovDeg, this.gunship.position, (emit) =>
+    this.infantryView.sync(this.units, heightPx, this.sensor.fovDeg);
+    const g = CONFIG.groundFire;
+    this.effects.sync(heightPx, this.sensor.fovDeg, this.gunship.position, (emit) => {
       this.projectiles.forEachActive((s) => {
         if (!WEAPONS[s.weapon].tracer) return;
         this.projectiles.positionOf(s, this.tracerHead);
         this.tracerDir.subVectors(s.to, s.from).normalize();
         emit(this.tracerHead, this.tracerDir);
-      }),
-    );
+      });
+      // Small-arms tracers between the soldiers on the ground.
+      for (const tr of this.units.tracers) {
+        if (!tr.active || tr.age < 0) continue;
+        this.tracerHead.lerpVectors(tr.from, tr.to, tr.age / tr.duration);
+        this.tracerDir.subVectors(tr.to, tr.from).normalize();
+        emit(this.tracerHead, this.tracerDir, g.tracerLength, g.tracerSize);
+      }
+    });
   }
 
   private handleInput(): void {
@@ -248,6 +293,10 @@ export class Game {
       guns: this.gunReadouts(),
       sensorMode: sensorModeLabel(this.sensorMode),
       clock: this.missionClock,
+      team: this.units.team.value,
+      teamMax: this.units.team.max,
+      underFire: this.units.team.underFire,
+      dangerClose: this.dangerCloseLeft > 0,
       debug: this.debug
         ? {
             fps: this.fps,
@@ -255,6 +304,7 @@ export class Game {
             calls: this.renderer.drawCalls,
             triangles: this.renderer.triangles,
             kills: this.kills,
+            enemies: this.units.aliveEnemies,
           }
         : null,
     });
@@ -293,6 +343,15 @@ export class Game {
       blurPx: this.sensorFx.blurPx,
       whiteout: this.sensorFx.whiteout,
     };
+  }
+
+  /** Mission failed (friendly fire or team overrun): freeze the fight and show why. */
+  private fail(reason: FailReason): void {
+    if (this.state === 'failed') return;
+    const reasonEl = this.screen.querySelector<HTMLElement>('[data-fail-reason]');
+    if (reasonEl) reasonEl.textContent = failReasonText(reason);
+    this.setState('failed');
+    if (document.pointerLockElement) document.exitPointerLock();
   }
 
   private setState(state: GameState): void {

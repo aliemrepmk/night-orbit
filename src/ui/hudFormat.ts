@@ -1,3 +1,4 @@
+import type { FailReason } from '../core/events';
 import type { WeaponStatus } from '../gunship/Weapons';
 import type { FireMode } from '../gunship/weaponDefs';
 
@@ -42,4 +43,22 @@ export function gunLine(g: GunReadout, selected: boolean): string {
   else if (g.fireMode === 'single') status = 'READY';
   else status = '■'.repeat(g.rounds) + '□'.repeat(g.capacity - g.rounds);
   return `${mark} ${label}${status}`;
+}
+
+/** Ridgeback's health line, e.g. `RIDGEBACK ▮▮▮▮▮▮▮▮▯▯  82%  UNDER FIRE` (PLAN.md §7.16). */
+export function teamLine(health: number, max: number, underFire: boolean): string {
+  const f = Math.min(1, Math.max(0, health / max));
+  // Round up so the bar never reads 0% while the team is still standing.
+  const pct = String(Math.ceil(f * 100 - 1e-9)).padStart(3);
+  return `RIDGEBACK ${bar(f, 10)} ${pct}%${underFire ? '  UNDER FIRE' : ''}`;
+}
+
+/** What the fail screen says for each way the mission can be lost. */
+export function failReasonText(reason: FailReason): string {
+  switch (reason) {
+    case 'friendly_fire':
+      return 'FRIENDLY FIRE: YOU HIT RIDGEBACK';
+    case 'team_overrun':
+      return 'RIDGEBACK OVERRUN';
+  }
 }

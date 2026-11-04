@@ -51,9 +51,15 @@ describe('Explosions.detonate', () => {
     return { sensor, sensorFx, bus, effects, soldier, truck, ex };
   }
 
-  function target(kind: 'infantry' | 'vehicle', position: Vector3, hp = 100) {
+  function target(
+    kind: 'infantry' | 'vehicle',
+    position: Vector3,
+    hp = 100,
+    side: 'enemy' | 'friendly' = 'enemy',
+  ) {
     const t: Target & { hp: number } = {
       kind,
+      side,
       position,
       armor: ARMOR.none,
       hp,
@@ -90,5 +96,61 @@ describe('Explosions.detonate', () => {
     ex.detonate(sensor.aim.clone(), WEAPONS['40'], true);
     ex.detonate(sensor.aim.clone(), WEAPONS['40'], true);
     expect(kills).toBe(1);
+  });
+
+  function friendlyRig(friendlyOffset: number) {
+    const r = rig();
+    const friendly = target(
+      'infantry',
+      new Vector3(r.sensor.aim.x + friendlyOffset, 0, r.sensor.aim.z),
+      100,
+      'friendly',
+    );
+    const ex = new Explosions(r.effects, r.sensor, r.sensorFx, r.bus, () => [friendly]);
+    const log: string[] = [];
+    r.bus.on('friendlyKilledByPlayer', (e) => log.push(`friendlyKilled:${e.weapon}`));
+    r.bus.on('missionFailed', (e) => log.push(`failed:${e.reason}`));
+    r.bus.on('dangerClose', (e) => log.push(`dangerClose:${e.weapon}:${e.distance.toFixed(0)}`));
+    r.bus.on('unitKilled', () => log.push('unitKilled'));
+    return { ...r, friendly, ex, log };
+  }
+
+  it('fails the mission with friendly_fire when the player kills a friendly', () => {
+    const { sensor, friendly, ex, log } = friendlyRig(3);
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    expect(friendly.alive).toBe(false);
+    // Not counted as an enemy kill; no danger-close warning on top of the failure.
+    expect(log).toEqual(['friendlyKilled:105', 'failed:friendly_fire']);
+  });
+
+  it('warns danger close when a friendly survives an impact inside the danger-close distance', () => {
+    // 105 mm: blast 22 m, danger close 33 m. A friendly 28 m away is unhurt but too close.
+    const { sensor, friendly, ex, log } = friendlyRig(28);
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    expect(friendly.hp).toBe(100);
+    expect(log).toEqual(['dangerClose:105:28']);
+  });
+
+  it('warns danger close (not failure) when a friendly is wounded but survives', () => {
+    const { sensor, friendly, ex, log } = friendlyRig(0);
+    ex.detonate(sensor.aim.clone(), WEAPONS['25'], true); // 70 damage < 100 HP
+    expect(friendly.alive).toBe(true);
+    expect(friendly.hp).toBe(30);
+    expect(log).toEqual(['dangerClose:25:0']);
+  });
+
+  it('says nothing when friendlies are beyond the danger-close distance', () => {
+    const { sensor, ex, log } = friendlyRig(40);
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    expect(log).toEqual([]);
+  });
+
+  it('uses each weapon’s own danger-close distance (12 m is close for 40 mm, not for 25 mm)', () => {
+    const a = friendlyRig(10);
+    a.ex.detonate(a.sensor.aim.clone(), WEAPONS['40'], true);
+    expect(a.log).toEqual(['dangerClose:40:10']);
+    const b = friendlyRig(10);
+    b.ex.detonate(b.sensor.aim.clone(), WEAPONS['25'], true);
+    expect(b.log).toEqual([]);
   });
 });

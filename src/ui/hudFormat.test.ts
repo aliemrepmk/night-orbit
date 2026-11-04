@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEAPONS } from '../gunship/weaponDefs';
 import { WeaponState } from '../gunship/Weapons';
-import { bar, countdown, gunLine, type GunReadout } from './hudFormat';
+import { bar, countdown, failReasonText, gunLine, teamLine, type GunReadout } from './hudFormat';
 
 function readout(w: WeaponState): GunReadout {
   return {
@@ -50,5 +50,24 @@ describe('HUD weapon lines', () => {
     expect(gunLine(readout(w), false)).toBe('  105MM READY');
     w.reloadLeft = 3.25;
     expect(gunLine(readout(w), false)).toBe('  105MM LOADING 3.3');
+  });
+});
+
+describe('teamLine', () => {
+  it('shows Ridgeback health as a 10-cell bar and a percentage', () => {
+    expect(teamLine(100, 100, false)).toBe('RIDGEBACK ▮▮▮▮▮▮▮▮▮▮ 100%');
+    expect(teamLine(82, 100, false)).toBe('RIDGEBACK ▮▮▮▮▮▮▮▮▯▯  82%');
+  });
+
+  it('flags UNDER FIRE and never reads 0% while the team is still standing', () => {
+    expect(teamLine(0.3, 100, true)).toBe('RIDGEBACK ▯▯▯▯▯▯▯▯▯▯   1%  UNDER FIRE');
+    expect(teamLine(0, 100, true)).toBe('RIDGEBACK ▯▯▯▯▯▯▯▯▯▯   0%  UNDER FIRE');
+  });
+});
+
+describe('failReasonText', () => {
+  it('names every fail reason', () => {
+    expect(failReasonText('friendly_fire')).toContain('FRIENDLY FIRE');
+    expect(failReasonText('team_overrun')).toContain('OVERRUN');
   });
 });

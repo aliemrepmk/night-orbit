@@ -8,9 +8,12 @@ import type { WeaponDef } from '../gunship/weaponDefs';
 import type { SensorFX } from '../render/SensorFX';
 import { applyRadial, falloff, type Damageable } from './Damage';
 
-/** A damageable thing that also says what it is (for kill events). */
+export type Side = 'enemy' | 'friendly';
+
+/** A damageable thing that also says what it is and whose side it's on. */
 export interface Target extends Damageable {
   readonly kind: 'infantry' | 'vehicle';
+  readonly side: Side;
 }
 
 /**
@@ -44,14 +47,21 @@ export class Explosions {
     private readonly sensor: Sensor,
     private readonly sensorFx: SensorFX,
     private readonly bus: EventBus<GameEvents>,
-    private readonly targets: () => Iterable<Target>,
+    /** Every target within `radius` (ground distance) of `center`: the unit spatial grid. */
+    private readonly targetsNear: (center: Vector3, radius: number) => readonly Target[],
   ) {}
 
   detonate(point: Vector3, w: WeaponDef, onGround: boolean): void {
-    for (const hit of applyRadial(point, w, this.targets())) {
+    // Query out to the danger-close distance: it is wider than the blast.
+    const near = this.targetsNear(point, Math.max(w.blastRadius, w.dangerClose));
+    let friendlyKilled = false;
+    for (const hit of applyRadial(point, w, near)) {
       const t = hit.target as Target;
-      if (!t.alive) this.bus.emit('unitKilled', { kind: t.kind, by: w.id });
+      if (t.alive) continue;
+      if (t.side === 'friendly') friendlyKilled = true;
+      else this.bus.emit('unitKilled', { kind: t.kind, by: w.id });
     }
+    this.checkFriendlies(point, w, near, friendlyKilled);
 
     this.effects.explosion(point, w, onGround);
 
@@ -65,5 +75,28 @@ export class Explosions {
     this.sensorFx.triggerWhiteout(whiteoutFor(w, halfHeight, inView));
 
     this.bus.emit('impact', { pos: point, weapon: w.id, distanceToAim });
+  }
+
+  /**
+   * PLAN.md §7.7: killing a friendly fails the mission; an impact within the weapon's
+   * danger-close distance of a (surviving) friendly raises a danger-close warning.
+   */
+  private checkFriendlies(
+    point: Vector3,
+    w: WeaponDef,
+    near: readonly Target[],
+    friendlyKilled: boolean,
+  ): void {
+    if (friendlyKilled) {
+      this.bus.emit('friendlyKilledByPlayer', { weapon: w.id });
+      this.bus.emit('missionFailed', { reason: 'friendly_fire' });
+      return;
+    }
+    let closest = Infinity;
+    for (const t of near) {
+      if (t.side === 'friendly' && t.alive)
+        closest = Math.min(closest, t.position.distanceTo(point));
+    }
+    if (closest < w.dangerClose) this.bus.emit('dangerClose', { weapon: w.id, distance: closest });
   }
 }

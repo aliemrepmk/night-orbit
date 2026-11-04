@@ -71,8 +71,23 @@ body {
   text-align: right;
 }
 
-[data-k='weapons'] {
+[data-k='weapons'],
+.hud-team {
   white-space: pre;
+}
+
+.hud-team {
+  margin-bottom: 0.6em;
+}
+
+.hud-alert {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + min(18vh, 180px) + 16px);
+  transform: translateX(-50%);
+  font-size: 1.3em;
+  letter-spacing: 0.3em;
+  animation: blink 0.5s steps(2) infinite;
 }
 
 .reticle {
@@ -151,9 +166,15 @@ body {
   text-align: right;
 }
 
-.screen[data-state='title'] .only-paused,
-.screen[data-state='paused'] .only-title {
+.screen:not([data-state='title']) .only-title,
+.screen:not([data-state='paused']) .only-paused,
+.screen:not([data-state='failed']) .only-failed {
   display: none;
+}
+
+.panel .fail-reason {
+  color: var(--hud);
+  letter-spacing: 0.2em;
 }
 
 @keyframes blink {
