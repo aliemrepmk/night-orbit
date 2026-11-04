@@ -17,17 +17,19 @@ every session.
 | **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
 | **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
-| M4 Infantry & friendlies                | ⬜ Next                                                                |
+| **M4** Infantry & friendlies            | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
 | M5 – M10                                | ⬜ Not started                                                         |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **174 tests in 26 files**).
-`npm run build` works (≈604 kB JS, 156 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **222 tests in 33 files**).
+`npm run build` works (≈619 kB JS, 161 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). Everything through M3 is pushed. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M3 are pushed; the M4 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
 ≤ 100 draw calls) and by a scripted lead test in the real game (§6). Feel test passed (user, 2026-11-04).
+M4 checked by Claude in Chrome (team, strobes in all three sensors, 60 enemies, overrun and
+friendly-fire fail screens, danger close; 60 FPS, GPU ~7.7–8.1 ms, ≤ 28 draw calls; §6).
 
 ---
 
@@ -60,19 +62,31 @@ src/
     Projectiles.ts (+test) pooled shells in flight; impact on exactly the right tick
   combat/
     Damage.ts (+test)      falloff, armor table, applyRadial
-    Explosions.ts (+test)  one impact end to end: damage, fx, shake, whiteout, events
+    Explosions.ts (+test)  one impact end to end: damage, fx, shake, whiteout, events,
+                           friendly fire → missionFailed, danger close
   fx/
     Heat.ts (+test)        heat table (PLAN §7.5) + cooling curves: bodies, craters, fire, wrecks
     Light.ts (+test)       NV table: near-IR albedo + glow per object, ground albedo from heat
     Particles.ts (+test)   pooled particle sim in typed arrays (pure)
     PointLayer.ts          one-draw-call point sprites (heat in thermal, light in NV)
     Effects.ts (+test)     flash, debris, smoke, craters, shockwave, fire, tracers
+  units/
+    unitDefs.ts            ALL infantry stats (rifleman, machine gunner, Ridgeback), data
+    SpatialGrid.ts (+test) 20 m grid: radius + nearest queries (blasts, separation, targeting)
+    Infantry.ts (+test)    one soldier (either side): walk, damage, fling death, cooling; recyclable
+    infantryPose.ts (+test) pure walk bob / lean / tumble / lying-flat pose
+    TeamHealth.ts (+test)  Ridgeback shared health: damage, +1/s regen after 4 s quiet, overrun
+    Squad.ts (+test)       route following with holds, diamond formation slots, strobe blink timing
+    UnitManager.ts (+test) owns all soldiers + grid; enemy advance/fire, Ridgeback return fire,
+                           ground tracers, overrun → missionFailed
+    InfantryRenderer.ts    ONE InstancedMesh for every soldier + IR strobe point layer
+    TestScene.ts (+test)   TEMPORARY M4 scene: Ridgeback route + wave spawner (≤ 60 alive)
   world/
     Terrain.ts (+test)     heightmap mesh + exact heightAt()
     groundHeat.ts (+test)  soil heat field (warm/cool field patches) within the soil range
     Collision.ts (+test)   raycast vs terrain + rotated building boxes (roofs before ground)
-    DummyTarget.ts (+test) TEMPORARY shootable soldier/truck: walks, dies, flings, cools, burns
-    PlaceholderWorld.ts    TEMPORARY: houses (+collision boxes), tree lines, 12 soldiers, 2 trucks
+    DummyTarget.ts (+test) TEMPORARY shootable truck (M5 replaces): drives, smokes, burns, cools
+    PlaceholderWorld.ts    TEMPORARY: houses (+collision boxes), tree lines, 2 dummy trucks
   render/
     Renderer.ts            WebGLRenderer + composer: heat (half-float, MSAA) → bloom → ThermalPass
     ThermalMaterial.ts     the one shader: signature (heat, albedo, glow) → heat or NV light
@@ -84,8 +98,9 @@ src/
     sounds.ts              PLACEHOLDER synth sound definitions (M9 replaces)
     AudioEngine.ts (+test) WebAudio player; silent no-op without WebAudio
   ui/
-    HUD.ts                 telemetry, reticles, gun status lines, clock, F1 stats (incl. KIA)
-    hudFormat.ts (+test)   pure gun status text: heat bar, clip boxes, LOADING countdown
+    HUD.ts                 telemetry, reticles, gun status, team health, DANGER CLOSE, clock,
+                           F1 stats (incl. KIA and live enemies EN)
+    hudFormat.ts (+test)   pure HUD text: gun status, team health line, fail reasons
     hud.css                HUD + title/pause screen styles
 ```
 
@@ -103,14 +118,42 @@ src/
 
 Mouse = slew sensor · **left click = fire (hold for 25 mm)** · `1`/`2`/`3` = 25/40/105 mm ·
 `Q` or wheel = cycle weapon · `F` = sensor: white-hot → black-hot → night vision · `Esc` = pause ·
-`F1` = FPS / GPU ms / draw calls / triangles / kills. If pointer lock is unavailable, **hold the
+`F1` = FPS / GPU ms / draw calls / triangles / kills / live enemies. If pointer lock is unavailable, **hold the
 right button and drag** to aim. Add `?debug=1` to the URL to start with stats on.
 
 ---
 
 ## 3. Manual checklists
 
-### 3.1 M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
+### 3.1 M4 feel test (pending): "60 enemies attacking a moving team is fun for 2 minutes"
+
+Run `npm run dev`, open the URL (add `?debug=1` for stats), click to begin. The orbit starts over
+Ridgeback (four soldiers in a diamond, west of the village) and follows them as they walk.
+Enemy groups of 6–10 arrive every 8 s from all sides, up to 60 alive. Tuning: `CONFIG.ridgeback`,
+`CONFIG.enemyFire`, `CONFIG.testScene`, `CONFIG.infantry`, and `src/units/unitDefs.ts`.
+
+- [ ] **Friend or foe:** with `1` (25 mm) you can find Ridgeback by the blinking strobes in
+      white-hot and black-hot; in NV (`F` ×2) the strobes are the brightest thing on screen and
+      soldiers nearly vanish. (Strobes too strong/weak in thermal: `strobeThermalHeat`, `strobeSize`.)
+- [ ] **Soldiers read as people:** they walk with a slight bob/lean, face where they go, stop and
+      turn to shoot; killed ones are thrown, lie flat and slowly cool. Bodies don't stack.
+- [ ] **Enemy fire is readable:** short tracers and muzzle flashes toward the team; the HUD shows
+      `RIDGEBACK ▮▮▮▮▮▮▮▮▯▯  82%  UNDER FIRE` and the bar drops; after 4 s without enemy fire it
+      climbs back +1/s.
+- [ ] **Ridgeback helps:** while holding at a waypoint they shoot back and slowly kill enemies
+      (those don't count in `KIA`, which is your kills only).
+- [ ] **Danger close:** a 105 mm within ~33 m (40 mm ~12 m, 25 mm ~4 m) of a friendly flashes
+      `DANGER CLOSE` under the reticle.
+- [ ] **Friendly fire:** killing a Ridgeback member shows `MISSION FAILED / FRIENDLY FIRE: YOU HIT
+    RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click reloads.
+- [ ] **Fun for 2 minutes?** Pressure should build if you don't thin the groups (Claude's scripted
+      run with no player fire: overrun at ~70 s). Too hard/easy → `accuracyNear/Far`, `dps` in
+      `unitDefs.ts`, `waveInterval`, `maxEnemies`.
+- [ ] `F1`: FPS ~60 and GPU well under 16 ms with 60 enemies, tracers and a few 105 mm hits.
+- [ ] Orbit follow: when the team walks on, the orbit glides after them and you can still aim
+      around them (the gimbal limit is 450 m from the orbit center).
+
+### 3.1b M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
 
 Run `npm run dev`, open the URL, click to begin, press `F1`. Weapon numbers are in
 `src/gunship/weaponDefs.ts` (stats + impact effects); feedback/effects tuning in `CONFIG.sensor`
@@ -183,11 +226,12 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **Start M4: infantry & friendlies** (PLAN.md §7.8, §7.9, §10 M4): replace `DummyTarget` with real
-   infantry (one InstancedMesh per pose, per-instance signature), the Ridgeback team with IR
-   strobes (NV-only glow), friendly-fire and danger-close checks (`dangerClose` radii are already
-   in `weaponDefs.ts`).
-2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+1. **M4 feel test** (§3.1) by the user, then tune and sign off M4.
+2. **Then M5: enemy AI & vehicles** (PLAN.md §7.10–7.11): paths, cover points, EnemyBrain
+   (cover / fire / flee, morale break), real trucks/technicals/APCs replacing `DummyTarget`.
+   Enemy line of sight is not checked yet (enemies shoot through houses); M5 should add it.
+3. Push the M4 commits once the user is happy with them.
+4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -233,7 +277,8 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     by angle) + glow (`thermalMath.nvSurfaceLight`, mirrored in the shader). `F` cycles
     WHT → BLK → NV and triggers the switch static. Costs ~1–2 ms GPU over thermal (8–10 ms).
     **For M3+:** new objects need albedo + glow too (muzzle flash / fire / explosions: `GLOW`);
-    **M4:** friendly IR strobes = blinking `GLOW.irStrobe` with ~0 heat, visible only in NV.
+    **M4 changed this:** strobes glow fully in NV and also carry a little heat
+    (`CONFIG.ridgeback.strobeThermalHeat` = 0.5) so they stay visible in thermal (see decision 21).
 15. **Keys pressed before pointer lock is granted are dropped** (state is still "title" for a
     moment after the click). Harmless; noticed while testing NV.
 16. **Firing pipeline (M3):** fire → raycast the sensor's line of sight from the aircraft (roofs
@@ -250,6 +295,29 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     the lead test in §6 (TypeScript `private` is compile-time only).
 20. **Impact sound isn't delayed by distance** (sound would take ~3 s to reach the aircraft); kept
     immediate for feedback in the placeholder. Revisit in M9.
+21. **Strobes are visible in thermal too (M4).** PLAN §7.9 wanted strobes "always visible"
+    while decision 14 had planned NV-only. In thermal both sides are identical warm figures, so
+    NV-only strobes would make friend-or-foe a guess outside NV. Kept as one config number
+    (`strobeThermalHeat`; 0 = realistic NV-only). Ask the user in the feel test.
+22. **M4 enemy AI is minimal:** think at 4 Hz (staggered): target the nearest friendly, walk at it,
+    stop at a random 60–95 % of its range, fire until the target leaves range. No cover, morale,
+    fleeing or line of sight (M5). Damage to the team = `dps × accuracy × dt`, accuracy 0.6 up
+    close → 0.25 at max range (`CONFIG.enemyFire`).
+23. **Team health regenerates after 4 s with no enemy fire** (PLAN §9), not "no enemy firing
+    within 80 m" (§7.9; PLAN updated). Individual friendlies have 100 HP against player fire only;
+    a wounded-but-alive friendly gives a danger-close warning, a dead one fails the mission.
+24. **Ridgeback return fire** only while holding at a waypoint: every 1.5–3.5 s each member shoots
+    the nearest enemy within 190 m, 30 % chance to kill. Reported as `unitKilled` with `by: 'team'`;
+    F1 `KIA` counts only the player's kills.
+25. **Retry reloads the page** (`location.reload()`); M8 adds a real restart that resets systems.
+    After a failure the world keeps rendering (orbit, smoke) but units and guns stop.
+26. **The orbit follows the team:** when Ridgeback is more than 70 m from the orbit's target center,
+    the center glides to the team (`CONFIG.ridgeback.followDistance`). M7's mission script takes this over.
+27. **Soldier budget:** at most 128 soldiers (alive + bodies); spawning past that reuses the
+    longest-dead body, never a living soldier. Units only simulate while playing (not behind the
+    title or pause screen), so the team can't be overrun before you start.
+28. **Explosions query targets through the unit grid** out to max(blast radius, danger-close
+    distance); `Damageable.takeDamage` takes a `DamageSource` (weapon id or `'team'`).
 
 ---
 
@@ -257,18 +325,21 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 _(Fill in after testing.)_
 
-| Date       | Item                     | Result                                                                                   | Action                                                                                                         |
-| ---------- | ------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 2026-11-03 | M1 manual checklist      | User reported everything works                                                           | None; M1 signed off                                                                                            |
-| 2026-11-03 | M2 look (Claude, Chrome) | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                  | Added dark HUD outline; softened soil patches                                                                  |
-| 2026-11-03 | M2 aiming (user)         | "Looking around feels a bit laggy"                                                       | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
-| 2026-11-03 | NV look (Claude, Chrome) | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light) | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
-| 2026-11-03 | M2 look test (user)      | "It looks well for now"                                                                  | None; M2 signed off                                                                                            |
-| 2026-11-03 | NV look test (user)      | Approved ("mark it signed off")                                                          | None; NV signed off                                                                                            |
-| 2026-11-03 | M3 tracers (Claude)      | First meters of each tracer drew as huge white blobs near the camera                     | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
-| 2026-11-03 | M3 smoke (Claude)        | 105 mm smoke too faint to read after the flash                                           | Warmer, more opaque plume                                                                                      |
-| 2026-11-03 | M3 lead test (scripted)  | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                 | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
-| 2026-11-04 | M3 feel test (user)      | "M3 seems to be working well"; signed off                                                | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
+| Date       | Item                          | Result                                                                                                                  | Action                                                                                                         |
+| ---------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 2026-11-03 | M1 manual checklist           | User reported everything works                                                                                          | None; M1 signed off                                                                                            |
+| 2026-11-03 | M2 look (Claude, Chrome)      | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                 | Added dark HUD outline; softened soil patches                                                                  |
+| 2026-11-03 | M2 aiming (user)              | "Looking around feels a bit laggy"                                                                                      | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
+| 2026-11-03 | NV look (Claude, Chrome)      | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
+| 2026-11-03 | M2 look test (user)           | "It looks well for now"                                                                                                 | None; M2 signed off                                                                                            |
+| 2026-11-03 | NV look test (user)           | Approved ("mark it signed off")                                                                                         | None; NV signed off                                                                                            |
+| 2026-11-03 | M3 tracers (Claude)           | First meters of each tracer drew as huge white blobs near the camera                                                    | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
+| 2026-11-03 | M3 smoke (Claude)             | 105 mm smoke too faint to read after the flash                                                                          | Warmer, more opaque plume                                                                                      |
+| 2026-11-03 | M3 lead test (scripted)       | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
+| 2026-11-04 | M3 feel test (user)           | "M3 seems to be working well"; signed off                                                                               | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
+| 2026-11-04 | M4 scripted (Claude, Chrome)  | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
+| 2026-11-04 | M4 fail/warn (Claude, Chrome) | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                  | Works as designed                                                                                              |
+| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls | None yet; user feel test pending                                                                               |
 
 ---
 

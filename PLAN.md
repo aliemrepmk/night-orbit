@@ -498,8 +498,8 @@ type InfantryState = 'idle' | 'moving' | 'inCover' | 'firing' | 'fleeing' | 'flu
 ### 7.9 Units: Friendlies (Ridgeback)
 
 - Four soldiers moving as a **squad** along scripted route segments (`moveTeam('route_fields_1')`).
-- Each has an **IR strobe**: a small sprite that blinks at 2 Hz at full brightness, **always visible** in both polarities. Strobes are the player's main safety cue.
-- **Team health** (0–100) is shared and shown in the HUD. It drops from enemy fire and slowly recovers (+1/s) when no enemy is firing within 80 m.
+- Each has an **IR strobe**: a small sprite that blinks at 2 Hz (members slightly out of step). It is at full brightness in night vision (where real IR strobes show) and kept **faintly visible in both thermal polarities** (`CONFIG.ridgeback.strobeThermalHeat`, 0 = NV-only), because soldiers of both sides look alike in thermal and strobes are the player's main safety cue.
+- **Team health** (0–100) is shared and shown in the HUD (`RIDGEBACK ▮▮▮▮▮▮▮▮▯▯  82%  UNDER FIRE`). It drops from enemy fire and recovers +1/s once no enemy has fired for 4 s (the §9 rule; the earlier "within 80 m" idea was dropped). Reaching 0 fails the mission (overrun).
 - Individual friendlies can't die from enemy fire (keeps the mission fair and the script simple). They **can** die from player fire → instant fail.
 - When stopped, they take formation positions behind cover points and visually fire at the nearest enemies, killing them slowly (they help, but you're the main force).
 
@@ -836,7 +836,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 
 ### M2+ — Night-Vision Sensor (added during development) — ✅ signed off
 
-- A separate image-intensifier sensor (reflected moon/sky light + IR glow, green phosphor), not just a tint. `F` cycles WHT HOT → BLK HOT → NV. IR strobes and lit windows glow only in NV. See STATUS.md §5 decision 14.
+- A separate image-intensifier sensor (reflected moon/sky light + IR glow, green phosphor), not just a tint. `F` cycles WHT HOT → BLK HOT → NV. Lit windows glow only in NV; IR strobes glow at full strength in NV and faintly in thermal (M4, see §7.9). See STATUS.md §5 decision 14.
 
 ### M3 — Weapons, Ballistics & Explosions (2 days) — ✅ signed off
 
@@ -845,11 +845,13 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** weapon state machines (fire rate, clip, overheat, reload timing); flight time = distance / speed; impact on the correct tick; spread stays within its radius; raycast hits roofs before ground.
 - ✅ **Done when:** each weapon feels distinct; you can hit a moving target only by leading it.
 
-### M4 — Infantry & Friendlies (2–3 days)
+### M4 — Infantry & Friendlies (2–3 days) — code-complete, awaiting feel test
 
 - Instanced infantry, walk animation, damage, fling-death, cooling bodies.
 - Ridgeback team with strobes, route following, shared team health, enemy fire effects.
-- Friendly fire → fail screen.
+- Friendly fire → fail screen (also team overrun → fail screen). Danger-close warning on the HUD.
+- Enemy AI is deliberately simple here (advance on the nearest friendly, stop inside range, fire); cover, morale and fleeing are M5.
+- The test scene is temporary (`units/TestScene.ts`): Ridgeback walks a back-and-forth route around the placeholder village while enemy groups keep arriving (up to 60 alive); the orbit follows the team. M6/M7 replace it with the real map and mission script.
 - 🧪 **Tests:** radial damage falloff; friendly-fire detection → fail event; danger-close event; team health damage and regeneration; spatial grid radius queries match brute force.
 - ✅ **Done when:** a test scene with 60 enemies attacking a moving team is fun for 2 minutes and runs at 60 FPS.
 
