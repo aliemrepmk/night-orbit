@@ -41,6 +41,27 @@ const VILLAGE: readonly (readonly [string, number, number, number, number, numbe
   ['v_k2', 24, -50, 0.15, 10, 8, 2],
   ['v_k3', -34, -82, 0.25, 8, 7, 1],
   ['v_k4', 18, -86, 0.2, 9, 8, 1],
+  // Along the back street (south of the main road)
+  ['v_b1', -95, 168, 0.02, 10, 8, 1],
+  ['v_b2', -65, 166, 0, 9, 8, 2],
+  ['v_b3', -35, 165, 0, 10, 8, 1],
+  ['v_b4', 0, 168, 0.05, 9, 7, 1],
+  ['v_b5', 28, 171, 0.05, 10, 8, 1],
+  ['v_b6', 86, 166, -0.3, 9, 8, 1],
+  ['v_b7', 118, 104, -0.5, 8, 7, 1],
+  // Along the west lane
+  ['v_l1', -112, -8, 0.2, 9, 8, 1],
+  ['v_l2', -128, -58, 0.3, 8, 7, 1],
+  ['v_l3', -72, -36, 0.2, 9, 8, 1],
+  // Along the east street
+  ['v_x1', 145, -14, 0.1, 9, 8, 1],
+  ['v_x2', 198, -40, 0.3, 10, 8, 2],
+  ['v_x3', 160, -80, 0.3, 8, 7, 1],
+  ['v_x4', 202, 12, 0, 9, 8, 1],
+  // North edge
+  ['v_o1', -62, -112, 0.2, 9, 8, 1],
+  ['v_o2', 56, -96, 0.1, 9, 8, 1],
+  ['v_o3', 60, -60, 0, 10, 8, 1],
 ];
 
 const BUILDINGS: readonly BuildingDef[] = [
@@ -57,6 +78,8 @@ const BUILDINGS: readonly BuildingDef[] = [
     size: [w, d],
     floors,
   })),
+  // A workshop at the east end of the village
+  { id: 'workshop', kind: 'garage', pos: [176, 76], rot: 0, size: [12, 9] },
   // The field clinic on the east side of the square: generator heat, lit windows. Protected.
   { id: 'clinic', kind: 'clinic', pos: [42, 14], rot: 0, size: [18, 12], protected: true },
   // Crossroads: gas station (canopy + shop), a garage, two houses
@@ -82,6 +105,12 @@ const PROPS: readonly PropDef[] = [
   { kind: 'car', pos: [84, 58], rot: 0 },
   { kind: 'crates', pos: [52, 36], rot: 0.2 },
   { kind: 'crates', pos: [-12, -40], rot: 0.6 },
+  { kind: 'car', pos: [-50, 154], rot: 0 },
+  { kind: 'car', pos: [100, 150], rot: -0.3 },
+  { kind: 'crates', pos: [160, 86], rot: 0.1 },
+  { kind: 'car', pos: [-120, -32], rot: 1.3 },
+  { kind: 'car', pos: [206, -76], rot: 1.2 },
+  { kind: 'hay', pos: [-140, -30], rot: 0.4 },
   // Crossroads
   { kind: 'car', pos: [310, 76], rot: 0.05 },
   { kind: 'car', pos: [372, -6], rot: 0.8 },
@@ -95,7 +124,7 @@ export const MAP: MapData = {
   flats: [
     { center: [-660, 170], radius: 30, falloff: 40 }, // OP
     { center: [-460, 30], radius: 50, falloff: 40 }, // farmyard
-    { center: [0, 40], radius: 160, falloff: 80 }, // village
+    { center: [10, 30], radius: 190, falloff: 80 }, // village
     { center: [330, 25], radius: 120, falloff: 60 }, // crossroads
     { center: [560, 300], radius: 130, falloff: 80 }, // quarry floor
   ],
@@ -149,6 +178,41 @@ export const MAP: MapData = {
         [-6, -90],
         [-40, -165],
         [-70, -260],
+      ],
+    },
+    {
+      id: 'back_street',
+      kind: 'dirt',
+      width: 5,
+      points: [
+        [-112, 148],
+        [-30, 146],
+        [55, 150],
+        [125, 128],
+        [150, 92],
+        [132, 46],
+      ],
+    },
+    {
+      id: 'west_lane',
+      kind: 'dirt',
+      width: 5,
+      points: [
+        [-80, 68],
+        [-90, 10],
+        [-114, -86],
+        [-130, -170],
+      ],
+    },
+    {
+      id: 'east_street',
+      kind: 'dirt',
+      width: 5,
+      points: [
+        [160, 41],
+        [172, -30],
+        [196, -110],
+        [214, -190],
       ],
     },
     {
@@ -476,7 +540,7 @@ export const MAP: MapData = {
   zones: {
     op: { center: [-660, 170], radius: 50 },
     fields: { center: [-440, 120], radius: 230 },
-    village: { center: [0, 40], radius: 170 },
+    village: { center: [10, 30], radius: 200 },
     crossroads: { center: [330, 20], radius: 120 },
     lz: { center: [560, 300], radius: 140 },
   },
@@ -558,6 +622,33 @@ export const MAP: MapData = {
         [2, -20],
       ],
     },
+    village_west: {
+      zone: 'village',
+      points: [
+        [-130, -170],
+        [-114, -86],
+        [-90, 10],
+        [-82, 50],
+      ],
+    },
+    village_northeast: {
+      zone: 'village',
+      points: [
+        [214, -190],
+        [196, -110],
+        [172, -30],
+        [140, 30],
+      ],
+    },
+    village_south: {
+      zone: 'village',
+      points: [
+        [52, 260],
+        [52, 180],
+        [56, 100],
+        [40, 60],
+      ],
+    },
     village_east: {
       zone: 'village',
       points: [
@@ -603,6 +694,11 @@ export const MAP: MapData = {
   spawnPoints: {
     op: [],
     fields: [
+      [-660, -110],
+      [-520, -116],
+      [-380, -104],
+      [-640, 250],
+      [-520, 330],
       [-600, -112],
       [-450, -112],
       [-320, -108],
@@ -613,6 +709,12 @@ export const MAP: MapData = {
     village: [
       [-62, -250],
       [-90, -160],
+      [-150, -120],
+      [240, -120],
+      [230, 120],
+      [-20, 230],
+      [120, 200],
+      [-150, 40],
       [210, -10],
       [190, 80],
       [76, -4],
@@ -620,6 +722,9 @@ export const MAP: MapData = {
       [101, 25],
     ],
     crossroads: [
+      [260, -160],
+      [520, 120],
+      [440, -110],
       [372, -220],
       [500, -50],
       [460, 110],
