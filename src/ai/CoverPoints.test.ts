@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { rayBox } from '../world/Collision';
-import { CoverSet, coverFromBoxes } from './CoverPoints';
+import { CoverSet, coverAlongBox, coverFromBoxes } from './CoverPoints';
 
 describe('CoverSet', () => {
   it('lets only one soldier hold a point at a time', () => {
@@ -59,6 +59,21 @@ describe('coverFromBoxes', () => {
       expect(d).toBeCloseTo(Math.hypot(6.5, 4.5));
       // Outside the walls: a vertical ray at the point misses the box.
       expect(rayBox(new Vector3(p.x, 50, p.z), new Vector3(0, -1, 0), box)).toBeNull();
+    }
+  });
+});
+
+describe('coverAlongBox', () => {
+  it('lines both faces of a hedge with points every step meters, just outside it', () => {
+    const hedge = { center: new Vector3(0, 1, 0), half: new Vector3(20, 1, 0.8), rotY: 0.5 };
+    const set = coverAlongBox(hedge, 10, 1, new CoverSet());
+    expect(set.points).toHaveLength(8); // 40 m → 4 per side
+    for (const p of set.points) {
+      expect(rayBox(new Vector3(p.x, 50, p.z), new Vector3(0, -1, 0), hedge)).toBeNull();
+      // 1.8 m from the hedge's center line (0.8 half thickness + 1 m)
+      const c = Math.cos(hedge.rotY);
+      const s = Math.sin(hedge.rotY);
+      expect(Math.abs(s * p.x + c * p.z)).toBeCloseTo(1.8);
     }
   });
 });

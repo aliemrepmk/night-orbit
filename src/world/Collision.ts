@@ -6,6 +6,8 @@ export interface CollisionBox {
   readonly center: Vector3;
   readonly half: Vector3;
   readonly rotY: number;
+  /** Something people walk on (a bridge deck): shells hit it, but it doesn't block walking or sight. */
+  readonly walkable?: boolean;
 }
 
 export interface RayHit {
@@ -72,6 +74,7 @@ export class Collision {
     }
     this.losDir.set(dx / len, dy / len, dz / len);
     for (const box of this.boxes) {
+      if (box.walkable) continue;
       const reach = Math.hypot(box.half.x, box.half.z);
       if (segmentPointDistance2D(from, to, box.center.x, box.center.z) > reach) continue;
       const t = rayBox(from, this.losDir, box);
@@ -90,6 +93,10 @@ export class Collision {
     out.z = z;
     let moved = false;
     for (const box of this.boxes) {
+      if (box.walkable) continue;
+      // Raised things (a gas-station canopy) don't block walking underneath.
+      const bottom = box.center.y - box.half.y;
+      if (bottom > this.ground.heightAt(box.center.x, box.center.z) + 2) continue;
       const reach = Math.hypot(box.half.x, box.half.z) + radius;
       const ox = out.x - box.center.x;
       const oz = out.z - box.center.z;

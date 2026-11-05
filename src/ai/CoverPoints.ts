@@ -88,3 +88,21 @@ export function coverFromBoxes(
   }
   return set;
 }
+
+/**
+ * Cover along both sides of a long wall, hedge or rock face (one box per straight segment, its
+ * local x along the segment): a point every `step` meters, `margin` meters out from each face.
+ */
+export function coverAlongBox(box: CollisionBox, step: number, margin: number, set: CoverSet) {
+  const c = Math.cos(box.rotY);
+  const s = Math.sin(box.rotY);
+  const n = Math.max(1, Math.floor((box.half.x * 2) / step));
+  for (let k = 0; k < n; k++) {
+    const lx = -box.half.x + ((k + 0.5) / n) * box.half.x * 2;
+    for (const side of [-1, 1]) {
+      const lz = side * (box.half.z + margin);
+      set.add(box.center.x + c * lx + s * lz, box.center.z - s * lx + c * lz);
+    }
+  }
+  return set;
+}

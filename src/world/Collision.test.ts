@@ -106,3 +106,26 @@ describe('Collision.pushOut', () => {
     }
   });
 });
+
+describe('Collision special boxes', () => {
+  it('a walkable deck stops shells but not walking or sight', () => {
+    const c = new Collision(flat, 0);
+    c.addBox({
+      center: new Vector3(0, 0.5, 0),
+      half: new Vector3(3, 0.5, 8),
+      rotY: 0,
+      walkable: true,
+    });
+    const out = { x: 0, z: 0 };
+    expect(c.pushOut(0, 0, 0.5, out)).toBe(false);
+    expect(c.lineOfSight(new Vector3(0, 0.2, -20), new Vector3(0, 0.2, 20))).toBe(true);
+    expect(c.raycast(new Vector3(0, 700, 0), down())!.kind).toBe('building');
+  });
+
+  it('a raised canopy does not push people out from under it', () => {
+    const c = new Collision(flat, 0);
+    c.addBox({ center: new Vector3(0, 4.7, 0), half: new Vector3(7, 0.3, 5), rotY: 0 });
+    const out = { x: 0, z: 0 };
+    expect(c.pushOut(1, 1, 0.5, out)).toBe(false);
+  });
+});
