@@ -27,6 +27,7 @@ const BISECT_ITERATIONS = 24;
  */
 export class Collision {
   readonly boxes: CollisionBox[] = [];
+  private readonly losDir = new Vector3();
 
   /** `maxGroundHeight` bounds the terrain so the march can skip empty air. */
   constructor(
@@ -52,6 +53,61 @@ export class Collision {
       }
     }
     return best;
+  }
+
+  /**
+   * True if nothing blocks the straight line from `from` to `to`: no building box and no hill
+   * (terrain sampled every `terrainStep` meters). Used for enemy and friendly line of sight.
+   */
+  lineOfSight(from: Vector3, to: Vector3, terrainStep = 10): boolean {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dz = to.z - from.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-6) return true;
+    const steps = Math.floor(len / terrainStep);
+    for (let k = 1; k <= steps; k++) {
+      const t = k / (steps + 1);
+      if (from.y + dy * t < this.ground.heightAt(from.x + dx * t, from.z + dz * t)) return false;
+    }
+    this.losDir.set(dx / len, dy / len, dz / len);
+    for (const box of this.boxes) {
+      const reach = Math.hypot(box.half.x, box.half.z);
+      if (segmentPointDistance2D(from, to, box.center.x, box.center.z) > reach) continue;
+      const t = rayBox(from, this.losDir, box);
+      if (t !== null && t < len) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Keeps a body of `radius` out of every building footprint: if (x, z) is inside one (grown by
+   * `radius`), moves it out through the nearest wall. Writes the result to `out`; returns true
+   * if it had to move.
+   */
+  pushOut(x: number, z: number, radius: number, out: { x: number; z: number }): boolean {
+    out.x = x;
+    out.z = z;
+    let moved = false;
+    for (const box of this.boxes) {
+      const reach = Math.hypot(box.half.x, box.half.z) + radius;
+      const ox = out.x - box.center.x;
+      const oz = out.z - box.center.z;
+      if (ox * ox + oz * oz > reach * reach) continue;
+      const c = Math.cos(box.rotY);
+      const s = Math.sin(box.rotY);
+      let lx = c * ox - s * oz;
+      let lz = s * ox + c * oz;
+      const hx = box.half.x + radius;
+      const hz = box.half.z + radius;
+      if (Math.abs(lx) >= hx || Math.abs(lz) >= hz) continue;
+      if (hx - Math.abs(lx) < hz - Math.abs(lz)) lx = (lx < 0 ? -1 : 1) * hx;
+      else lz = (lz < 0 ? -1 : 1) * hz;
+      out.x = box.center.x + c * lx + s * lz;
+      out.z = box.center.z - s * lx + c * lz;
+      moved = true;
+    }
+    return moved;
   }
 
   /** Distance along the ray to the terrain surface, or null if it never reaches the ground. */
@@ -83,6 +139,15 @@ export class Collision {
     }
     return null;
   }
+}
+
+/** Ground (x/z) distance from point (px, pz) to the segment a–b. */
+export function segmentPointDistance2D(a: Vector3, b: Vector3, px: number, pz: number): number {
+  const vx = b.x - a.x;
+  const vz = b.z - a.z;
+  const len2 = vx * vx + vz * vz;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - a.x) * vx + (pz - a.z) * vz) / len2)) : 0;
+  return Math.hypot(a.x + vx * t - px, a.z + vz * t - pz);
 }
 
 function at(origin: Vector3, dir: Vector3, t: number): Vector3 {

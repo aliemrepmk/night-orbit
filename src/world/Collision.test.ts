@@ -54,3 +54,55 @@ describe('Collision.raycast', () => {
     expect(hit.point.y).toBeCloseTo(terrain.heightAt(hit.point.x, hit.point.z), 1);
   });
 });
+
+describe('Collision.lineOfSight', () => {
+  const eye = (x: number, z: number, y = 1.5) => new Vector3(x, y, z);
+
+  it('is clear across open flat ground', () => {
+    const c = new Collision(flat, 0);
+    expect(c.lineOfSight(eye(0, 0), eye(200, 50))).toBe(true);
+  });
+
+  it('is blocked by a house between the two soldiers, not by one beside the line', () => {
+    const c = new Collision(flat, 0);
+    c.addBox({ center: new Vector3(50, 3, 0), half: new Vector3(5, 3, 4), rotY: 0.4 });
+    expect(c.lineOfSight(eye(0, 0), eye(100, 0))).toBe(false);
+    expect(c.lineOfSight(eye(0, 20), eye(100, 20))).toBe(true);
+    // Over the roof: a high shooter sees past it.
+    expect(c.lineOfSight(eye(0, 0, 30), eye(100, 0, 30))).toBe(true);
+  });
+
+  it('is blocked by a hill in between', () => {
+    const hill = { heightAt: (x: number) => (Math.abs(x - 100) < 20 ? 10 : 0) };
+    const c = new Collision(hill, 10);
+    expect(c.lineOfSight(eye(0, 0), eye(200, 0))).toBe(false);
+    expect(c.lineOfSight(eye(0, 0), eye(60, 0))).toBe(true);
+  });
+});
+
+describe('Collision.pushOut', () => {
+  it('moves a body inside a building out through the nearest wall', () => {
+    const c = new Collision(flat, 0);
+    c.addBox({ center: new Vector3(0, 3, 0), half: new Vector3(5, 3, 4), rotY: 0 });
+    const out = { x: 0, z: 0 };
+    expect(c.pushOut(4, 0.5, 0.5, out)).toBe(true);
+    expect(out.x).toBeCloseTo(5.5); // nearest wall is +x
+    expect(out.z).toBeCloseTo(0.5);
+    expect(c.pushOut(10, 0, 0.5, out)).toBe(false);
+    expect(out).toEqual({ x: 10, z: 0 });
+  });
+
+  it('works for rotated buildings (the result is outside the footprint)', () => {
+    const c = new Collision(flat, 0);
+    const box = { center: new Vector3(20, 3, -10), half: new Vector3(6, 3, 2), rotY: 1.1 };
+    c.addBox(box);
+    const out = { x: 0, z: 0 };
+    for (let k = 0; k < 20; k++) {
+      const x = 20 + Math.cos(k) * 3;
+      const z = -10 + Math.sin(k * 1.7) * 3;
+      c.pushOut(x, z, 0.4, out);
+      // A vertical ray at the result misses the box.
+      expect(rayBox(new Vector3(out.x, 50, out.z), down(), box)).toBeNull();
+    }
+  });
+});
