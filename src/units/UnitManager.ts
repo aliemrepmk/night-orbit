@@ -56,6 +56,11 @@ export interface UnitWorld {
   lineOfSight(from: Vector3, to: Vector3): boolean;
   /** Moves (x, z) out of any building (grown by `radius`) into `out`; true if it moved. */
   pushOut(x: number, z: number, radius: number, out: { x: number; z: number }): boolean;
+  /**
+   * Where to walk instead of straight from (fx, fz) to (tx, tz) when something in between can't
+   * be walked through (the stream: go via the bridge). Writes `out`; false = walk straight.
+   */
+  detour?(fx: number, fz: number, tx: number, tz: number, out: { x: number; z: number }): boolean;
 }
 
 /** Open ground: nothing blocks anything (tests, and before a map exists). */
@@ -108,6 +113,7 @@ export class UnitManager {
   private readonly eyeA = new Vector3();
   private readonly eyeB = new Vector3();
   private readonly pushed = { x: 0, z: 0 };
+  private readonly via = { x: 0, z: 0 };
   private readonly world: UnitWorld;
   readonly cover: CoverSet;
   private readonly cfg: UnitsConfig;
@@ -584,6 +590,11 @@ export class UnitManager {
    * into it is dropped, and a soldier walking straight at it turns along it instead.
    */
   private moveToward(u: Infantry, x: number, z: number, maxSpeed: number): void {
+    // Never wade the stream: walk via the bridge when the straight line would cross it.
+    if (this.world.detour?.(u.position.x, u.position.z, x, z, this.via)) {
+      x = this.via.x;
+      z = this.via.z;
+    }
     const dx = x - u.position.x;
     const dz = z - u.position.z;
     const dist = Math.hypot(dx, dz);

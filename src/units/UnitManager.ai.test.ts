@@ -242,3 +242,41 @@ describe('UnitManager enemy AI (M5)', () => {
     expect(units.aliveEnemies).toBe(4);
   });
 });
+
+describe('UnitManager stream crossing (M6 feedback)', () => {
+  it('enemies cross the stream on the bridge, never by wading', async () => {
+    const { StreamCrossings } = await import('../world/crossings');
+    // Stream along x = 100 (north–south), a bridge at z = -60; the team holds at the origin.
+    const stream = {
+      width: 6,
+      depth: 1.6,
+      points: [
+        [100, -800],
+        [100, 800],
+      ] as const,
+    };
+    const sc = new StreamCrossings(stream, [
+      { id: 'b', at: [100, -60], heading: Math.PI / 2, length: 16, width: 8 },
+    ]);
+    const world: UnitWorld = {
+      lineOfSight: () => true,
+      pushOut: (x, z, _r, out) => {
+        out.x = x;
+        out.z = z;
+        return false;
+      },
+      detour: (fx, fz, tx, tz, out) => sc.detour(fx, fz, tx, tz, out),
+    };
+    const { units } = rig({ world });
+    const e = units.spawnEnemy(INFANTRY.rifleman, 260, 40)!;
+    e.standoff = 0.3; // must close to 60 m: has to cross
+    let lastX = e.position.x;
+    for (let k = 0; k < 60 * 120; k++) {
+      units.update(DT);
+      const x = e.position.x;
+      if (lastX >= 100 !== x >= 100) expect(Math.abs(e.position.z + 60)).toBeLessThan(4);
+      lastX = x;
+    }
+    expect(e.position.x).toBeLessThan(100); // it did get across
+  });
+});

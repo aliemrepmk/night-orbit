@@ -30,6 +30,7 @@ import { UnitManager } from '../units/UnitManager';
 import { VehicleManager } from '../units/VehicleManager';
 import { VehicleRenderer } from '../units/VehicleRenderer';
 import { Collision } from '../world/Collision';
+import { StreamCrossings } from '../world/crossings';
 import { MAP } from '../world/MapData';
 import type { ZoneId } from '../world/mapTypes';
 import { Terrain } from '../world/Terrain';
@@ -102,8 +103,14 @@ export class Game {
     this.world = new WorldBuilder(MAP, this.terrain, this.collision);
     // Soldiers walk on the surface (over the bridge deck, not through the stream bed).
     const surface = (x: number, z: number) => this.world.surfaceAt(x, z);
+    const crossings = new StreamCrossings(MAP.stream, MAP.bridges);
     this.units = new UnitManager(surface, this.bus, createRng(4040), journeyRoute(MAP), {
-      world: this.collision,
+      // Houses and hills block sight and walking; the stream can only be crossed on the bridge.
+      world: {
+        lineOfSight: (a, b) => this.collision.lineOfSight(a, b),
+        pushOut: (x, z, r, out) => this.collision.pushOut(x, z, r, out),
+        detour: (fx, fz, tx, tz, out) => crossings.detour(fx, fz, tx, tz, out),
+      },
       cover: this.world.cover,
     });
     this.vehicles = new VehicleManager(
