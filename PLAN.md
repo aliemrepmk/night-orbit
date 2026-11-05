@@ -37,6 +37,7 @@
    - 7.16 HUD & UI Screens
    - 7.17 Audio
    - 7.18 Debug Tools
+   - 7.19 Air Support (added during development)
 8. [The Mission, Beat by Beat](#8-the-mission-beat-by-beat)
 9. [Balance Tables](#9-balance-tables)
 10. [Milestones & Acceptance Criteria](#10-milestones--acceptance-criteria)
@@ -711,6 +712,38 @@ starts on the first click (browser autoplay rules).
 - **Cheats (dev only):** `G` god mode for the team, `N` skip to next phase, `K` kill all enemies, time-scale ×0.25 / ×4.
 - URL flags: `?phase=village` to start at a phase, `?debug=1`.
 
+### 7.19 Air Support (added during development, milestone M5+)
+
+Besides its own guns, the gunship crew can call in strikes from other aircraft on a point you mark
+with the sensor. It's a timing-and-restraint tool, not a replacement for the guns: every strike
+lands after a delay, and the same friendly-fire, danger-close and protected-clinic rules apply.
+Aircraft are generic types with fictional callsigns (names are placeholders, like §2).
+
+| Strike                          | Callsign (placeholder) | Delay after call | Footprint                                      | Good against                                  | Cooldown |
+| ------------------------------- | ---------------------- | ---------------- | ---------------------------------------------- | --------------------------------------------- | -------- |
+| **Gun run** (attack jet, 30 mm) | HAMMER 1-1             | ~7 s             | strip ~60 × 8 m along a chosen axis, ~2 s walk | infantry in the open, technicals, APCs (×0.6) | ~60 s    |
+| **Bomb** (fast jet)             | SABRE 2-2              | ~18 s            | one blast, ~40 m radius, danger close ~100 m   | anything, including APCs                      | ~90 s    |
+
+- **Unlimited use, cooldown only** (user decision, 2026-11-05): each strike can be called again as
+  soon as its cooldown ends. If that makes the gunship's own guns feel redundant, the cooldowns
+  (in `config.ts`) are the knob.
+- **Controls:** `T` cycles air-support mode (GUN RUN → BOMB → off). In that mode the reticle
+  shows the strike's footprint on the ground (gun-run strip, bomb radius) and the HUD shows
+  readiness / cooldown; the wheel rotates the gun-run axis; left click calls the strike on the
+  marked point (it locks to the ground point, not the screen). `T` ends the mode without calling.
+  (Dev cheat `G` stays god mode, see §7.18.)
+- **What you see:** a hot streak crossing the feed shortly before impact; for the gun run, a
+  rapid line of small impacts walking along the strip; for the bomb, a 105 mm-style impact, but
+  bigger. Sound arrives a little later (M9).
+- **Rules:** damage goes through `Explosions.detonate` like the guns (a new weapon source per
+  strike), so killing a friendly fails the mission, near misses raise danger close, and hitting
+  the clinic (M6/M7) fails it too. Kills count as the player's. The FCO warns before confirming a
+  strike whose footprint is within its danger-close distance of Ridgeback (radio lines in M7);
+  until then the HUD shows `DANGER CLOSE` on the preview.
+- **Code:** `gunship/airSupport.ts` (pure: strike definitions, cooldowns, footprint geometry,
+  impact schedule along the strip) and an `AirSupport` system that schedules impacts into
+  `Explosions`; strike stats live in data (`airSupportDefs.ts`).
+
 ---
 
 ## 8. The Mission, Beat by Beat
@@ -862,6 +895,12 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - As built: line of sight (houses + hills) gates enemy and Ridgeback fire; soldiers slide around houses; cover is taken if it has a view of the target **or** brings the soldier ≥ 15 m closer (corner-to-corner bounding on hilly ground); crouched soldiers take less 25/40 mm damage. Until M6 the cover points are generated at house corners and convoys use four temporary test roads (`units/TestScene.ts`).
 - 🧪 **Tests:** cover reservation (one soldier per point); EnemyBrain decisions for given situations; path following reaches the end; vehicle armor multipliers and damage states; wreck blocks road.
 - ✅ **Done when:** enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly.
+
+### M5+ — Air Support (added during development, 1–2 days)
+
+- Gun run and bomb strikes called on a sensor-marked point (§7.19): footprint preview, delay, cooldowns, a hot jet streak, impacts through `Explosions` (friendly fire, danger close).
+- 🧪 **Tests:** cooldown and readiness; gun-run impacts spaced evenly along the chosen axis and strip length; impacts land after the configured delay at the locked ground point; strike damage uses the same friendly-fire / danger-close path (a strike killing a friendly fails the mission); footprint danger-close preview.
+- ✅ **Done when:** calling a strike feels like a deliberate, risky decision, the delay makes you predict where enemies will be, and the guns still matter.
 
 ### M6 — The Handcrafted Map (2–3 days)
 

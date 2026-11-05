@@ -273,10 +273,13 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 ## 4. Next steps
 
 1. **M5 feel test** (§3.1) by the user, then tune and sign off M5; push the M5 commits.
-2. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
+2. **Then M5+: air support** (user idea, 2026-11-05; PLAN.md §7.19 and M5+): gun run (attack jet,
+   HAMMER 1-1) and bomb (fast jet, SABRE 2-2) called on the sensor point with `T`, delay,
+   footprint preview, cooldown-only (unlimited) use, through `Explosions` (friendly fire applies).
+3. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
    cover points and enemy approach paths, flattened ground under the village and LZ, debug
    overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -392,6 +395,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     avoid the houses). Wrecks aren't cover points yet (possible M6/M10 addition).
 36. **Enemy approach paths are supported** (`spawnEnemy(..., { path })`) but the test scene
     doesn't use them; M6/M7 author them in `MapData`.
+
+37. **Air support was added to the plan as M5+** (user request, 2026-11-05), built after the M5
+    sign-off. User choices: generic aircraft with fictional callsigns (not real type names, to fit
+    the fictional setting), and **unlimited use limited only by cooldowns** (Claude had suggested
+    2 gun runs + 1 bomb per mission). Strike key is `T` because §7.18 reserves `G` for god mode.
 
 ---
 
