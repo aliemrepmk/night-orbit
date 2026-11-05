@@ -24,13 +24,14 @@ import { HUD } from '../ui/HUD';
 import { failReasonText, type GunReadout } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
 import { DebugOverlay } from '../debug/DebugOverlay';
-import { formatPlacement, mapOverlay } from '../debug/mapOverlay';
+import { formatPlacement, mapOverlay, nextTourStop } from '../debug/mapOverlay';
 import { ConvoySpawner, WaveSpawner, journeyRoute } from '../units/TestScene';
 import { UnitManager } from '../units/UnitManager';
 import { VehicleManager } from '../units/VehicleManager';
 import { VehicleRenderer } from '../units/VehicleRenderer';
 import { Collision } from '../world/Collision';
 import { MAP } from '../world/MapData';
+import type { ZoneId } from '../world/mapTypes';
 import { Terrain } from '../world/Terrain';
 import { mapHeightField } from '../world/terrainShape';
 import { WorldBuilder } from '../world/WorldBuilder';
@@ -54,6 +55,8 @@ export class Game {
   private readonly world: WorldBuilder;
   /** Map-authoring overlay (F2) and placer (P): dev builds or `?debug=1` only. */
   private readonly overlay: DebugOverlay | null = null;
+  /** Zone the F3 look-test tour has parked the orbit over (null = following Ridgeback). */
+  private tourStop: ZoneId | null = null;
   private readonly bus = new EventBus<GameEvents>();
   private readonly weapons = new Weapons();
   private readonly projectiles = new Projectiles();
@@ -229,6 +232,7 @@ export class Game {
 
   /** The orbit re-centers on Ridgeback once the team has walked away from the orbit center. */
   private followTeam(): void {
+    if (this.tourStop) return; // the F3 tour holds the orbit over a zone
     const team = this.units.teamPosition;
     const c = this.gunship.targetCenter;
     if (Math.hypot(team.x - c.x, team.z - c.z) > CONFIG.ridgeback.followDistance) {
@@ -358,6 +362,15 @@ export class Game {
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
     if (this.overlay) {
       if (this.input.wasPressed('F2')) this.overlay.toggle();
+      // F3: tour the orbit over each zone (for look tests), then back to following the team.
+      if (this.input.wasPressed('F3')) {
+        this.tourStop = nextTourStop(this.tourStop);
+        if (this.tourStop) {
+          const [x, z] = MAP.zones[this.tourStop].center;
+          this.gunship.snapTo(x, z); // jump: the gimbal limit would clamp a far aim point
+          this.sensor.aim.set(x, this.terrain.heightAt(x, z), z);
+        }
+      }
       // Placer: log the crosshair's ground point, ready to paste into MapData.
       if (this.input.wasPressed('KeyP')) {
         const a = this.sensor.aim;

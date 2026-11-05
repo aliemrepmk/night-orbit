@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAP } from '../world/MapData';
-import { formatPlacement, mapOverlay } from './mapOverlay';
+import { ZONE_TOUR, formatPlacement, mapOverlay, nextTourStop } from './mapOverlay';
 
 describe('mapOverlay', () => {
   const shapes = mapOverlay(MAP, [{ x: 1, z: 2 }], 16);
@@ -43,5 +43,21 @@ describe('formatPlacement', () => {
   it('rounds to whole meters, ready to paste into MapData', () => {
     expect(formatPlacement(-123.4, 456.6)).toBe('[-123, 457]');
     expect(formatPlacement(-0.2, 0.4)).toBe('[0, 0]');
+  });
+});
+
+describe('zone tour (F3)', () => {
+  it('visits every zone west to east, then hands the orbit back to the team', () => {
+    const seen: string[] = [];
+    let stop = nextTourStop(null);
+    while (stop !== null) {
+      seen.push(stop);
+      stop = nextTourStop(stop);
+    }
+    expect(seen).toEqual([...ZONE_TOUR]);
+    expect([...ZONE_TOUR].sort()).toEqual(Object.keys(MAP.zones).sort());
+    // West to east.
+    const xs = ZONE_TOUR.map((z) => MAP.zones[z].center[0]);
+    expect([...xs].sort((a, b) => a - b)).toEqual(xs);
   });
 });

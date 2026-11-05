@@ -1,4 +1,4 @@
-import type { MapData, Vec2 } from '../world/mapTypes';
+import type { MapData, Vec2, ZoneId } from '../world/mapTypes';
 
 export type OverlayKind = 'zone' | 'road' | 'route' | 'path' | 'vehicle' | 'spawn' | 'cover';
 
@@ -51,4 +51,17 @@ export function mapOverlay(
 export function formatPlacement(x: number, z: number): string {
   // `+ 0` turns -0 into 0.
   return `[${Math.round(x) + 0}, ${Math.round(z) + 0}]`;
+}
+
+/** Zones in journey order (west → east) for the look-test tour (F3). */
+export const ZONE_TOUR: readonly ZoneId[] = ['op', 'fields', 'village', 'crossroads', 'lz'];
+
+/**
+ * F3 tour step: the next zone to center the orbit on, or null to go back to following Ridgeback
+ * (after the last zone). `current` is null while following the team.
+ */
+export function nextTourStop(current: ZoneId | null): ZoneId | null {
+  if (current === null) return ZONE_TOUR[0];
+  const i = ZONE_TOUR.indexOf(current);
+  return i + 1 < ZONE_TOUR.length ? ZONE_TOUR[i + 1] : null;
 }

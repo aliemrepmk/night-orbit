@@ -63,7 +63,7 @@ export class Input {
     );
 
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'F1' || e.code === 'F2') e.preventDefault(); // browser help / rename
+      if (e.code === 'F1' || e.code === 'F2' || e.code === 'F3') e.preventDefault(); // help / rename / find
       if (!e.repeat) this.pressed.add(e.code);
       this.held.add(e.code);
     });
