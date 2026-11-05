@@ -22,6 +22,8 @@ export interface GroundTracer {
   duration: number;
   active: boolean;
   side: 'enemy' | 'friendly';
+  /** From a mounted gun: drawn bigger and longer. */
+  heavy: boolean;
 }
 
 /**
@@ -142,6 +144,7 @@ export class UnitManager {
         duration: 0,
         active: false,
         side: 'enemy',
+        heavy: false,
       });
     }
     this.rebuildGrid();
@@ -195,6 +198,65 @@ export class UnitManager {
   targetsNear(center: Vector3, radius: number): Target[] {
     this.scratch.length = 0;
     return this.grid.queryRadius(center.x, center.z, radius, this.scratch);
+  }
+
+  /** Nearest living Ridgeback member to `pos`, or null. */
+  nearestFriendlyTo(pos: Vector3): Infantry | null {
+    let best: Infantry | null = null;
+    let bestD = Infinity;
+    for (const f of this.friendlies) {
+      if (!f.alive) continue;
+      const d = (f.position.x - pos.x) ** 2 + (f.position.z - pos.z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  /** Line of sight from a point (e.g. a vehicle's gun) to a soldier's eyes. */
+  canSeeFrom(from: Vector3, to: Infantry): boolean {
+    this.eyeB.copy(to.position).setY(to.position.y + this.cfg.ai.eyeHeight);
+    return this.world.lineOfSight(from, this.eyeB);
+  }
+
+  /** Enemy fire from `from` at Ridgeback for `dt` seconds: dps × accuracy at that distance. */
+  damageTeam(from: Vector3, target: Infantry, dps: number, maxRange: number, dt: number): void {
+    const d = Math.hypot(target.position.x - from.x, target.position.z - from.z);
+    this.team.damage(dps * enemyAccuracy(d, maxRange, this.cfg.enemyFire) * dt);
+  }
+
+  /** A visible burst from any shooter (soldier or mounted gun). */
+  burstFrom(from: Vector3, to: Infantry, count: number, side: 'enemy' | 'friendly', heavy = false) {
+    this.onMuzzleFlash(from);
+    const g = this.cfg.groundFire;
+    for (let k = 0; k < count; k++) {
+      const tr = this.tracers[this.nextTracer];
+      this.nextTracer = (this.nextTracer + 1) % this.tracers.length;
+      tr.from.copy(from);
+      this.aimPos.set(
+        to.position.x + range(this.rng, -3, 3),
+        to.position.y + range(this.rng, -1, 1),
+        to.position.z + range(this.rng, -3, 3),
+      );
+      tr.to.copy(this.aimPos);
+      tr.duration = tr.from.distanceTo(tr.to) / g.tracerSpeed;
+      tr.age = -k * 0.07; // rounds leave the barrel one after another
+      tr.active = true;
+      tr.side = side;
+      tr.heavy = heavy;
+    }
+  }
+
+  /** Makes a living enemy run from (x, z) for `seconds` (blasts, bailing out of a wreck). */
+  scare(e: Infantry, x: number, z: number, seconds: number): void {
+    if (!e.alive) return;
+    this.releaseCover(e);
+    e.action = 'flee';
+    e.state = 'fleeing';
+    e.fleeLeft = Math.max(e.fleeLeft, seconds);
+    this.awayFrom(e, x, z, 60);
   }
 
   update(dt: number): void {
@@ -418,12 +480,7 @@ export class UnitManager {
     this.grid.queryRadius(pos.x, pos.z, r, this.neighbors);
     for (const t of this.neighbors) {
       if (t.side !== 'enemy' || t.kind !== 'infantry' || !t.alive) continue;
-      const e = t as Infantry;
-      this.releaseCover(e);
-      e.action = 'flee';
-      e.state = 'fleeing';
-      e.fleeLeft = Math.max(e.fleeLeft, range(this.rng, ai.panicMin, ai.panicMax));
-      this.awayFrom(e, pos.x, pos.z, 60);
+      this.scare(t as Infantry, pos.x, pos.z, range(this.rng, ai.panicMin, ai.panicMax));
     }
   }
 
@@ -512,17 +569,7 @@ export class UnitManager {
   }
 
   private nearestFriendly(e: Infantry): Infantry | null {
-    let best: Infantry | null = null;
-    let bestD = Infinity;
-    for (const f of this.friendlies) {
-      if (!f.alive) continue;
-      const d = (f.position.x - e.position.x) ** 2 + (f.position.z - e.position.z) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = f;
-      }
-    }
-    return best;
+    return this.nearestFriendlyTo(e.position);
   }
 
   /** Seek a point and slow down when close (arrive steering), plus separation. */
@@ -583,26 +630,10 @@ export class UnitManager {
     }
   }
 
-  /** A visible burst: muzzle flash plus a few tracers that scatter around the target. */
+  /** A soldier's burst: muzzle flash plus a few tracers that scatter around the target. */
   private burst(from: Infantry, to: Infantry, side: 'enemy' | 'friendly'): void {
-    this.onMuzzleFlash(from.position);
-    const g = this.cfg.groundFire;
-    for (let k = 0; k < from.def.burst; k++) {
-      const tr = this.tracers[this.nextTracer];
-      this.nextTracer = (this.nextTracer + 1) % this.tracers.length;
-      tr.from.copy(from.position);
-      tr.from.y += 0.3;
-      this.aimPos.set(
-        to.position.x + range(this.rng, -3, 3),
-        to.position.y + range(this.rng, -1, 1),
-        to.position.z + range(this.rng, -3, 3),
-      );
-      tr.to.copy(this.aimPos);
-      tr.duration = tr.from.distanceTo(tr.to) / g.tracerSpeed;
-      tr.age = -k * 0.07; // rounds leave the barrel one after another
-      tr.active = true;
-      tr.side = side;
-    }
+    this.eyeA.copy(from.position).setY(from.position.y + 0.3);
+    this.burstFrom(this.eyeA, to, from.def.burst, side);
   }
 
   private updateTracers(dt: number): void {

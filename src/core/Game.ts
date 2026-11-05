@@ -22,8 +22,10 @@ import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import { failReasonText, type GunReadout } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
-import { TEST_ROUTE, WaveSpawner } from '../units/TestScene';
+import { ConvoySpawner, TEST_ROADS, TEST_ROUTE, WaveSpawner } from '../units/TestScene';
 import { UnitManager } from '../units/UnitManager';
+import { VehicleManager } from '../units/VehicleManager';
+import { VehicleRenderer } from '../units/VehicleRenderer';
 import { Collision } from '../world/Collision';
 import { PlaceholderWorld } from '../world/PlaceholderWorld';
 import { Terrain } from '../world/Terrain';
@@ -51,7 +53,10 @@ export class Game {
   private readonly explosions: Explosions;
   private readonly units: UnitManager;
   private readonly spawner = new WaveSpawner(createRng(5050));
+  private readonly convoys = new ConvoySpawner(createRng(7070));
+  private readonly vehicles: VehicleManager;
   private readonly infantryView = new InfantryRenderer();
+  private readonly vehicleView = new VehicleRenderer();
   private readonly audio = new AudioEngine();
   private readonly spreadRng = createRng(31337);
   /** Trigger state gathered per frame, consumed by the next fixed step. */
@@ -87,13 +92,21 @@ export class Game {
       world: this.collision,
       cover: coverFromBoxes(this.collision.boxes, CONFIG.ai.coverMargin),
     });
+    this.vehicles = new VehicleManager(
+      this.units,
+      ground,
+      this.bus,
+      createRng(6060),
+      CONFIG.vehicles,
+      CONFIG.testScene.machineGunnerChance,
+    );
+    this.world.addRoads(TEST_ROADS);
     this.gunship.snapTo(this.units.teamPosition.x, this.units.teamPosition.z);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
 
     this.renderer = new Renderer(canvas, this.sensor.camera);
     this.renderer.scene.add(this.world.root);
-    for (const truck of this.world.targets) this.units.addTarget(truck);
-    this.renderer.scene.add(this.infantryView.root);
+    this.renderer.scene.add(this.infantryView.root, this.vehicleView.mesh);
 
     this.effects = new Effects(ground, createRng(77));
     this.renderer.scene.add(this.effects.root);
@@ -181,10 +194,12 @@ export class Game {
     );
     if (playing) {
       this.spawner.update(dt, this.units);
+      this.convoys.update(dt, this.units, this.vehicles);
       this.units.update(dt);
+      this.vehicles.update(dt);
       this.followTeam();
     }
-    this.world.update(dt, this.effects);
+    this.vehicleView.emitEffects(this.vehicles.vehicles, this.effects, dt);
     this.effects.update(dt);
     this.sensorFx.update(dt);
     this.dangerCloseLeft = Math.max(0, this.dangerCloseLeft - dt);
@@ -238,6 +253,7 @@ export class Game {
   private syncEffects(): void {
     const heightPx = this.viewportHeight * this.renderer.webgl.getPixelRatio();
     this.infantryView.sync(this.units, heightPx, this.sensor.fovDeg);
+    this.vehicleView.sync(this.vehicles.vehicles);
     const g = CONFIG.groundFire;
     this.effects.sync(heightPx, this.sensor.fovDeg, this.gunship.position, (emit) => {
       this.projectiles.forEachActive((s) => {
@@ -251,7 +267,8 @@ export class Game {
         if (!tr.active || tr.age < 0) continue;
         this.tracerHead.lerpVectors(tr.from, tr.to, tr.age / tr.duration);
         this.tracerDir.subVectors(tr.to, tr.from).normalize();
-        emit(this.tracerHead, this.tracerDir, g.tracerLength, g.tracerSize);
+        if (tr.heavy) emit(this.tracerHead, this.tracerDir, g.heavyTracerLength, g.heavyTracerSize);
+        else emit(this.tracerHead, this.tracerDir, g.tracerLength, g.tracerSize);
       }
     });
   }
@@ -310,6 +327,7 @@ export class Game {
             triangles: this.renderer.triangles,
             kills: this.kills,
             enemies: this.units.aliveEnemies,
+            vehicles: this.vehicles.alive,
           }
         : null,
     });

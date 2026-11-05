@@ -30,6 +30,7 @@ export interface HudData {
     triangles: number;
     kills: number;
     enemies: number;
+    vehicles: number;
   } | null;
 }
 
@@ -119,7 +120,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}`
+        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}`
         : '',
     );
   }

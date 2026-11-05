@@ -255,11 +255,40 @@ export const CONFIG = {
     followDistance: 70,
   },
 
+  /** Enemy vehicles (PLAN.md §7.10; per-type stats live in `units/vehicleDefs.ts`). */
+  vehicles: {
+    /** PLAN.md §11: at most 12 live vehicles + wrecks; old wrecks and empty trucks recycle. */
+    maxVehicles: 12,
+    /** Driving: speeding up and braking (m/s²), turning (rad/s), slowing within this of corners. */
+    accel: 2.5,
+    brake: 7,
+    turnRate: 1.2,
+    cornerSlowRadius: 18,
+    /** A vehicle or wreck this close ahead (and within `blockWidth` sideways) blocks the road. */
+    blockDistance: 13,
+    blockWidth: 3.5,
+    /** Seconds stuck behind something before unloading / opening fire right there. */
+    blockedWait: 2,
+    /** One soldier climbs out of a truck every this many seconds. */
+    unloadInterval: 0.6,
+    /** Chance that each soldier still inside a destroyed vehicle bails out (and runs). */
+    bailChance: 0.5,
+    /** Mounted guns pick a target this often, and show a burst every 0.4–1.0 s. */
+    thinkInterval: 0.5,
+    burstMin: 0.4,
+    burstMax: 1.0,
+    /** Wrecks younger than this (s) are never recycled for new vehicles. */
+    wreckMinAge: 60,
+  },
+
   /** Enemy and friendly tracers on the ground (short, purely visual). */
   groundFire: {
     tracerSpeed: 380,
     tracerLength: 5,
     tracerSize: 0.55,
+    /** Mounted guns (technicals, APCs) fire bigger, longer tracers. */
+    heavyTracerLength: 9,
+    heavyTracerSize: 1.1,
     /** At most this many ground tracers in flight (pooled). */
     maxTracers: 160,
   },
@@ -270,7 +299,7 @@ export const CONFIG = {
     maxEnemies: 60,
     /** Groups spawned at the start, then one more every `waveInterval` seconds. */
     initialGroups: 3,
-    waveInterval: 8,
+    waveInterval: 10,
     groupMin: 6,
     groupMax: 10,
     /** Groups appear this far from the team, scattered within `groupRadius`. */
@@ -279,6 +308,13 @@ export const CONFIG = {
     groupRadius: 14,
     /** PLAN.md §9: one in six enemies is a machine gunner. */
     machineGunnerChance: 1 / 6,
+    /** Convoys: the first one after this many seconds, then one every `convoyInterval`. */
+    convoyFirst: 20,
+    convoyInterval: 45,
+    /** Spacing between vehicles in a convoy (m), and the chance of a technical / an APC joining the truck. */
+    convoyGap: 22,
+    technicalChance: 0.6,
+    apcChance: 0.3,
   },
 
   hud: {

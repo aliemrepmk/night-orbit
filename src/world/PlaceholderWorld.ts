@@ -7,49 +7,40 @@ import {
   InstancedMesh,
   Matrix4,
   Mesh,
-  Object3D,
   Quaternion,
   Vector3,
 } from 'three';
+import type { PathPoint } from '../ai/Paths';
 import { createRng, range, type Rng } from '../core/rng';
-import type { Effects } from '../fx/Effects';
-import { FIRE, HEAT } from '../fx/Heat';
+import { HEAT } from '../fx/Heat';
 import { ALBEDO, GLOW, groundAlbedo, signature, type Signature } from '../fx/Light';
 import { ThermalMaterial } from '../render/ThermalMaterial';
 import type { Collision } from './Collision';
-import { DummyTarget } from './DummyTarget';
 import { createGroundHeat } from './groundHeat';
+import { buildRoadGeometry } from './Roads';
 import type { Terrain } from './Terrain';
-
-/** A dummy truck plus the meshes/materials that draw it. */
-interface DummyView {
-  target: DummyTarget;
-  obj: Object3D;
-  body: ThermalMaterial;
-  engine: ThermalMaterial;
-}
 
 const MAX_WINDOWS = 160;
 const MAX_CHIMNEYS = 40;
 
 /**
- * TEMPORARY content so there is something to aim at: a cluster of houses, a farm,
- * tree lines and two dummy trucks you can shoot. Soldiers are real units since M4
- * (`units/`); M5 replaces the trucks and M6 replaces the rest with the handcrafted map.
+ * TEMPORARY content so there is something to fight over: a cluster of houses, a farm, tree
+ * lines and the test roads. Soldiers (M4) and vehicles (M5) are real units in `units/`;
+ * M6 replaces all of this with the handcrafted map.
  * Every object has a signature: heat for thermal (`fx/Heat.ts`, PLAN.md §7.5) and near-IR
  * albedo + glow for night vision (`fx/Light.ts`).
  */
 export class PlaceholderWorld {
   readonly root = new Group();
-  /** Everything the guns can hurt. */
-  readonly targets: DummyTarget[] = [];
-  private readonly dummies: DummyView[] = [];
 
   private readonly wallMat = new ThermalMaterial({
     signature: signature(HEAT.wall, ALBEDO.wall),
   });
   private readonly roofMat = new ThermalMaterial({
     signature: signature(HEAT.roof, ALBEDO.roof),
+  });
+  private readonly roadMat = new ThermalMaterial({
+    signature: signature(HEAT.road, ALBEDO.road),
   });
   private readonly windows = new InstancedSignature(
     new BoxGeometry(1.2, 1.1, 0.3),
@@ -85,21 +76,17 @@ export class PlaceholderWorld {
     this.addHouses(rng, 380, -80, 3, 30); // crossroads
     this.root.add(this.windows.finish(), this.chimneys.finish());
     this.addTrees(rng);
-    this.addDummies(rng);
+    // Roads sit just above the terrain; the offset keeps them from flickering into it.
+    this.roadMat.polygonOffset = true;
+    this.roadMat.polygonOffsetFactor = -2;
+    this.roadMat.polygonOffsetUnits = -4;
   }
 
-  update(dt: number, effects: Effects): void {
-    for (const d of this.dummies) {
-      const t = d.target;
-      t.update(dt);
-      d.obj.position.copy(t.position);
-      d.obj.rotation.set(0, t.heading, 0);
-      const fire = t.burning ? (t.heat - FIRE.min) / (FIRE.max - FIRE.min) : 0;
-      d.body.setSignature(t.heat, t.alive ? ALBEDO.vehicleBody : 0.08, t.burning ? 0.6 * fire : 0);
-      d.engine.setHeat(t.alive ? HEAT.engine : t.heat);
-      if (t.burning) effects.fire(t.position, dt);
-      else if (t.smoking || !t.alive) effects.smokePuff(t.position, dt, t.alive ? 1 : 0.3);
-    }
+  /** Dirt roads as ribbons over the terrain (the test roads until M6's map data). */
+  addRoads(roads: readonly (readonly PathPoint[])[], width = 7): void {
+    const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
+    for (const r of roads)
+      this.root.add(new Mesh(buildRoadGeometry(r, width, ground), this.roadMat));
   }
 
   private addHouses(rng: Rng, cx: number, cz: number, count: number, spread: number): void {
@@ -198,41 +185,6 @@ export class PlaceholderWorld {
       }
     }
     this.root.add(trees.finish());
-  }
-
-  /** Two trucks circling the village: moving targets until M5 brings real vehicles. */
-  private addDummies(rng: Rng): void {
-    const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
-    const truckGeo = new BoxGeometry(2.4, 2.4, 6);
-    const engineGeo = new BoxGeometry(2.0, 0.6, 1.4);
-
-    for (let k = 0; k < 2; k++) {
-      const target = new DummyTarget(
-        { cx: 0, cz: 0, r: 180 + k * 60, speed: 9, phase: range(rng, 0, Math.PI * 2) },
-        ground,
-        1.2,
-        k + 1,
-      );
-      const body = new ThermalMaterial({
-        signature: signature(HEAT.vehicleBody, ALBEDO.vehicleBody),
-      });
-      const engine = new ThermalMaterial({
-        signature: signature(HEAT.engine, ALBEDO.vehicleBody),
-        noise: 0.3,
-      });
-      const truck = new Group();
-      truck.add(new Mesh(truckGeo, body));
-      const block = new Mesh(engineGeo, engine); // hot engine block under the hood
-      block.position.set(0, 1.25, 2.1);
-      truck.add(block);
-      this.addDummy({ target, obj: truck, body, engine });
-    }
-  }
-
-  private addDummy(d: DummyView): void {
-    this.dummies.push(d);
-    this.targets.push(d.target);
-    this.root.add(d.obj);
   }
 }
 

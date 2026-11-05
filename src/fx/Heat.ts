@@ -15,6 +15,8 @@ export const HEAT = {
   soldier: 0.95,
   vehicleBody: 0.4,
   engine: 1.0,
+  /** Tyres and tracks warm up from rolling. */
+  wheels: 0.55,
   exhaust: 0.9,
   flash: 1.0,
 } as const;
