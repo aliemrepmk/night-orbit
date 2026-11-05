@@ -37,6 +37,7 @@ M5 checked by Claude in Chrome (enemies at house corners, convoy on the west roa
 105 mm truck kill → burning wreck with the convoy queued behind it; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls; §6).
 M5 feel test passed (user, 2026-11-05). M5+ checked by Claude in Chrome (strip and circle previews, inbound
 callouts, rearm countdowns, gun-run lethality, bomb flash/shockwave/whiteout and jet streak; 60 FPS, GPU ~8 ms; §6).
+M6 and its feedback fixes checked by Claude in Chrome (zone tour in all sensors, no spawn camping, enemies cross on the bridge; §6).
 
 ---
 
@@ -567,6 +568,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M6 play (Claude, Chrome)        | 58 of 64 enemies spawned on approach paths, 26 heading for cover, a convoy queued into the village; 60 FPS, 30–34 calls                    | Works; no console errors. GPU 7–8 ms (~10 ms with the F2 overlay)                                                              |
 | 2026-11-05 | M6 look test (user)             | "Enemies can be spawn killed (same point)", "village can be populated with more roads, houses", "enemies do not use the bridge"            | Anti-camping spawner, 43-house village on 5 streets, bridge detours (decisions 47–49); look test to repeat                     |
 | 2026-11-05 | M6 fixes (Claude, headless)     | Chrome extension was not connected, so checked headless: a 3-min real-map scene run, every enemy stream crossing on the bridge             | Regression test `mapScene.test.ts` (fails without the detour: an enemy waded 185 m from the bridge). Not yet seen in a browser |
+| 2026-11-05 | M6 fixes (Claude, Chrome)       | F3 tour of all 5 zones in WHT/BLK/NV at all zooms reads right; spawn camping: crosshair held on a spawn site, later groups 239–520 m away; 14 live enemy stream crossings, all ≤ 3.4 m from the bridge center (Ridgeback 1.6 m); bomb lands on its point; 60 FPS, GPU 7.6–8.2 ms (11.3 ms with F2), 30–38 calls; no console errors | Fixes confirmed in the browser; M6 look test (user) still to repeat |
 
 ---
 
