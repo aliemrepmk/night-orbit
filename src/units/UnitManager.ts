@@ -443,7 +443,8 @@ export class UnitManager {
 
   /**
    * Nearest free cover point that is worth taking: close to the soldier, within reach of the
-   * target, not farther from it than the soldier already is, and with a view of the target.
+   * target, not farther from it than the soldier already is, and either with a view of the
+   * target or at least `coverBound` meters closer to it.
    */
   private findCover(e: Infantry, t: Infantry, dist: number): CoverPoint | null {
     const ai = this.cfg.ai;
@@ -454,6 +455,9 @@ export class UnitManager {
       if (p.id === e.rejectedCover) return false;
       const d = Math.hypot(p.x - t.position.x, p.z - t.position.z);
       if (d > reach || d > dist + 5) return false;
+      // Cover that moves it well forward is worth taking even without a view from it: it
+      // bounds from corner to corner toward the team.
+      if (d <= dist - ai.coverBound) return true;
       eye.set(p.x, this.groundAt(p.x, p.z) + this.cfg.infantry.lift + ai.eyeHeight, p.z);
       return this.world.lineOfSight(eye, this.eyeB);
     });

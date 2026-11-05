@@ -191,6 +191,8 @@ export const CONFIG = {
     coverEngageFactor: 1.25,
     /** A cover point must be within range × this of the target (and not farther than the soldier). */
     coverReach: 0.9,
+    /** Cover at least this much closer to the target is taken even without a view from it (bounding forward). */
+    coverBound: 15,
     /** Close enough to count as in cover (m), and how far from walls corners are placed. */
     coverArrive: 0.8,
     coverMargin: 1.4,

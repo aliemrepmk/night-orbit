@@ -74,6 +74,28 @@ describe('UnitManager enemy AI (M5)', () => {
     expect(e.cover).toBeNull();
   });
 
+  it('bounds forward to cover without a view, then moves on from it', () => {
+    const blind: UnitWorld = {
+      lineOfSight: () => false,
+      pushOut: (x, z, _r, out) => {
+        out.x = x;
+        out.z = z;
+        return false;
+      },
+    };
+    const cover = new CoverSet();
+    const fwd = cover.add(160, 0); // 30 m closer to the team
+    const side = cover.add(188, 8); // no closer: needs a view, which nobody has
+    const { units } = rig({ cover, world: blind });
+    const e = units.spawnEnemy(INFANTRY.rifleman, 190, 0)!;
+    step(units, 0.5);
+    expect(e.cover).toBe(fwd);
+    expect(e.cover).not.toBe(side);
+    step(units, 20);
+    expect(e.rejectedCover).toBe(fwd.id); // got there, couldn't see, moved on
+    expect(e.position.x).toBeLessThan(158);
+  });
+
   it('frees its cover point when it dies', () => {
     const cover = new CoverSet();
     const point = cover.add(160, 0);
