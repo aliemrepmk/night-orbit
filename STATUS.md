@@ -19,12 +19,13 @@ every session.
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
+| **M5+** Air support                     | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
 | M6 – M10                                | ⬜ Not started                                                         |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **278 tests in 39 files**).
-`npm run build` works (≈636 kB JS, 167 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **296 tests in 40 files**).
+`npm run build` works (≈642 kB JS, 169 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed; the M5 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed; the M5 and M5+ commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -33,6 +34,8 @@ M4 checked by Claude in Chrome (team, strobes in all three sensors, 60 enemies, 
 friendly-fire fail screens, danger close; 60 FPS, GPU ~7.7–8.1 ms, ≤ 28 draw calls; §6). Feel test passed (user, 2026-11-05).
 M5 checked by Claude in Chrome (enemies at house corners, convoy on the west road, mounted-gun tracers,
 105 mm truck kill → burning wreck with the convoy queued behind it; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls; §6).
+M5 feel test passed (user, 2026-11-05). M5+ checked by Claude in Chrome (strip and circle previews, inbound
+callouts, rearm countdowns, gun-run lethality, bomb flash/shockwave/whiteout and jet streak; 60 FPS, GPU ~8 ms; §6).
 
 ---
 
@@ -60,7 +63,10 @@ src/
     Gunship.ts (+test)     counter-clockwise orbit, center glide, heading
     Sensor.ts (+test)      ground-stabilized camera, slew, gimbal limit, zoom, telemetry getters
     sensorMath.ts (+test)  pure math: slew, meters-per-pixel, clamp, heading, smoothing
-    weaponDefs.ts (+test)  ALL weapon stats (PLAN §9) + per-weapon impact effects (data)
+    weaponDefs.ts (+test)  ALL weapon stats (PLAN §9) + per-weapon impact effects (data); the
+                           `Ordnance` type every impact (guns and strikes) shares
+    airSupportDefs.ts      ALL air-strike stats (gun run, bomb) + the ORDNANCE table (data)
+    AirSupport.ts (+test)  strike aiming mode, cooldowns, impact schedule, jet passes, footprints
     Weapons.ts (+test)     state machines: 25 mm heat/overheat, 40 mm clip, 105 mm reload
     ballistics.ts (+test)  flight time, spread disc, spread across view, muzzle position
     Projectiles.ts (+test) pooled shells in flight; impact on exactly the right tick
@@ -134,15 +140,40 @@ src/
 ### Controls (current)
 
 Mouse = slew sensor · **left click = fire (hold for 25 mm)** · `1`/`2`/`3` = 25/40/105 mm ·
-`Q` or wheel = cycle weapon · `F` = sensor: white-hot → black-hot → night vision · `Esc` = pause ·
-`F1` = FPS / GPU ms / draw calls / triangles / kills / live enemies. If pointer lock is unavailable, **hold the
+`Q` or wheel = cycle weapon · `T` = air support: gun run → bomb → off (wheel turns the run, click calls it) ·
+`F` = sensor: white-hot → black-hot → night vision · `Esc` = pause ·
+`F1` = FPS / GPU ms / draw calls / triangles / kills / live enemies / live vehicles. If pointer lock is unavailable, **hold the
 right button and drag** to aim. Add `?debug=1` to the URL to start with stats on.
 
 ---
 
 ## 3. Manual checklists
 
-### 3.1 M5 feel test (passed 2026-11-05): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
+### 3.1 M5+ feel test (pending): "calling a strike is a deliberate, risky decision; the delay makes you predict; the guns still matter"
+
+Run `npm run dev`, click to begin. Strike stats: `src/gunship/airSupportDefs.ts`; wheel step and
+jet streak: `CONFIG.airSupport`.
+
+- [ ] **Aiming:** `T` once = GUN RUN (▶ on its HUD line, a dashed 60 × 8 m strip on the ground
+      under the crosshair, running away from the aircraft); the wheel turns it in 15° steps.
+      `T` again = BOMB (dashed 40 m circle), `T` again = back to the guns. Pressing `1`/`2`/`3`
+      or `Q` also returns to the guns. While aiming, clicks don't fire the guns.
+- [ ] **Calling:** a click calls the strike on that ground point (it stays there even if you
+      look away). The top of the HUD shows `HAMMER 1-1 INBOUND 7` (gun run) or
+      `SABRE 2-2 INBOUND 18` (bomb), counting down; the strike line shows `REARM 60` / `REARM 90`.
+- [ ] **Gun run:** a hot streak dives in along the strip, and 40 small hits walk along it in 2 s.
+      Claude measured ~65 % of soldiers inside the strip killed (they keep walking during the
+      7 s delay, so lead the group). Good against technicals; hurts APCs (×0.6).
+- [ ] **Bomb:** 18 s later, one huge flash, shockwave ring, shake and whiteout; anything within
+      ~25 m dies, APCs included. The jet passes high overhead just before.
+- [ ] **Restraint:** with a friendly within 25 m of the strip (100 m of the bomb point) the
+      footprint turns solid and blinks, and `FRIENDLIES DANGER CLOSE` shows. Calling anyway can
+      kill Ridgeback → `FRIENDLY FIRE` fail screen.
+- [ ] **Balance:** unlimited calls, cooldown only (your choice). Does it make the guns feel
+      redundant? Knobs: `cooldown`, `delay`, `impacts`, `damage` in `airSupportDefs.ts`.
+- [ ] `F1`: GPU stays well under 16 ms during a gun run and after a bomb.
+
+### 3.1a M5 feel test (passed 2026-11-05): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats; F1 shows `VEH` = live vehicles), click
 to begin. Same moving-team scene as M4, plus a convoy every 45 s (first at 20 s) on the road that
@@ -171,7 +202,7 @@ ends nearest Ridgeback. Tuning: `CONFIG.ai`, `CONFIG.vehicles`, `CONFIG.testScen
 - [ ] Difficulty: with no player fire the team was overrun at ~75 s (Claude's run). Waves now come
       every 10 s (was 8) to make room for the convoys.
 
-### 3.1a M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
+### 3.1b M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats), click to begin. The orbit starts over
 Ridgeback (four soldiers in a diamond, west of the village) and follows them as they walk.
@@ -199,7 +230,7 @@ RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click re
 - [ ] Orbit follow: when the team walks on, the orbit glides after them and you can still aim
       around them (the gimbal limit is 450 m from the orbit center).
 
-### 3.1b M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
+### 3.1c M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
 
 Run `npm run dev`, open the URL, click to begin, press `F1`. Weapon numbers are in
 `src/gunship/weaponDefs.ts` (stats + impact effects); feedback/effects tuning in `CONFIG.sensor`
@@ -272,9 +303,7 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M5+: air support** (in progress) (user idea, 2026-11-05; PLAN.md §7.19 and M5+): gun run (attack jet,
-   HAMMER 1-1) and bomb (fast jet, SABRE 2-2) called on the sensor point with `T`, delay,
-   footprint preview, cooldown-only (unlimited) use, through `Explosions` (friendly fire applies).
+1. **M5+ feel test** (§3.1) by the user, then tune and sign off M5+; push the M5 and M5+ commits.
 2. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
    cover points and enemy approach paths, flattened ground under the village and LZ, debug
    overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
@@ -400,32 +429,48 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     the fictional setting), and **unlimited use limited only by cooldowns** (Claude had suggested
     2 gun runs + 1 bomb per mission). Strike key is `T` because §7.18 reserves `G` for god mode.
 
+38. **Every impact is now `Ordnance`** (guns and strikes share one type in `weaponDefs.ts`);
+    `DamageSource`, armor tables and the `impact` / `dangerClose` / `friendlyKilledByPlayer`
+    events take any `OrdnanceId` (`'25' | '40' | '105' | 'gunrun' | 'bomb'`). Air-strike kills
+    count as the player's (`KIA`). APC armor vs the gun run is 0.6, vs the bomb 1.0.
+39. **Gun-run tuning came from browser measurements:** with a 15 m panic radius per hit, soldiers
+    ran out of the strip before the later rounds arrived (0 kills on a group of 9), so it is 6 m;
+    30 hits × 120 damage killed ~30 % of soldiers in the strip, so it is now 40 × 200 (inner 1.5 m,
+    blast 4.5 m) → ~65 %. Gun-run hits leave no craters (40 per run would flush the 60-crater pool).
+40. **Air-support input:** `T` cycles the aiming mode; while aiming, the trigger and wheel belong to
+    the strike (no gun fire, wheel turns the run); selecting a gun ends aiming. A strike on
+    cooldown ignores the click and stays in aiming mode. The run starts pointing away from the
+    aircraft. Strikes only advance while playing (they wait during pause and stop on failure).
+    The preview is projected to screen pixels each frame and drawn as an SVG polygon in the HUD.
+
 ---
 
 ## 6. Manual test results / notes
 
 _(Fill in after testing.)_
 
-| Date       | Item                          | Result                                                                                                                                     | Action                                                                                                         |
-| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| 2026-11-03 | M1 manual checklist           | User reported everything works                                                                                                             | None; M1 signed off                                                                                            |
-| 2026-11-03 | M2 look (Claude, Chrome)      | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                                    | Added dark HUD outline; softened soil patches                                                                  |
-| 2026-11-03 | M2 aiming (user)              | "Looking around feels a bit laggy"                                                                                                         | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
-| 2026-11-03 | NV look (Claude, Chrome)      | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                                   | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
-| 2026-11-03 | M2 look test (user)           | "It looks well for now"                                                                                                                    | None; M2 signed off                                                                                            |
-| 2026-11-03 | NV look test (user)           | Approved ("mark it signed off")                                                                                                            | None; NV signed off                                                                                            |
-| 2026-11-03 | M3 tracers (Claude)           | First meters of each tracer drew as huge white blobs near the camera                                                                       | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
-| 2026-11-03 | M3 smoke (Claude)             | 105 mm smoke too faint to read after the flash                                                                                             | Warmer, more opaque plume                                                                                      |
-| 2026-11-03 | M3 lead test (scripted)       | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                                   | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
-| 2026-11-04 | M3 feel test (user)           | "M3 seems to be working well"; signed off                                                                                                  | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
-| 2026-11-04 | M4 scripted (Claude, Chrome)  | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                                   | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
-| 2026-11-04 | M4 fail/warn (Claude, Chrome) | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                                     | Works as designed                                                                                              |
-| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls                    | None                                                                                                           |
-| 2026-11-05 | M4 feel test (user)           | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                                                | None; M4 signed off                                                                                            |
-| 2026-11-05 | M5 cover (Claude, Chrome)     | No enemy ever took cover: hills blocked the view from every corner to the team                                                             | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover             |
-| 2026-11-05 | M5 convoy (Claude, Chrome)    | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                 |
-| 2026-11-05 | M5 scripted (Claude, Chrome)  | No player fire: convoys + waves overran the team at ~75 s                                                                                  | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                     |
-| 2026-11-05 | M5 feel test (user)           | "M5 feel test seems good"                                                                                                                  | None; M5 signed off                                                                                            |
+| Date       | Item                            | Result                                                                                                                                     | Action                                                                                                         |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 2026-11-03 | M1 manual checklist             | User reported everything works                                                                                                             | None; M1 signed off                                                                                            |
+| 2026-11-03 | M2 look (Claude, Chrome)        | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                                    | Added dark HUD outline; softened soil patches                                                                  |
+| 2026-11-03 | M2 aiming (user)                | "Looking around feels a bit laggy"                                                                                                         | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
+| 2026-11-03 | NV look (Claude, Chrome)        | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                                   | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
+| 2026-11-03 | M2 look test (user)             | "It looks well for now"                                                                                                                    | None; M2 signed off                                                                                            |
+| 2026-11-03 | NV look test (user)             | Approved ("mark it signed off")                                                                                                            | None; NV signed off                                                                                            |
+| 2026-11-03 | M3 tracers (Claude)             | First meters of each tracer drew as huge white blobs near the camera                                                                       | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
+| 2026-11-03 | M3 smoke (Claude)               | 105 mm smoke too faint to read after the flash                                                                                             | Warmer, more opaque plume                                                                                      |
+| 2026-11-03 | M3 lead test (scripted)         | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                                   | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
+| 2026-11-04 | M3 feel test (user)             | "M3 seems to be working well"; signed off                                                                                                  | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
+| 2026-11-04 | M4 scripted (Claude, Chrome)    | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                                   | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
+| 2026-11-04 | M4 fail/warn (Claude, Chrome)   | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                                     | Works as designed                                                                                              |
+| 2026-11-04 | M4 look (Claude, Chrome)        | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls                    | None                                                                                                           |
+| 2026-11-05 | M4 feel test (user)             | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                                                | None; M4 signed off                                                                                            |
+| 2026-11-05 | M5 cover (Claude, Chrome)       | No enemy ever took cover: hills blocked the view from every corner to the team                                                             | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover             |
+| 2026-11-05 | M5 convoy (Claude, Chrome)      | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                 |
+| 2026-11-05 | M5 scripted (Claude, Chrome)    | No player fire: convoys + waves overran the team at ~75 s                                                                                  | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                     |
+| 2026-11-05 | M5 feel test (user)             | "M5 feel test seems good"                                                                                                                  | None; M5 signed off                                                                                            |
+| 2026-11-05 | M5+ gun run (Claude, Chrome)    | 0 kills on a group of 9: first hits panicked them out of the strip; then ~30 % killed in the strip                                         | Panic radius 15 → 6 m, 30 × 120 → 40 × 200 damage: ~65 % (11 of 17) killed over 6 runs                         |
+| 2026-11-05 | M5+ bomb + HUD (Claude, Chrome) | Bomb killed a truck outright; flash, shockwave, whiteout, jet streak; strip/circle previews, INBOUND and REARM lines OK                    | Controls-table row was too long (squashed the key column): shortened. 60 FPS, GPU ~8 ms, no console errors     |
 
 ---
 
@@ -433,6 +478,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M5 feel test, then M6)."
+> "Read STATUS.md and PLAN.md. Let's continue (M5+ feel test, then M6)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
