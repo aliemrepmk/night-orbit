@@ -19,13 +19,13 @@ every session.
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
-| **M5+** Air support                     | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
+| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | M6 – M10                                | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **296 tests in 40 files**).
 `npm run build` works (≈642 kB JS, 169 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed; the M5 and M5+ commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -149,7 +149,7 @@ right button and drag** to aim. Add `?debug=1` to the URL to start with stats on
 
 ## 3. Manual checklists
 
-### 3.1 M5+ feel test (pending): "calling a strike is a deliberate, risky decision; the delay makes you predict; the guns still matter"
+### 3.1 M5+ feel test (passed 2026-11-05): "calling a strike is a deliberate, risky decision; the delay makes you predict; the guns still matter"
 
 Run `npm run dev`, click to begin. Strike stats: `src/gunship/airSupportDefs.ts`; wheel step and
 jet streak: `CONFIG.airSupport`.
@@ -303,11 +303,10 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M5+ feel test** (§3.1) by the user, then tune and sign off M5+; push the M5 and M5+ commits.
-2. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
+1. **M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
    cover points and enemy approach paths, flattened ground under the village and LZ, debug
    overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -471,6 +470,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M5 feel test (user)             | "M5 feel test seems good"                                                                                                                  | None; M5 signed off                                                                                            |
 | 2026-11-05 | M5+ gun run (Claude, Chrome)    | 0 kills on a group of 9: first hits panicked them out of the strip; then ~30 % killed in the strip                                         | Panic radius 15 → 6 m, 30 × 120 → 40 × 200 damage: ~65 % (11 of 17) killed over 6 runs                         |
 | 2026-11-05 | M5+ bomb + HUD (Claude, Chrome) | Bomb killed a truck outright; flash, shockwave, whiteout, jet streak; strip/circle previews, INBOUND and REARM lines OK                    | Controls-table row was too long (squashed the key column): shortened. 60 FPS, GPU ~8 ms, no console errors     |
+| 2026-11-05 | M5+ feel test (user)            | "Feel test is good"                                                                                                                        | None; M5+ signed off                                                                                           |
 
 ---
 
@@ -478,6 +478,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M5+ feel test, then M6)."
+> "Read STATUS.md and PLAN.md. Let's start M6."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.

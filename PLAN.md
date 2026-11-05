@@ -897,7 +897,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** cover reservation (one soldier per point); EnemyBrain decisions for given situations; path following reaches the end; vehicle armor multipliers and damage states; wreck blocks road.
 - ✅ **Done when:** enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly.
 
-### M5+ — Air Support (added during development, 1–2 days) — code-complete, awaiting feel test
+### M5+ — Air Support (added during development, 1–2 days) — ✅ signed off
 
 - Gun run and bomb strikes called on a sensor-marked point (§7.19): footprint preview, delay, cooldowns, a hot jet streak, impacts through `Explosions` (friendly fire, danger close).
 - 🧪 **Tests:** cooldown and readiness; gun-run impacts spaced evenly along the chosen axis and strip length; impacts land after the configured delay at the locked ground point; strike damage uses the same friendly-fire / danger-close path (a strike killing a friendly fails the mission); footprint danger-close preview.
