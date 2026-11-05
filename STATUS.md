@@ -18,18 +18,21 @@ every session.
 | **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
-| M5 – M10                                | ⬜ Not started                                                         |
+| **M5** Enemy AI & vehicles              | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
+| M6 – M10                                | ⬜ Not started                                                         |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **222 tests in 33 files**).
-`npm run build` works (≈619 kB JS, 161 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **278 tests in 39 files**).
+`npm run build` works (≈636 kB JS, 167 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed; the M5 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
 ≤ 100 draw calls) and by a scripted lead test in the real game (§6). Feel test passed (user, 2026-11-04).
 M4 checked by Claude in Chrome (team, strobes in all three sensors, 60 enemies, overrun and
 friendly-fire fail screens, danger close; 60 FPS, GPU ~7.7–8.1 ms, ≤ 28 draw calls; §6). Feel test passed (user, 2026-11-05).
+M5 checked by Claude in Chrome (enemies at house corners, convoy on the west road, mounted-gun tracers,
+105 mm truck kill → burning wreck with the convoy queued behind it; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls; §6).
 
 ---
 
@@ -44,7 +47,8 @@ index.html                 canvas, HUD root, title/pause screen with controls ta
 src/
   main.ts                  entry point (dev builds expose `window.nightOrbit` for debugging)
   config.ts                ALL tunable numbers (orbit, sensor, terrain, loop, thermal, NV, render,
-                           sensorFx, gunnery, fx)
+                           sensorFx, gunnery, infantry, ai, enemyFire, ridgeback, vehicles,
+                           groundFire, testScene, hud, fx)
   config.test.ts           config sanity rules (M0 smoke test)
   core/
     Game.ts                owns systems; frame → input → fixed steps → camera sync → render → HUD
@@ -70,6 +74,10 @@ src/
     Particles.ts (+test)   pooled particle sim in typed arrays (pure)
     PointLayer.ts          one-draw-call point sprites (heat in thermal, light in NV)
     Effects.ts (+test)     flash, debris, smoke, craters, shockwave, fire, tracers
+  ai/
+    Paths.ts (+test)       ground polylines: point/heading at distance, corner slowdown factor
+    CoverPoints.ts (+test) cover reservation (one soldier per point); corner points from houses
+    EnemyBrain.ts (+test)  pure decision: flee / take cover / fire / advance / hold
   units/
     unitDefs.ts            ALL infantry stats (rifleman, machine gunner, Ridgeback), data
     SpatialGrid.ts (+test) 20 m grid: radius + nearest queries (blasts, separation, targeting)
@@ -77,16 +85,25 @@ src/
     infantryPose.ts (+test) pure walk bob / lean / tumble / lying-flat pose
     TeamHealth.ts (+test)  Ridgeback shared health: damage, +1/s regen after 4 s quiet, overrun
     Squad.ts (+test)       route following with holds, diamond formation slots, strobe blink timing
-    UnitManager.ts (+test) owns all soldiers + grid; enemy advance/fire, Ridgeback return fire,
-                           ground tracers, overrun → missionFailed
+    UnitManager.ts (+test) owns all soldiers + grid; runs EnemyBrain (cover, line of sight, panic,
+                           morale), wall sliding, Ridgeback return fire, tracers, overrun → fail
     InfantryRenderer.ts    ONE InstancedMesh for every soldier + IR strobe point layer
-    TestScene.ts (+test)   TEMPORARY M4 scene: Ridgeback route + wave spawner (≤ 60 alive)
+    vehicleDefs.ts         ALL vehicle stats + box-part layouts (truck, technical, APC), data
+    Vehicle.ts (+test)     one vehicle: road driving (corner slowdown, smooth turning), armor,
+                           intact → smoking → burning wreck; recyclable
+    VehicleManager.ts (+test) convoy spacing, wrecks block the road, unloading, mounted guns,
+                           bail-outs; pool of 12
+    VehicleRenderer.ts     ONE InstancedMesh of boxes for every vehicle part + smoke/fire emission
+    UnitManager.ai.test.ts M5 enemy behavior: cover, line of sight, walls, panic, morale, paths
+    TestScene.ts (+test)   TEMPORARY M4/M5 scene: Ridgeback route, wave spawner (≤ 60 alive),
+                           four test roads + convoy spawner
   world/
     Terrain.ts (+test)     heightmap mesh + exact heightAt()
     groundHeat.ts (+test)  soil heat field (warm/cool field patches) within the soil range
-    Collision.ts (+test)   raycast vs terrain + rotated building boxes (roofs before ground)
-    DummyTarget.ts (+test) TEMPORARY shootable truck (M5 replaces): drives, smokes, burns, cools
-    PlaceholderWorld.ts    TEMPORARY: houses (+collision boxes), tree lines, 2 dummy trucks
+    Collision.ts (+test)   raycast vs terrain + rotated building boxes (roofs before ground);
+                           line of sight (houses + hills) and push-out of building footprints
+    Roads.ts (+test)       road ribbons draped over the terrain
+    PlaceholderWorld.ts    TEMPORARY: houses (+collision boxes), tree lines, test roads
   render/
     Renderer.ts            WebGLRenderer + composer: heat (half-float, MSAA) → bloom → ThermalPass
     ThermalMaterial.ts     the one shader: signature (heat, albedo, glow) → heat or NV light
@@ -99,7 +116,7 @@ src/
     AudioEngine.ts (+test) WebAudio player; silent no-op without WebAudio
   ui/
     HUD.ts                 telemetry, reticles, gun status, team health, DANGER CLOSE, clock,
-                           F1 stats (incl. KIA and live enemies EN)
+                           F1 stats (incl. KIA, live enemies EN, live vehicles VEH)
     hudFormat.ts (+test)   pure HUD text: gun status, team health line, fail reasons
     hud.css                HUD + title/pause screen styles
 ```
@@ -125,7 +142,36 @@ right button and drag** to aim. Add `?debug=1` to the URL to start with stats on
 
 ## 3. Manual checklists
 
-### 3.1 M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
+### 3.1 M5 feel test (pending): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
+
+Run `npm run dev`, open the URL (add `?debug=1` for stats; F1 shows `VEH` = live vehicles), click
+to begin. Same moving-team scene as M4, plus a convoy every 45 s (first at 20 s) on the road that
+ends nearest Ridgeback. Tuning: `CONFIG.ai`, `CONFIG.vehicles`, `CONFIG.testScene`,
+`src/units/vehicleDefs.ts`, `panicRadius` in `src/gunship/weaponDefs.ts`.
+
+- [ ] **Cover:** when Ridgeback walks past the village (south-west leg), enemies run to house
+      corners, crouch (lower, leaning) and fire from there; they hop forward corner to corner.
+      One soldier per corner. Crouched soldiers take less 25/40 mm damage (`ARMOR.cover`).
+- [ ] **Line of sight:** enemies behind a house or a hill don't fire (team health doesn't drop for
+      them); they walk around houses (sliding along the wall), not through them.
+- [ ] **Panic:** a 105 mm hit near a group (within ~45 m) sends the survivors running away for
+      3–5 s, then they come back. 40 mm has a 10 m panic radius, 25 mm none.
+- [ ] **Morale:** after you kill 3+ soldiers near one, it may break (30 %) and run back the way
+      it came for 8–12 s. Fleeing soldiers are fast, bright targets.
+- [ ] **Convoy:** a truck leads, often a technical and sometimes an APC behind, ~22 m apart, slowing
+      for bends. Trucks stop at the road end and 6–8 soldiers climb out of the back one by one.
+- [ ] **Vehicle damage:** trucks take ~2 × 40 mm or one 105 mm; they smoke below half health, then
+      burn (fire + smoke) and lose their cab. The APC laughs off 25 mm; it needs the 105 mm.
+- [ ] **Wreck blocks the road:** kill the lead truck on the way in: the vehicles behind stop short
+      of the wreck and unload / open fire right there. Some soldiers bail out of a burning truck
+      and run; the rest count as kills (`KIA`).
+- [ ] **Technicals are priority targets:** once stopped, their heavier tracers drain team health
+      fast (dps 3 vs 0.6 for a rifleman); the APC fires on the move (dps 4).
+- [ ] `F1`: FPS ~60, GPU well under 16 ms with a convoy, burning wrecks and ~60 soldiers.
+- [ ] Difficulty: with no player fire the team was overrun at ~75 s (Claude's run). Waves now come
+      every 10 s (was 8) to make room for the convoys.
+
+### 3.1a M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats), click to begin. The orbit starts over
 Ridgeback (four soldiers in a diamond, west of the village) and follows them as they walk.
@@ -145,7 +191,7 @@ Enemy groups of 6–10 arrive every 8 s from all sides, up to 60 alive. Tuning: 
 - [ ] **Danger close:** a 105 mm within ~33 m (40 mm ~12 m, 25 mm ~4 m) of a friendly flashes
       `DANGER CLOSE` under the reticle.
 - [ ] **Friendly fire:** killing a Ridgeback member shows `MISSION FAILED / FRIENDLY FIRE: YOU HIT
-  RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click reloads.
+RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click reloads.
 - [ ] **Fun for 2 minutes?** Pressure should build if you don't thin the groups (Claude's scripted
       run with no player fire: overrun at ~70 s). Too hard/easy → `accuracyNear/Far`, `dps` in
       `unitDefs.ts`, `waveInterval`, `maxEnemies`.
@@ -226,10 +272,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M5: enemy AI & vehicles** (PLAN.md §7.10–7.11): paths, cover points, EnemyBrain
-   (cover / fire / flee, morale break), real trucks/technicals/APCs replacing `DummyTarget`.
-   Enemy line of sight is not checked yet (enemies shoot through houses); M5 should add it.
-2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+1. **M5 feel test** (§3.1) by the user, then tune and sign off M5; push the M5 commits.
+2. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
+   cover points and enemy approach paths, flattened ground under the village and LZ, debug
+   overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -286,7 +333,7 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     on the first fixed step only; the click that starts/resumes the game is discarded.
 17. **Tracers** are point sprites, skipped within 150 m of the sensor and capped at 7 px
     (`CONFIG.gunnery`); without this they were huge white blobs near the camera (regression test).
-18. **`DummyTarget` and the placeholder sounds are temporary** (M4 units, M9 audio). Dummy HP/armor
+18. **`DummyTarget` (removed in M5) and the placeholder sounds are temporary** (M9 audio). Dummy HP/armor
     follow the plan (rifleman 100 HP; cargo truck 300 HP, armor 0.5/1/1).
 19. **Dev-only debug hook:** `window.nightOrbit` (the Game) exists only in `npm run dev`; Vite strips
     it from production builds (checked: not in `dist/`). Used for scripted browser checks, e.g.
@@ -317,28 +364,60 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 28. **Explosions query targets through the unit grid** out to max(blast radius, danger-close
     distance); `Damageable.takeDamage` takes a `DamageSource` (weapon id or `'team'`).
 
+29. **Cover points are generated at house corners** (1.4 m outside each corner) until M6
+    hand-places them per zone. A soldier only looks for cover within 1.25 × its range of the
+    target and 40 m of itself; a point must be within 0.9 × range of the target and not farther
+    than the soldier already is, and either have a view of the target or bring it ≥ 15 m closer
+    (corner-to-corner bounding). In cover without a view it moves on and won't pick that point
+    again right away. Crouched soldiers take 0.5 / 0.7 / 1.0 damage from 25 / 40 / 105 mm and
+    Ridgeback hits them half as often.
+30. **Line of sight checks houses and hills** (terrain sampled every 10 m, eye level 0.5 m above
+    the body center). On the placeholder terrain (±22 m hills) hills block ~38 % of 50–250 m
+    sightlines, which is why decision 29's bounding rule exists. M6 flattens the village/LZ.
+31. **Morale is event-based, not a meter:** each nearby (25 m) enemy death adds 1 stress; being
+    wounded also counts. At 3 stress (or when wounded) the soldier rolls once (30 % to break)
+    and the stress resets. Breaking = run toward its spawn point for 8–12 s, then rally. Big
+    blasts (weapon `panicRadius`: 105 mm 45 m, 40 mm 10 m) make survivors run 3–5 s regardless.
+32. **Walls:** soldiers are pushed out of building footprints (0.6 m body radius) and then slide
+    along the wall in one committed direction for 0.6 s (a regression test covers the "dither in
+    front of the wall's middle" bug found while writing it). No pathfinding/navmesh (PLAN §7.11).
+33. **Vehicles:** the road-blocked check looks `blockDistance` (13 m) plus braking distance ahead,
+    so fast vehicles stop short of a queue (found by a test: a technical rear-ended a stopped
+    truck). After 2 s stuck, a truck unloads and a gun vehicle opens fire right there. Technicals
+    fire only when stopped; APCs on the move. Mounted-gun damage uses the same accuracy curve as
+    rifles. Soldiers inside a destroyed vehicle bail out (50 %, panicked) or die (counted as kills).
+34. **Vehicle pool of 12** (PLAN §11): when full, empty parked trucks are recycled first, then
+    wrecks older than 60 s; never a vehicle still in the fight (the spawn then fails).
+35. **Vehicles don't collide with soldiers or houses** (they only follow roads; the test roads
+    avoid the houses). Wrecks aren't cover points yet (possible M6/M10 addition).
+36. **Enemy approach paths are supported** (`spawnEnemy(..., { path })`) but the test scene
+    doesn't use them; M6/M7 author them in `MapData`.
+
 ---
 
 ## 6. Manual test results / notes
 
 _(Fill in after testing.)_
 
-| Date       | Item                          | Result                                                                                                                  | Action                                                                                                         |
-| ---------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| 2026-11-03 | M1 manual checklist           | User reported everything works                                                                                          | None; M1 signed off                                                                                            |
-| 2026-11-03 | M2 look (Claude, Chrome)      | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                 | Added dark HUD outline; softened soil patches                                                                  |
-| 2026-11-03 | M2 aiming (user)              | "Looking around feels a bit laggy"                                                                                      | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
-| 2026-11-03 | NV look (Claude, Chrome)      | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
-| 2026-11-03 | M2 look test (user)           | "It looks well for now"                                                                                                 | None; M2 signed off                                                                                            |
-| 2026-11-03 | NV look test (user)           | Approved ("mark it signed off")                                                                                         | None; NV signed off                                                                                            |
-| 2026-11-03 | M3 tracers (Claude)           | First meters of each tracer drew as huge white blobs near the camera                                                    | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
-| 2026-11-03 | M3 smoke (Claude)             | 105 mm smoke too faint to read after the flash                                                                          | Warmer, more opaque plume                                                                                      |
-| 2026-11-03 | M3 lead test (scripted)       | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
-| 2026-11-04 | M3 feel test (user)           | "M3 seems to be working well"; signed off                                                                               | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
-| 2026-11-04 | M4 scripted (Claude, Chrome)  | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
-| 2026-11-04 | M4 fail/warn (Claude, Chrome) | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                  | Works as designed                                                                                              |
-| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls | None                                                                                                           |
-| 2026-11-05 | M4 feel test (user)           | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                             | None; M4 signed off                                                                                            |
+| Date       | Item                          | Result                                                                                                                                     | Action                                                                                                         |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 2026-11-03 | M1 manual checklist           | User reported everything works                                                                                                             | None; M1 signed off                                                                                            |
+| 2026-11-03 | M2 look (Claude, Chrome)      | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                                    | Added dark HUD outline; softened soil patches                                                                  |
+| 2026-11-03 | M2 aiming (user)              | "Looking around feels a bit laggy"                                                                                                         | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                           |
+| 2026-11-03 | NV look (Claude, Chrome)      | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                                   | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                     |
+| 2026-11-03 | M2 look test (user)           | "It looks well for now"                                                                                                                    | None; M2 signed off                                                                                            |
+| 2026-11-03 | NV look test (user)           | Approved ("mark it signed off")                                                                                                            | None; NV signed off                                                                                            |
+| 2026-11-03 | M3 tracers (Claude)           | First meters of each tracer drew as huge white blobs near the camera                                                                       | Skip < 150 m from sensor, cap 7 px; regression test                                                            |
+| 2026-11-03 | M3 smoke (Claude)             | 105 mm smoke too faint to read after the flash                                                                                             | Warmer, more opaque plume                                                                                      |
+| 2026-11-03 | M3 lead test (scripted)       | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                                   | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                      |
+| 2026-11-04 | M3 feel test (user)           | "M3 seems to be working well"; signed off                                                                                                  | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
+| 2026-11-04 | M4 scripted (Claude, Chrome)  | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                                   | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
+| 2026-11-04 | M4 fail/warn (Claude, Chrome) | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                                     | Works as designed                                                                                              |
+| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls                    | None                                                                                                           |
+| 2026-11-05 | M4 feel test (user)           | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                                                | None; M4 signed off                                                                                            |
+| 2026-11-05 | M5 cover (Claude, Chrome)     | No enemy ever took cover: hills blocked the view from every corner to the team                                                             | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover             |
+| 2026-11-05 | M5 convoy (Claude, Chrome)    | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                 |
+| 2026-11-05 | M5 scripted (Claude, Chrome)  | No player fire: convoys + waves overran the team at ~75 s                                                                                  | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                     |
 
 ---
 
@@ -346,6 +425,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's start M5."
+> "Read STATUS.md and PLAN.md. Let's continue (M5 feel test, then M6)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.

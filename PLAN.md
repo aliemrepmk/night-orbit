@@ -530,7 +530,7 @@ Keep it simple and authored; no navmesh needed.
   else if friendlies within weapon range (≤ 250 m) and line of sight → fire
   else → advance along assigned path toward friendlies
   ```
-- **Morale (light touch):** a big 105 mm hit near an enemy group makes survivors break and run for 3–5 s. Fleeing enemies are bright moving targets, which feels good to hit.
+- **Morale (light touch):** a big 105 mm hit near an enemy group makes survivors break and run for 3–5 s. Fleeing enemies are bright moving targets, which feels good to hit. Losses nearby (3 within 25 m) or being wounded trigger the 30 % flee roll once; a broken soldier runs back toward where it came from for 8–12 s, then rallies (STATUS.md §5 decision 31).
 - **Spatial grid:** 20 m cells, rebuilt each tick, used for blast queries, separation and nearest-target lookups.
 
 ### 7.12 World / Map Building
@@ -855,10 +855,11 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** radial damage falloff; friendly-fire detection → fail event; danger-close event; team health damage and regeneration; spatial grid radius queries match brute force.
 - ✅ **Done when:** a test scene with 60 enemies attacking a moving team is fun for 2 minutes and runs at 60 FPS.
 
-### M5 — Enemy AI & Vehicles (2–3 days)
+### M5 — Enemy AI & Vehicles (2–3 days) — code-complete, awaiting feel test
 
 - Paths, cover points, EnemyBrain, separation, morale break.
 - Trucks (unloading), technicals, APCs, damage states, wrecks blocking roads.
+- As built: line of sight (houses + hills) gates enemy and Ridgeback fire; soldiers slide around houses; cover is taken if it has a view of the target **or** brings the soldier ≥ 15 m closer (corner-to-corner bounding on hilly ground); crouched soldiers take less 25/40 mm damage. Until M6 the cover points are generated at house corners and convoys use four temporary test roads (`units/TestScene.ts`).
 - 🧪 **Tests:** cover reservation (one soldier per point); EnemyBrain decisions for given situations; path following reaches the end; vehicle armor multipliers and damage states; wreck blocks road.
 - ✅ **Done when:** enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly.
 
