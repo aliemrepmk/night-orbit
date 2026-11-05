@@ -18,8 +18,14 @@ export class Terrain {
   readonly half: number;
   /** Row-major heights: index = j * n + i, where i runs along x and j along z. */
   readonly heights: Float32Array;
+  /** Highest vertex (bounds ray marching in `Collision`). */
+  readonly maxHeight: number;
 
-  constructor(cfg: TerrainConfig = CONFIG.terrain) {
+  /**
+   * `height` gives the ground shape (the map's `mapHeightField` in the game); without it the
+   * terrain is plain rolling noise hills from `cfg` (tests, tools).
+   */
+  constructor(cfg: TerrainConfig = CONFIG.terrain, height?: (x: number, z: number) => number) {
     this.size = cfg.size;
     this.cellSize = cfg.cellSize;
     this.half = cfg.size / 2;
@@ -27,13 +33,18 @@ export class Terrain {
     this.heights = new Float32Array(this.n * this.n);
 
     const noise = createNoise2D(createRng(cfg.seed));
+    const at = height ?? ((x: number, z: number) => rawHeight(noise, x, z, cfg.hillHeight));
+    let max = -Infinity;
     for (let j = 0; j < this.n; j++) {
       for (let i = 0; i < this.n; i++) {
         const x = -this.half + i * this.cellSize;
         const z = -this.half + j * this.cellSize;
-        this.heights[j * this.n + i] = rawHeight(noise, x, z, cfg.hillHeight);
+        const h = at(x, z);
+        this.heights[j * this.n + i] = h;
+        if (h > max) max = h;
       }
     }
+    this.maxHeight = max;
   }
 
   /** Height of the grid vertex (i, j). */
