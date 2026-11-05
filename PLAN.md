@@ -522,7 +522,7 @@ type InfantryState = 'idle' | 'moving' | 'inCover' | 'firing' | 'fleeing' | 'flu
 Keep it simple and authored; no navmesh needed.
 
 - **Paths:** hand-placed polylines in `MapData` (spawn → approach → cover area).
-- **Cover points:** hand-placed positions per zone, each with a "facing" direction. A reservation system makes sure one soldier per point.
+- **Cover points:** derived from the authored map objects (building and prop corners, both faces of hedges, walls and rock faces; STATUS.md §5 decision 29). A reservation system makes sure one soldier per point.
 - **Steering:** `seek/arrive` toward the next waypoint plus `separation` from nearby soldiers (via the spatial grid) so groups don't stack.
 - **EnemyBrain** (runs every 0.25 s per enemy, staggered for performance):
   ```
@@ -903,10 +903,11 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** cooldown and readiness; gun-run impacts spaced evenly along the chosen axis and strip length; impacts land after the configured delay at the locked ground point; strike damage uses the same friendly-fire / danger-close path (a strike killing a friendly fails the mission); footprint danger-close preview.
 - ✅ **Done when:** calling a strike feels like a deliberate, risky decision, the delay makes you predict where enemies will be, and the guns still matter.
 
-### M6 — The Handcrafted Map (2–3 days)
+### M6 — The Handcrafted Map (2–3 days) — code-complete, awaiting look test
 
 - Full `MapData`: fields, farmhouse, stream and bridge, village (~25 buildings + clinic), crossroads, north road, quarry LZ, tree lines.
 - Debug overlay + Placer tool built **first**, to speed up authoring.
+- As built: cover points are derived from the authored objects (building and prop corners, both faces of hedges, walls and quarry rock) rather than hand-placed per zone; the map is checked by `validateMap`; debug tools are F2 overlay, P placer and an F3 zone tour (dev builds or `?debug=1`). The temporary test scene now runs on the real map until M7's mission script replaces it.
 - 🧪 **Tests:** MapData validation (all referenced ids exist, paths inside the map, no buildings on roads, clinic marked protected).
 - ✅ **Done when:** flying the orbit over each zone shows a believable, readable place.
 

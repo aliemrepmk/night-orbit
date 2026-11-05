@@ -20,12 +20,13 @@ every session.
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
-| M6 – M10                                | ⬜ Not started                                                         |
+| **M6** The handcrafted map              | 🟨 Code-complete. Tests pass; **look test pending (§3.1)**             |
+| M7 – M10                                | ⬜ Not started                                                         |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **296 tests in 40 files**).
-`npm run build` works (≈642 kB JS, 169 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **340 tests in 44 files**).
+`npm run build` works (≈662 kB JS, 176 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed; the M6 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -101,15 +102,24 @@ src/
                            bail-outs; pool of 12
     VehicleRenderer.ts     ONE InstancedMesh of boxes for every vehicle part + smoke/fire emission
     UnitManager.ai.test.ts M5 enemy behavior: cover, line of sight, walls, panic, morale, paths
-    TestScene.ts (+test)   TEMPORARY M4/M5 scene: Ridgeback route, wave spawner (≤ 60 alive),
-                           four test roads + convoy spawner
+    TestScene.ts (+test)   TEMPORARY scene on the real map (M7 replaces): Ridgeback walks the whole
+                           journey; waves on the map's approach paths/spawns (≤ 60); convoys
   world/
-    Terrain.ts (+test)     heightmap mesh + exact heightAt()
-    groundHeat.ts (+test)  soil heat field (warm/cool field patches) within the soil range
+    mapTypes.ts            the MapData types (roads, stream, bridges, fields, buildings, walls,
+                           props, zones, routes, enemy/vehicle paths, spawns)
+    MapData.ts             THE handcrafted Varesh Valley map (data; edit this to change the map)
+    validateMap.ts (+test) authoring checks + 2D geometry helpers (rects, polylines, crossings)
+    terrainShape.ts (+test) the map's height field: hills, valley walls, flats, level roads, stream
+    Terrain.ts (+test)     heightmap mesh + exact heightAt() (takes a height field)
+    groundHeat.ts (+test)  ground heat: soil patches, and per-field levels (plowed/grass/stubble/gravel)
     Collision.ts (+test)   raycast vs terrain + rotated building boxes (roofs before ground);
                            line of sight (houses + hills) and push-out of building footprints
     Roads.ts (+test)       road ribbons draped over the terrain
-    PlaceholderWorld.ts    TEMPORARY: houses (+collision boxes), tree lines, test roads
+    WorldBuilder.ts (+test) MapData → meshes (≈13 draw calls), collision boxes, cover, bridge surface
+    InstancedSignature.ts  static InstancedMesh with a signature per instance
+  debug/
+    mapOverlay.ts (+test)  overlay shapes from MapData; placer format; F3 zone-tour order
+    DebugOverlay.ts        SVG overlay projected onto the sensor view (F2), placer mark
   render/
     Renderer.ts            WebGLRenderer + composer: heat (half-float, MSAA) → bloom → ThermalPass
     ThermalMaterial.ts     the one shader: signature (heat, albedo, glow) → heat or NV light
@@ -144,12 +154,42 @@ Mouse = slew sensor · **left click = fire (hold for 25 mm)** · `1`/`2`/`3` = 2
 `F` = sensor: white-hot → black-hot → night vision · `Esc` = pause ·
 `F1` = FPS / GPU ms / draw calls / triangles / kills / live enemies / live vehicles. If pointer lock is unavailable, **hold the
 right button and drag** to aim. Add `?debug=1` to the URL to start with stats on.
+Map authoring (dev builds, or `?debug=1`): `F2` = map overlay · `P` = log the crosshair point as
+`[x, z]` (console + clipboard) · `F3` = tour the orbit over each zone, then back to the team.
 
 ---
 
 ## 3. Manual checklists
 
-### 3.1 M5+ feel test (passed 2026-11-05): "calling a strike is a deliberate, risky decision; the delay makes you predict; the guns still matter"
+### 3.1 M6 look test (pending): "flying the orbit over each zone shows a believable, readable place"
+
+Run `npm run dev`, click to begin. Press `F3` to park the orbit over each zone in turn (OP →
+fields → village → crossroads → LZ; a sixth press goes back to following Ridgeback). Try all
+three weapons' zoom and all three sensors (`F`). `F2` shows the map overlay; `P` logs the
+crosshair point (to paste into `src/world/MapData.ts`).
+
+- [ ] **Fields:** plowed fields read warm with faint furrows, grass fields cool; hedgerows as
+      thin lines; the farmhouse, barn and shed; hay bales; the tree line to the north.
+- [ ] **Stream and bridge:** the cold (black in white-hot) stream runs north–south west of the
+      village; the farm track crosses it on a small bridge. Ridgeback walks over it (Claude
+      checked: nobody wades).
+- [ ] **Village:** ~26 houses along the main road and north street, lit windows, chimneys,
+      a square with parked cars and crates. The **clinic** on the square's east side has lit
+      windows on every side and a hot generator next to it (it is protected; firing on it only
+      fails the mission from M7).
+- [ ] **Crossroads:** the north and east roads meet the main road; gas station canopy, shop,
+      garage, two houses, compound walls.
+- [ ] **Quarry LZ:** a light gravel floor with warmer rock faces on three sides, open to the
+      north-east, south-east and west.
+- [ ] **Valley:** the ground rises into hills/mountains beyond the map edge; no visible terrain
+      edge from any orbit.
+- [ ] **Play still works:** Ridgeback now walks the whole journey OP → LZ (and back); enemy
+      groups arrive along the map's approach paths; convoys come down the north/east roads or
+      into the village. Enemies use cover at houses, hedges, walls, rocks and props.
+- [ ] `F1`: GPU well under 16 ms and draw calls well under 150 over every zone (Claude:
+      ~30–34 calls, GPU 7–8 ms; ~10 ms with the F2 overlay on).
+
+### 3.1a M5+ feel test (passed 2026-11-05): "calling a strike is a deliberate, risky decision; the delay makes you predict; the guns still matter"
 
 Run `npm run dev`, click to begin. Strike stats: `src/gunship/airSupportDefs.ts`; wheel step and
 jet streak: `CONFIG.airSupport`.
@@ -173,7 +213,7 @@ jet streak: `CONFIG.airSupport`.
       redundant? Knobs: `cooldown`, `delay`, `impacts`, `damage` in `airSupportDefs.ts`.
 - [ ] `F1`: GPU stays well under 16 ms during a gun run and after a bomb.
 
-### 3.1a M5 feel test (passed 2026-11-05): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
+### 3.1b M5 feel test (passed 2026-11-05): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats; F1 shows `VEH` = live vehicles), click
 to begin. Same moving-team scene as M4, plus a convoy every 45 s (first at 20 s) on the road that
@@ -202,7 +242,7 @@ ends nearest Ridgeback. Tuning: `CONFIG.ai`, `CONFIG.vehicles`, `CONFIG.testScen
 - [ ] Difficulty: with no player fire the team was overrun at ~75 s (Claude's run). Waves now come
       every 10 s (was 8) to make room for the convoys.
 
-### 3.1b M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
+### 3.1c M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats), click to begin. The orbit starts over
 Ridgeback (four soldiers in a diamond, west of the village) and follows them as they walk.
@@ -230,7 +270,7 @@ RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click re
 - [ ] Orbit follow: when the team walks on, the orbit glides after them and you can still aim
       around them (the gimbal limit is 450 m from the orbit center).
 
-### 3.1c M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
+### 3.1d M3 feel test (passed 2026-11-04; unchecked edge cases listed in §6)
 
 Run `npm run dev`, open the URL, click to begin, press `F1`. Weapon numbers are in
 `src/gunship/weaponDefs.ts` (stats + impact effects); feedback/effects tuning in `CONFIG.sensor`
@@ -303,10 +343,12 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
-   cover points and enemy approach paths, flattened ground under the village and LZ, debug
-   overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
-2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+1. **M6 look test** (§3.1) by the user, then tune and sign off M6; push the M6 commits.
+2. **Then M7: mission scripting & dialogue** (PLAN.md §7.14–7.15, §8): the mission runner
+   (phases, conditions, actions), the radio with subtitles, protected-clinic fail logic
+   (`WorldBuilder.protectedBoxes`), `moveTeam` on the map's route ids, scripted spawns at the
+   map's spawn points/paths, the extraction helicopter. Replaces `units/TestScene.ts`.
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -394,8 +436,10 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 28. **Explosions query targets through the unit grid** out to max(blast radius, danger-close
     distance); `Damageable.takeDamage` takes a `DamageSource` (weapon id or `'team'`).
 
-29. **Cover points are generated at house corners** (1.4 m outside each corner) until M6
-    hand-places them per zone. A soldier only looks for cover within 1.25 × its range of the
+29. **Cover points come from the authored objects** (M6 replaced "hand-placed cover per zone",
+    PLAN §7.11): 1.4 m outside each building corner, 1 m outside each prop corner, and every 9 m
+    along both faces of each hedge, wall and rock face; points inside anything or in the stream
+    are dropped (~440 points). To add cover somewhere, add a prop or wall in `MapData.ts`. A soldier only looks for cover within 1.25 × its range of the
     target and 40 m of itself; a point must be within 0.9 × range of the target and not farther
     than the soldier already is, and either have a view of the target or bring it ≥ 15 m closer
     (corner-to-corner bounding). In cover without a view it moves on and won't pick that point
@@ -442,6 +486,32 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     aircraft. Strikes only advance while playing (they wait during pause and stop on failure).
     The preview is projected to screen pixels each frame and drawn as an SVG polygon in the HUD.
 
+41. **The map is data** (`world/MapData.ts`, types in `mapTypes.ts`), checked by `validateMap`
+    (inside the map, unique ids, one protected clinic in the village, routes joined in order,
+    nothing on roads, no overlapping buildings/props, spawns and paths on open ground, vehicle
+    paths on roads, a bridge wherever a road crosses the stream). `validateMap.test.ts` keeps the
+    real map valid; break a rule and the message names the object and the point.
+42. **Terrain comes from the map** (`terrainShape.ts`): hills 18 m (was 28), a valley rising
+    140 m from 760 m out (the mountains outside the playable map), level flats under the OP,
+    farmyard, village, crossroads and quarry, roads level across their width, the stream cut
+    1.6 m deep except within ~12–24 m of the bridge (a culvert, so a squad wider than the 8 m
+    deck doesn't wade: found in the browser, Ridgeback's leader walked 3 m off the deck's center).
+    The 10 m terrain grid softens the stream channel; the water ribbon on top shows its course.
+    `CONFIG.terrain.seed/hillHeight` only drive the plain noise terrain used in tests now.
+43. **Everything on the map is instanced by kind** (boxes, rough boxes for hedges/rock/hay, hip
+    roofs, trees) so the whole map is ~13 draw calls; barns use two tilted box planes as a gable
+    roof. Quarry rock is warm (0.27) and its floor is a `gravel` field (warmest ground): at the
+    first try the quarry was invisible against the soil.
+44. **People walk on `WorldBuilder.surfaceAt`** (bridge deck over the stream); vehicles and
+    effects use the bare terrain. Bridge decks are `walkable` collision boxes (shells hit them,
+    they don't block walking or sight); the gas-station canopy only blocks shells (people stand
+    under it).
+45. **Debug tools ship in production behind `?debug=1`** (F2 overlay, P placer, F3 zone tour);
+    `window.nightOrbit` stays dev-only. The PLAN §7.18 cheats (god mode, skip phase…) come with M7.
+46. **Clinic protection is data only in M6**: `protected: true` in MapData and
+    `WorldBuilder.protectedBoxes` (the clinic and its generator); the fail rule and FCO warning
+    are M7 (PLAN §7.7, §8 phase 2).
+
 ---
 
 ## 6. Manual test results / notes
@@ -471,6 +541,9 @@ _(Fill in after testing.)_
 | 2026-11-05 | M5+ gun run (Claude, Chrome)    | 0 kills on a group of 9: first hits panicked them out of the strip; then ~30 % killed in the strip                                         | Panic radius 15 → 6 m, 30 × 120 → 40 × 200 damage: ~65 % (11 of 17) killed over 6 runs                         |
 | 2026-11-05 | M5+ bomb + HUD (Claude, Chrome) | Bomb killed a truck outright; flash, shockwave, whiteout, jet streak; strip/circle previews, INBOUND and REARM lines OK                    | Controls-table row was too long (squashed the key column): shortened. 60 FPS, GPU ~8 ms, no console errors     |
 | 2026-11-05 | M5+ feel test (user)            | "Feel test is good"                                                                                                                        | None; M5+ signed off                                                                                           |
+| 2026-11-05 | M6 look (Claude, Chrome)        | Village, roads, clinic generator, fields and stream read well; the quarry was invisible (rock ≈ soil heat)                                 | Rock 0.14 → 0.27 and a warm gravel quarry floor: walls and floor now stand out                                 |
+| 2026-11-05 | M6 bridge (Claude, Chrome)      | 3 of 4 Ridgeback members waded through the stream bed beside the 6 m bridge                                                                | Stream kept shallow around bridges, deck 6 → 8 m: nobody dips below the banks; regression test                 |
+| 2026-11-05 | M6 play (Claude, Chrome)        | 58 of 64 enemies spawned on approach paths, 26 heading for cover, a convoy queued into the village; 60 FPS, 30–34 calls                    | Works; no console errors. GPU 7–8 ms (~10 ms with the F2 overlay)                                              |
 
 ---
 
@@ -478,6 +551,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's start M6."
+> "Read STATUS.md and PLAN.md. Let's continue (M6 look test, then M7)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
