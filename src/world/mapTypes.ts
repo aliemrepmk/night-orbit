@@ -5,6 +5,11 @@
  */
 export type Vec2 = readonly [number, number];
 
+/** `[x, z]` map points as `{ x, z }` path points (for `ai/Paths`, road ribbons). */
+export function toPathPoints(points: readonly Vec2[]): { x: number; z: number }[] {
+  return points.map(([x, z]) => ({ x, z }));
+}
+
 export type ZoneId = 'op' | 'fields' | 'village' | 'crossroads' | 'lz';
 
 export interface Zone {
@@ -50,7 +55,8 @@ export interface BridgeDef {
   readonly width: number;
 }
 
-export type FieldKind = 'plowed' | 'grass' | 'stubble';
+/** `gravel`: the quarry floor (bare stone that keeps the day's heat). */
+export type FieldKind = 'plowed' | 'grass' | 'stubble' | 'gravel';
 
 export interface FieldDef {
   readonly kind: FieldKind;
