@@ -532,6 +532,8 @@ Keep it simple and authored; no navmesh needed.
   else → advance along assigned path toward friendlies
   ```
 - **Morale (light touch):** a big 105 mm hit near an enemy group makes survivors break and run for 3–5 s. Fleeing enemies are bright moving targets, which feels good to hit. Losses nearby (3 within 25 m) or being wounded trigger the 30 % flee roll once; a broken soldier runs back toward where it came from for 8–12 s, then rallies (STATUS.md §5 decision 31).
+- **Stream:** soldiers never wade the stream: when the straight walk to their goal crosses it they detour over the bridge (`world/crossings.ts`), which makes the bridge a natural choke point.
+- **Spawning (anti spawn-camping):** groups appear at a random rested site (path start or spawn point) 180–450 m from the team, never within 160 m of the sensor's aim, one soldier at a time; a site rests 30 s after use. M7's scripted spawns keep these rules.
 - **Spatial grid:** 20 m cells, rebuilt each tick, used for blast queries, separation and nearest-target lookups.
 
 ### 7.12 World / Map Building
@@ -565,7 +567,7 @@ export const MAP: MapData = {
  [OP / start] ─► [FIELDS: hedgerows, farmhouse, barn, tree line]
                         │
                         ▼  (dirt track, small bridge over stream)
-                 [VILLAGE: ~25 houses, narrow streets, square, CLINIC (protected)]
+                 [VILLAGE: ~40 houses, narrow streets, square, CLINIC (protected)]
                         │
                         ▼  (main road)
                  [CROSSROADS: gas station, walls; convoy arrives from NORTH road]
@@ -769,7 +771,7 @@ Target total duration: **12–15 minutes**. Enemy counts below are starting valu
 
 ### Phase 2 — Village (~5 min, the centerpiece)
 
-- **Terrain:** ~25 houses, a square, narrow streets, the **field clinic** (protected) on the square.
+- **Terrain:** ~40 houses on five streets, a square, the **field clinic** (protected) on the square.
 - **Beats:**
   1. FCO: _"Be advised, the building with the generator heat on the square is a clinic. Do not engage it under any circumstances."_ The clinic is marked on screen for 5 s.
   2. The team enters the west edge. Enemies on rooftops and in streets in groups of 3–5, appearing from doorways (spawn points at building doors).
