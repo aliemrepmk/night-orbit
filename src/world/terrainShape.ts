@@ -7,6 +7,9 @@ const ROAD_SHOULDER = 3;
 const ROAD_BLEND = 10;
 /** The stream bed is flat for its width, its banks slope over this many meters. */
 const STREAM_BANK = 7;
+/** Around a bridge the stream stays shallow (a culvert), so people beside the deck stay dry. */
+const BRIDGE_SHALLOW = 12;
+const BRIDGE_BLEND = 12;
 /** Width (m) over which the ground rises from the valley floor to the full mountain height. */
 const VALLEY_RAMP = 650;
 
@@ -63,7 +66,7 @@ function smoothstep(a: number, b: number, v: number): number {
  * 1. gentle simplex hills (`hillHeight`), rising into mountains beyond `valleyStart`
  * 2. flattened under the village, farmyard, crossroads, OP and quarry (`flats`)
  * 3. roads level across their width, following the ground along their length
- * 4. the stream cut `depth` meters into it
+ * 4. the stream cut `depth` meters into it (but not under and beside its bridges)
  */
 export function mapHeightField(map: MapData): (x: number, z: number) => number {
   const t = map.terrain;
@@ -118,7 +121,11 @@ export function mapHeightField(map: MapData): (x: number, z: number) => number {
     // The stream: a flat bed `depth` below the surrounding ground, sloping banks.
     if (x >= streamBox.minX && x <= streamBox.maxX && z >= streamBox.minZ && z <= streamBox.maxZ) {
       nearestOn(stream.points, x, z, near);
-      const cut = 1 - smoothstep(stream.width / 2, stream.width / 2 + STREAM_BANK, near.d);
+      let cut = 1 - smoothstep(stream.width / 2, stream.width / 2 + STREAM_BANK, near.d);
+      for (const b of map.bridges) {
+        const d = Math.hypot(x - b.at[0], z - b.at[1]);
+        cut *= smoothstep(BRIDGE_SHALLOW, BRIDGE_SHALLOW + BRIDGE_BLEND, d);
+      }
       h -= stream.depth * cut;
     }
     return h;

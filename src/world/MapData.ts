@@ -213,7 +213,7 @@ export const MAP: MapData = {
     ],
   },
 
-  bridges: [{ id: 'farm_bridge', at: [-225, 130], heading: 1.64, length: 16, width: 6 }],
+  bridges: [{ id: 'farm_bridge', at: [-225, 130], heading: 1.64, length: 16, width: 8 }],
 
   fields: [
     {
@@ -277,6 +277,18 @@ export const MAP: MapData = {
         [280, 112],
         [290, 260],
         [130, 270],
+      ],
+    },
+    {
+      kind: 'gravel',
+      polygon: [
+        [478, 205],
+        [600, 188],
+        [680, 236],
+        [690, 360],
+        [630, 418],
+        [520, 420],
+        [462, 340],
       ],
     },
     {

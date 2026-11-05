@@ -52,6 +52,14 @@ describe('mapHeightField', () => {
     expect(bank - h(x, z)).toBeGreaterThan(MAP.stream.depth * 0.6);
   });
 
+  it('keeps the stream shallow at the bridge, so a squad wider than the deck stays dry', () => {
+    const b = MAP.bridges[0];
+    const bank = h(b.at[0] - 30, b.at[1] - 20);
+    for (const dz of [-6, -3, 0, 3, 6]) {
+      expect(bank - h(b.at[0], b.at[1] + dz)).toBeLessThan(0.5);
+    }
+  });
+
   it('rises into mountains outside the valley', () => {
     const valley = h(0, 0);
     expect(h(1500, 0) - valley).toBeGreaterThan(MAP.terrain.valleyRise * 0.6);
