@@ -1,6 +1,6 @@
 # NIGHT ORBIT — Project Status & Handoff
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-05_
 
 This file says **where the project is right now**, **what needs testing**, and **what comes next**.
 The full design and milestone list are in [`PLAN.md`](PLAN.md). Update this file at the end of
@@ -17,19 +17,19 @@ every session.
 | **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6) |
 | **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
-| **M4** Infantry & friendlies            | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
+| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | M5 – M10                                | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **222 tests in 33 files**).
 `npm run build` works (≈619 kB JS, 161 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M3 are pushed; the M4 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M4 are pushed. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
 ≤ 100 draw calls) and by a scripted lead test in the real game (§6). Feel test passed (user, 2026-11-04).
 M4 checked by Claude in Chrome (team, strobes in all three sensors, 60 enemies, overrun and
-friendly-fire fail screens, danger close; 60 FPS, GPU ~7.7–8.1 ms, ≤ 28 draw calls; §6).
+friendly-fire fail screens, danger close; 60 FPS, GPU ~7.7–8.1 ms, ≤ 28 draw calls; §6). Feel test passed (user, 2026-11-05).
 
 ---
 
@@ -125,7 +125,7 @@ right button and drag** to aim. Add `?debug=1` to the URL to start with stats on
 
 ## 3. Manual checklists
 
-### 3.1 M4 feel test (pending): "60 enemies attacking a moving team is fun for 2 minutes"
+### 3.1 M4 feel test (passed 2026-11-05): "60 enemies attacking a moving team is fun for 2 minutes"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats), click to begin. The orbit starts over
 Ridgeback (four soldiers in a diamond, west of the village) and follows them as they walk.
@@ -145,7 +145,7 @@ Enemy groups of 6–10 arrive every 8 s from all sides, up to 60 alive. Tuning: 
 - [ ] **Danger close:** a 105 mm within ~33 m (40 mm ~12 m, 25 mm ~4 m) of a friendly flashes
       `DANGER CLOSE` under the reticle.
 - [ ] **Friendly fire:** killing a Ridgeback member shows `MISSION FAILED / FRIENDLY FIRE: YOU HIT
-    RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click reloads.
+  RIDGEBACK`; ignoring the enemies long enough shows `RIDGEBACK OVERRUN`. Click reloads.
 - [ ] **Fun for 2 minutes?** Pressure should build if you don't thin the groups (Claude's scripted
       run with no player fire: overrun at ~70 s). Too hard/easy → `accuracyNear/Far`, `dps` in
       `unitDefs.ts`, `waveInterval`, `maxEnemies`.
@@ -226,12 +226,10 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M4 feel test** (§3.1) by the user, then tune and sign off M4.
-2. **Then M5: enemy AI & vehicles** (PLAN.md §7.10–7.11): paths, cover points, EnemyBrain
+1. **M5: enemy AI & vehicles** (PLAN.md §7.10–7.11): paths, cover points, EnemyBrain
    (cover / fire / flee, morale break), real trucks/technicals/APCs replacing `DummyTarget`.
    Enemy line of sight is not checked yet (enemies shoot through houses); M5 should add it.
-3. Push the M4 commits once the user is happy with them.
-4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -339,7 +337,8 @@ _(Fill in after testing.)_
 | 2026-11-04 | M3 feel test (user)           | "M3 seems to be working well"; signed off                                                                               | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari |
 | 2026-11-04 | M4 scripted (Claude, Chrome)  | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                |
 | 2026-11-04 | M4 fail/warn (Claude, Chrome) | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                  | Works as designed                                                                                              |
-| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls | None yet; user feel test pending                                                                               |
+| 2026-11-04 | M4 look (Claude, Chrome)      | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls | None                                                                                                           |
+| 2026-11-05 | M4 feel test (user)           | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                             | None; M4 signed off                                                                                            |
 
 ---
 
@@ -347,6 +346,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's start M4."
+> "Read STATUS.md and PLAN.md. Let's start M5."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.

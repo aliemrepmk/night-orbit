@@ -845,7 +845,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** weapon state machines (fire rate, clip, overheat, reload timing); flight time = distance / speed; impact on the correct tick; spread stays within its radius; raycast hits roofs before ground.
 - ✅ **Done when:** each weapon feels distinct; you can hit a moving target only by leading it.
 
-### M4 — Infantry & Friendlies (2–3 days) — code-complete, awaiting feel test
+### M4 — Infantry & Friendlies (2–3 days) — ✅ signed off
 
 - Instanced infantry, walk animation, damage, fling-death, cooling bodies.
 - Ridgeback team with strobes, route following, shared team health, enemy fire effects.
