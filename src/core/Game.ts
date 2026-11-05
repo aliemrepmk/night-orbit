@@ -1,5 +1,4 @@
 import { Vector3 } from 'three';
-import { coverFromBoxes } from '../ai/CoverPoints';
 import { AudioEngine } from '../audio/AudioEngine';
 import { impactVolume } from '../audio/sounds';
 import { Explosions } from '../combat/Explosions';
@@ -24,13 +23,17 @@ import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import { failReasonText, type GunReadout } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
-import { ConvoySpawner, TEST_ROADS, TEST_ROUTE, WaveSpawner } from '../units/TestScene';
+import { DebugOverlay } from '../debug/DebugOverlay';
+import { formatPlacement, mapOverlay } from '../debug/mapOverlay';
+import { ConvoySpawner, WaveSpawner, journeyRoute } from '../units/TestScene';
 import { UnitManager } from '../units/UnitManager';
 import { VehicleManager } from '../units/VehicleManager';
 import { VehicleRenderer } from '../units/VehicleRenderer';
 import { Collision } from '../world/Collision';
-import { PlaceholderWorld } from '../world/PlaceholderWorld';
+import { MAP } from '../world/MapData';
 import { Terrain } from '../world/Terrain';
+import { mapHeightField } from '../world/terrainShape';
+import { WorldBuilder } from '../world/WorldBuilder';
 import { EventBus } from './EventBus';
 import type { FailReason, GameEvents } from './events';
 import { FixedStepper } from './FixedStepper';
@@ -44,10 +47,13 @@ export class Game {
   state: GameState = 'title';
 
   private readonly renderer: Renderer;
-  private readonly terrain = new Terrain();
-  // Ray hits can't be higher than the tallest hill (+ margin); buildings are boxes on top.
-  private readonly collision = new Collision(this.terrain, CONFIG.terrain.hillHeight + 2);
-  private readonly world: PlaceholderWorld;
+  // The handcrafted map (PLAN.md §7.12): terrain shaped by MapData, then everything on it.
+  private readonly terrain = new Terrain(CONFIG.terrain, mapHeightField(MAP));
+  // Ray hits can't be higher than the highest ground (+ margin); buildings are boxes on top.
+  private readonly collision = new Collision(this.terrain, this.terrain.maxHeight + 2);
+  private readonly world: WorldBuilder;
+  /** Map-authoring overlay (F2) and placer (P): dev builds or `?debug=1` only. */
+  private readonly overlay: DebugOverlay | null = null;
   private readonly bus = new EventBus<GameEvents>();
   private readonly weapons = new Weapons();
   private readonly projectiles = new Projectiles();
@@ -90,10 +96,12 @@ export class Game {
   ) {
     const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
     // The world first: its houses are what soldiers take cover behind and can't see through.
-    this.world = new PlaceholderWorld(this.terrain, this.collision);
-    this.units = new UnitManager(ground, this.bus, createRng(4040), TEST_ROUTE, {
+    this.world = new WorldBuilder(MAP, this.terrain, this.collision);
+    // Soldiers walk on the surface (over the bridge deck, not through the stream bed).
+    const surface = (x: number, z: number) => this.world.surfaceAt(x, z);
+    this.units = new UnitManager(surface, this.bus, createRng(4040), journeyRoute(MAP), {
       world: this.collision,
-      cover: coverFromBoxes(this.collision.boxes, CONFIG.ai.coverMargin),
+      cover: this.world.cover,
     });
     this.vehicles = new VehicleManager(
       this.units,
@@ -103,7 +111,6 @@ export class Game {
       CONFIG.vehicles,
       CONFIG.testScene.machineGunnerChance,
     );
-    this.world.addRoads(TEST_ROADS);
     this.gunship.snapTo(this.units.teamPosition.x, this.units.teamPosition.z);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
 
@@ -131,6 +138,9 @@ export class Game {
     this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
 
     this.hud = new HUD(hudRoot);
+    if (import.meta.env.DEV || this.debug) {
+      this.overlay = new DebugOverlay(hudRoot, mapOverlay(MAP, this.world.cover.points), ground);
+    }
     this.input = new Input(canvas);
     this.input.onLockChange = (locked) => {
       if (this.state !== 'failed') this.setState(locked ? 'playing' : 'paused');
@@ -172,6 +182,7 @@ export class Game {
     this.syncEffects();
     this.renderer.render(this.thermalFrame(now / 1000));
     this.updateHud();
+    this.overlay?.render(this.sensor.camera, window.innerWidth, window.innerHeight);
     this.input.endFrame();
   }
 
@@ -345,6 +356,18 @@ export class Game {
       this.sensorFx.triggerSwitch();
     }
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
+    if (this.overlay) {
+      if (this.input.wasPressed('F2')) this.overlay.toggle();
+      // Placer: log the crosshair's ground point, ready to paste into MapData.
+      if (this.input.wasPressed('KeyP')) {
+        const a = this.sensor.aim;
+        const text = formatPlacement(a.x, a.z);
+        console.info('[placer]', text);
+        navigator.clipboard?.writeText(text).catch(() => {});
+        this.overlay.markPlaced(a.x, a.y, a.z, text);
+        if (!this.overlay.visible) this.overlay.toggle();
+      }
+    }
     // With pointer lock the browser handles Esc (and we get a lock-change event); in drag mode we must.
     if (this.input.dragMode && this.input.wasPressed('Escape')) this.setState('paused');
   }

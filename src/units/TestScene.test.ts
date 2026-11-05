@@ -3,7 +3,10 @@ import { CONFIG } from '../config';
 import { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
 import { createRng } from '../core/rng';
-import { ConvoySpawner, TEST_ROADS, TEST_ROUTE, WaveSpawner } from './TestScene';
+import { ConvoySpawner, WaveSpawner, journeyRoute } from './TestScene';
+import { MAP } from '../world/MapData';
+
+const TEST_ROUTE = journeyRoute();
 import { UnitManager } from './UnitManager';
 import { VehicleManager } from './VehicleManager';
 
@@ -16,6 +19,19 @@ function rig() {
   const spawner = new WaveSpawner(createRng(3));
   return { units, spawner };
 }
+
+describe('journeyRoute', () => {
+  it('joins every route segment from the OP to the LZ without repeating the joints', () => {
+    const route = journeyRoute();
+    const total = MAP.routeOrder.reduce((n, id) => n + MAP.friendlyRoutes[id].length, 0);
+    expect(route).toHaveLength(total - (MAP.routeOrder.length - 1));
+    expect(route[0]).toEqual({ x: MAP.zones.op.center[0], z: MAP.zones.op.center[1] });
+    expect(route[route.length - 1]).toEqual({
+      x: MAP.zones.lz.center[0],
+      z: MAP.zones.lz.center[1],
+    });
+  });
+});
 
 describe('WaveSpawner', () => {
   it('starts with a few groups at the configured distance from the team', () => {
@@ -53,6 +69,25 @@ describe('WaveSpawner', () => {
     }
   });
 
+  it('sends groups along the map approach paths when one starts in range', () => {
+    const { units, spawner } = rig();
+    spawner.update(DT, units);
+    const withPath = units.enemies.filter((e) => e.path !== null);
+    expect(withPath.length).toBeGreaterThan(0);
+    for (const e of withPath) {
+      expect(
+        Math.hypot(e.position.x - e.path!.start.x, e.position.z - e.path!.start.z),
+      ).toBeLessThan(cfg.groupRadius * 1.5);
+    }
+  });
+
+  it('falls back to random bearings without a map', () => {
+    const units = new UnitManager(flat, new EventBus<GameEvents>(), createRng(2), TEST_ROUTE);
+    const spawner = new WaveSpawner(createRng(3), cfg, null);
+    expect(spawner.update(DT, units)).toBeGreaterThan(0);
+    expect(units.enemies.every((e) => e.path === null)).toBe(true);
+  });
+
   it('mixes in machine gunners (about one in six)', () => {
     const { units, spawner } = rig();
     for (let g = 0; g < 10; g++) spawner.spawnGroup(units);
@@ -70,14 +105,13 @@ describe('ConvoySpawner', () => {
     return { units, vehicles, spawner: new ConvoySpawner(createRng(4)) };
   }
 
-  it('keeps every test road inside the map and ending near the team route', () => {
-    for (const road of TEST_ROADS) {
-      for (const p of road) {
-        expect(Math.abs(p.x)).toBeLessThanOrEqual(CONFIG.map.size / 2);
-        expect(Math.abs(p.z)).toBeLessThanOrEqual(CONFIG.map.size / 2);
-      }
-      const end = road[road.length - 1];
-      const nearest = Math.min(...TEST_ROUTE.map((r) => Math.hypot(r.x - end.x, r.z - end.z)));
+  it('uses the map vehicle paths, each ending near the team journey', () => {
+    const { spawner } = convoyRig();
+    expect(spawner.roads).toHaveLength(Object.keys(MAP.vehiclePaths).length);
+    for (const road of spawner.roads) {
+      const nearest = Math.min(
+        ...TEST_ROUTE.map((r) => Math.hypot(r.x - road.end.x, r.z - road.end.z)),
+      );
       expect(nearest).toBeLessThan(260);
     }
   });

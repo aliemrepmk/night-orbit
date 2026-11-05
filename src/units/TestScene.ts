@@ -1,4 +1,4 @@
-import { Path, type PathPoint } from '../ai/Paths';
+import { Path } from '../ai/Paths';
 import { CONFIG } from '../config';
 import { range, type Rng } from '../core/rng';
 import type { RoutePoint } from './Squad';
@@ -6,49 +6,27 @@ import type { UnitManager } from './UnitManager';
 import { INFANTRY } from './unitDefs';
 import type { VehicleManager } from './VehicleManager';
 import { VEHICLES, type VehicleDef } from './vehicleDefs';
+import { MAP } from '../world/MapData';
+import { toPathPoints, type MapData, type Vec2 } from '../world/mapTypes';
 
 /**
- * TEMPORARY M4/M5 test scene (M6 brings the real map, M7 the mission script): Ridgeback walks
- * around the west and south of the placeholder village, back and forth, while enemy groups
- * keep arriving from every direction and convoys drive in on four roads.
+ * TEMPORARY test scene on the real map (M7's mission script replaces it): Ridgeback walks its
+ * whole journey (OP → fields → village → crossroads → LZ) back and forth, enemy groups keep
+ * arriving along the map's approach paths and at its spawn points, and convoys drive the map's
+ * vehicle paths.
  */
-export const TEST_ROUTE: readonly RoutePoint[] = [
-  { x: -430, z: 300 },
-  { x: -260, z: 210 },
-  { x: -190, z: 20 },
-  { x: -175, z: -190 },
-  { x: 40, z: -235 },
-  { x: 250, z: -175 },
-  { x: 330, z: -125 },
-];
 
-/**
- * Roads from the map edge toward the team's route, each ending ~200 m short of it, where trucks
- * unload and technicals open fire (west, north, east and south).
- */
-export const TEST_ROADS: readonly (readonly PathPoint[])[] = [
-  [
-    { x: -780, z: -60 },
-    { x: -560, z: -30 },
-    { x: -420, z: -70 },
-    { x: -340, z: -60 },
-  ],
-  [
-    { x: 130, z: -780 },
-    { x: 90, z: -600 },
-    { x: 115, z: -440 },
-  ],
-  [
-    { x: 780, z: -40 },
-    { x: 640, z: -70 },
-    { x: 530, z: -30 },
-  ],
-  [
-    { x: -40, z: 780 },
-    { x: -110, z: 580 },
-    { x: -190, z: 420 },
-  ],
-];
+/** Ridgeback's full journey: every route segment in order, joined into one route. */
+export function journeyRoute(map: MapData = MAP): RoutePoint[] {
+  const out: RoutePoint[] = [];
+  for (const id of map.routeOrder) {
+    for (const [x, z] of map.friendlyRoutes[id]) {
+      const last = out[out.length - 1];
+      if (!last || Math.hypot(last.x - x, last.z - z) > 1) out.push({ x, z });
+    }
+  }
+  return out;
+}
 
 export type TestSceneConfig = { readonly [K in keyof typeof CONFIG.testScene]: number };
 
@@ -60,11 +38,18 @@ export class WaveSpawner {
   private timer: number;
   private started = false;
 
+  private readonly paths: Path[];
+
   constructor(
     private readonly rng: Rng,
     private readonly cfg: TestSceneConfig = CONFIG.testScene,
+    /** Approach paths and spawn points come from here; null = random bearings only. */
+    private readonly map: MapData | null = MAP,
   ) {
     this.timer = cfg.waveInterval;
+    this.paths = map
+      ? Object.values(map.enemyPaths).map((p) => new Path(toPathPoints(p.points)))
+      : [];
   }
 
   /** Returns how many enemies were spawned this tick. */
@@ -81,23 +66,44 @@ export class WaveSpawner {
     return this.spawnGroup(units);
   }
 
-  /** One group at a random bearing from the team, respecting the alive cap. */
+  /**
+   * One group, respecting the alive cap: at the start of a map approach path between `spawnMin`
+   * and `spawnMax` from the team (the group follows the path), else at a spawn point in that
+   * ring, else at a random bearing.
+   */
   spawnGroup(units: UnitManager): number {
     const c = this.cfg;
     const room = c.maxEnemies - units.aliveEnemies;
     const size = Math.min(room, Math.round(range(this.rng, c.groupMin, c.groupMax)));
     if (size <= 0) return 0;
     const team = units.teamPosition;
-    const bearing = range(this.rng, 0, Math.PI * 2);
-    const dist = range(this.rng, c.spawnMin, c.spawnMax);
-    const cx = clamp(team.x + Math.sin(bearing) * dist);
-    const cz = clamp(team.z + Math.cos(bearing) * dist);
+    const inRing = (p: Vec2) => {
+      const d = Math.hypot(p[0] - team.x, p[1] - team.z);
+      return d >= c.spawnMin && d <= c.spawnMax;
+    };
+    let cx: number;
+    let cz: number;
+    let path: Path | null = null;
+    const paths = this.paths.filter((p) => inRing([p.start.x, p.start.z]));
+    const spawns = this.map ? Object.values(this.map.spawnPoints).flat().filter(inRing) : [];
+    if (paths.length > 0) {
+      path = paths[Math.floor(this.rng() * paths.length)];
+      cx = path.start.x;
+      cz = path.start.z;
+    } else if (spawns.length > 0) {
+      [cx, cz] = spawns[Math.floor(this.rng() * spawns.length)];
+    } else {
+      const bearing = range(this.rng, 0, Math.PI * 2);
+      const dist = range(this.rng, c.spawnMin, c.spawnMax);
+      cx = clamp(team.x + Math.sin(bearing) * dist);
+      cz = clamp(team.z + Math.cos(bearing) * dist);
+    }
     let n = 0;
     for (let k = 0; k < size; k++) {
       const def = this.rng() < c.machineGunnerChance ? INFANTRY.machineGunner : INFANTRY.rifleman;
       const x = clamp(cx + range(this.rng, -c.groupRadius, c.groupRadius));
       const z = clamp(cz + range(this.rng, -c.groupRadius, c.groupRadius));
-      if (units.spawnEnemy(def, x, z)) n++;
+      if (units.spawnEnemy(def, x, z, { path })) n++;
     }
     return n;
   }
@@ -108,8 +114,8 @@ function clamp(v: number): number {
 }
 
 /**
- * Sends a convoy every `convoyInterval` seconds down the road that ends nearest the team: a
- * truck in front, sometimes a technical and an APC behind it, `convoyGap` meters apart.
+ * Sends a convoy every `convoyInterval` seconds along the map vehicle path that ends nearest the
+ * team: a truck in front, sometimes a technical and an APC behind it, `convoyGap` meters apart.
  */
 export class ConvoySpawner {
   readonly roads: readonly Path[];
@@ -117,10 +123,10 @@ export class ConvoySpawner {
 
   constructor(
     private readonly rng: Rng,
-    roads: readonly (readonly PathPoint[])[] = TEST_ROADS,
+    roads: readonly (readonly Vec2[])[] = Object.values(MAP.vehiclePaths),
     private readonly cfg: TestSceneConfig = CONFIG.testScene,
   ) {
-    this.roads = roads.map((r) => new Path(r));
+    this.roads = roads.map((r) => new Path(toPathPoints(r)));
     this.timer = cfg.convoyFirst;
   }
 
@@ -132,7 +138,7 @@ export class ConvoySpawner {
     return this.send(this.nearestRoad(units), vehicles);
   }
 
-  /** The road whose end is closest to Ridgeback right now. */
+  /** The vehicle path whose end is closest to Ridgeback right now. */
   nearestRoad(units: UnitManager): Path {
     const t = units.teamPosition;
     let best = this.roads[0];

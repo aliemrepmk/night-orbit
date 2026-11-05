@@ -302,7 +302,7 @@ export const CONFIG = {
     maxTracers: 160,
   },
 
-  /** TEMPORARY M4 test scene (M7's mission script replaces it): waves attacking a moving team. */
+  /** TEMPORARY test scene on the real map (M7's mission script replaces it): waves attacking a moving team. */
   testScene: {
     /** Most enemies alive at once (M4 "done when": 60 enemies attacking a moving team). */
     maxEnemies: 60,
@@ -311,9 +311,9 @@ export const CONFIG = {
     waveInterval: 10,
     groupMin: 6,
     groupMax: 10,
-    /** Groups appear this far from the team, scattered within `groupRadius`. */
-    spawnMin: 260,
-    spawnMax: 360,
+    /** Groups appear this far from the team (at map paths / spawn points), scattered within `groupRadius`. */
+    spawnMin: 180,
+    spawnMax: 450,
     groupRadius: 14,
     /** PLAN.md §9: one in six enemies is a machine gunner. */
     machineGunnerChance: 1 / 6,
