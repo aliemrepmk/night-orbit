@@ -20,13 +20,13 @@ every session.
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
-| **M6** The handcrafted map              | 🟨 Code-complete. Tests pass; **look test pending (§3.1)**             |
+| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                     |
 | M7 – M10                                | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **348 tests in 46 files**).
 `npm run build` works (≈666 kB JS, 178 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed; the M6 commits are local, **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed; the M6 commits are local, with a push scheduled for 2026-11-06 00:30 (Turkish time). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -164,7 +164,7 @@ Map authoring (dev builds, or `?debug=1`): `F2` = map overlay · `P` = log the c
 
 ## 3. Manual checklists
 
-### 3.1 M6 look test (pending): "flying the orbit over each zone shows a believable, readable place"
+### 3.1 M6 look test (passed 2026-11-05): "flying the orbit over each zone shows a believable, readable place"
 
 Run `npm run dev`, click to begin. Press `F3` to park the orbit over each zone in turn (OP →
 fields → village → crossroads → LZ; a sixth press goes back to following Ridgeback). Try all
@@ -352,12 +352,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M6 look test** (§3.1) by the user, then tune and sign off M6; push the M6 commits.
-2. **Then M7: mission scripting & dialogue** (PLAN.md §7.14–7.15, §8): the mission runner
+1. **M7: mission scripting & dialogue**: mission scripting & dialogue** (PLAN.md §7.14–7.15, §8): the mission runner
    (phases, conditions, actions), the radio with subtitles, protected-clinic fail logic
    (`WorldBuilder.protectedBoxes`), `moveTeam` on the map's route ids, scripted spawns at the
    map's spawn points/paths, the extraction helicopter. Replaces `units/TestScene.ts`.
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -569,6 +568,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M6 look test (user)             | "Enemies can be spawn killed (same point)", "village can be populated with more roads, houses", "enemies do not use the bridge"            | Anti-camping spawner, 43-house village on 5 streets, bridge detours (decisions 47–49); look test to repeat                     |
 | 2026-11-05 | M6 fixes (Claude, headless)     | Chrome extension was not connected, so checked headless: a 3-min real-map scene run, every enemy stream crossing on the bridge             | Regression test `mapScene.test.ts` (fails without the detour: an enemy waded 185 m from the bridge). Not yet seen in a browser |
 | 2026-11-05 | M6 fixes (Claude, Chrome)       | F3 tour of all 5 zones in WHT/BLK/NV at all zooms reads right; spawn camping: crosshair held on a spawn site, later groups 239–520 m away; 14 live enemy stream crossings, all ≤ 3.4 m from the bridge center (Ridgeback 1.6 m); bomb lands on its point; 60 FPS, GPU 7.6–8.2 ms (11.3 ms with F2), 30–38 calls; no console errors | Fixes confirmed in the browser; M6 look test (user) still to repeat |
+| 2026-11-05 | M6 look test (user)             | "Look test seems nice"                                                                                                                       | None; M6 signed off                                                                                                            |
 
 ---
 

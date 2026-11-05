@@ -905,7 +905,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** cooldown and readiness; gun-run impacts spaced evenly along the chosen axis and strip length; impacts land after the configured delay at the locked ground point; strike damage uses the same friendly-fire / danger-close path (a strike killing a friendly fails the mission); footprint danger-close preview.
 - ✅ **Done when:** calling a strike feels like a deliberate, risky decision, the delay makes you predict where enemies will be, and the guns still matter.
 
-### M6 — The Handcrafted Map (2–3 days) — code-complete, awaiting look test
+### M6 — The Handcrafted Map (2–3 days) — ✅ signed off
 
 - Full `MapData`: fields, farmhouse, stream and bridge, village (~25 buildings + clinic), crossroads, north road, quarry LZ, tree lines.
 - Debug overlay + Placer tool built **first**, to speed up authoring.
