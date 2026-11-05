@@ -888,7 +888,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 - 🧪 **Tests:** radial damage falloff; friendly-fire detection → fail event; danger-close event; team health damage and regeneration; spatial grid radius queries match brute force.
 - ✅ **Done when:** a test scene with 60 enemies attacking a moving team is fun for 2 minutes and runs at 60 FPS.
 
-### M5 — Enemy AI & Vehicles (2–3 days) — code-complete, awaiting feel test
+### M5 — Enemy AI & Vehicles (2–3 days) — ✅ signed off
 
 - Paths, cover points, EnemyBrain, separation, morale break.
 - Trucks (unloading), technicals, APCs, damage states, wrecks blocking roads.

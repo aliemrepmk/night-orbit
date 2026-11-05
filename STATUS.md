@@ -18,7 +18,7 @@ every session.
 | **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                  |
 | **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                  |
 | **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
-| **M5** Enemy AI & vehicles              | 🟨 Code-complete. Tests pass; **feel test pending (§3.1)**             |
+| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | M6 – M10                                | ⬜ Not started                                                         |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **278 tests in 39 files**).
@@ -142,7 +142,7 @@ right button and drag** to aim. Add `?debug=1` to the URL to start with stats on
 
 ## 3. Manual checklists
 
-### 3.1 M5 feel test (pending): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
+### 3.1 M5 feel test (passed 2026-11-05): "enemies visibly take cover, advance and flee; a convoy arrives, unloads and burns convincingly"
 
 Run `npm run dev`, open the URL (add `?debug=1` for stats; F1 shows `VEH` = live vehicles), click
 to begin. Same moving-team scene as M4, plus a convoy every 45 s (first at 20 s) on the road that
@@ -272,14 +272,13 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M5 feel test** (§3.1) by the user, then tune and sign off M5; push the M5 commits.
-2. **Then M5+: air support** (user idea, 2026-11-05; PLAN.md §7.19 and M5+): gun run (attack jet,
+1. **M5+: air support** (in progress) (user idea, 2026-11-05; PLAN.md §7.19 and M5+): gun run (attack jet,
    HAMMER 1-1) and bomb (fast jet, SABRE 2-2) called on the sensor point with `T`, delay,
    footprint preview, cooldown-only (unlimited) use, through `Explosions` (friendly fire applies).
-3. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
+2. **Then M6: the handcrafted map** (PLAN.md §7.12): `MapData` with roads, zones, hand-placed
    cover points and enemy approach paths, flattened ground under the village and LZ, debug
    overlay + Placer first. It replaces `PlaceholderWorld`, the test roads and the corner cover.
-4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -426,6 +425,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M5 cover (Claude, Chrome)     | No enemy ever took cover: hills blocked the view from every corner to the team                                                             | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover             |
 | 2026-11-05 | M5 convoy (Claude, Chrome)    | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                 |
 | 2026-11-05 | M5 scripted (Claude, Chrome)  | No player fire: convoys + waves overran the team at ~75 s                                                                                  | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                     |
+| 2026-11-05 | M5 feel test (user)           | "M5 feel test seems good"                                                                                                                  | None; M5 signed off                                                                                            |
 
 ---
 
