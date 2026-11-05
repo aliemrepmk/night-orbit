@@ -314,7 +314,12 @@ export const CONFIG = {
     /** Groups appear this far from the team (at map paths / spawn points), scattered within `groupRadius`. */
     spawnMin: 180,
     spawnMax: 450,
-    groupRadius: 14,
+    groupRadius: 18,
+    /** Anti spawn-camping: members of a group appear one by one, never where the sensor is
+     * looking, and a spawn point rests for `spawnCooldown` seconds after it is used. */
+    trickleInterval: 0.7,
+    avoidAimRadius: 160,
+    spawnCooldown: 30,
     /** PLAN.md §9: one in six enemies is a machine gunner. */
     machineGunnerChance: 1 / 6,
     /** Convoys: the first one after this many seconds, then one every `convoyInterval`. */

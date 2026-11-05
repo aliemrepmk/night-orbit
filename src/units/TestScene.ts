@@ -33,79 +33,156 @@ export type TestSceneConfig = { readonly [K in keyof typeof CONFIG.testScene]: n
 /** Enemies stay inside the playable map (with a margin). */
 const MAP_LIMIT = CONFIG.map.size / 2 - 20;
 
-/** Keeps groups of enemies coming at the team, up to `maxEnemies` alive at once. */
+/** A place a group can appear: an approach path's start (the group then follows it), or a spawn point. */
+interface SpawnSite {
+  readonly x: number;
+  readonly z: number;
+  readonly path: Path | null;
+  /** Time it was last used (anti spawn-camping). */
+  lastUsed: number;
+}
+
+/** One soldier of a group waiting to appear (groups trickle in, they don't pop in at once). */
+interface Pending {
+  at: number;
+  x: number;
+  z: number;
+  path: Path | null;
+  machineGunner: boolean;
+}
+
+/**
+ * Keeps groups of enemies coming at the team, up to `maxEnemies` alive at once. Against spawn
+ * camping (user feedback, M6): a group appears at a random site between `spawnMin` and
+ * `spawnMax` from the team that the sensor is NOT looking at and that hasn't been used for
+ * `spawnCooldown` s, scattered over `groupRadius`, one soldier every `trickleInterval` s.
+ */
 export class WaveSpawner {
   private timer: number;
   private started = false;
-
-  private readonly paths: Path[];
+  private time = 0;
+  private readonly sites: SpawnSite[] = [];
+  private readonly pending: Pending[] = [];
 
   constructor(
     private readonly rng: Rng,
     private readonly cfg: TestSceneConfig = CONFIG.testScene,
     /** Approach paths and spawn points come from here; null = random bearings only. */
-    private readonly map: MapData | null = MAP,
+    map: MapData | null = MAP,
   ) {
     this.timer = cfg.waveInterval;
-    this.paths = map
-      ? Object.values(map.enemyPaths).map((p) => new Path(toPathPoints(p.points)))
-      : [];
+    if (!map) return;
+    for (const p of Object.values(map.enemyPaths)) {
+      const path = new Path(toPathPoints(p.points));
+      this.sites.push({ x: path.start.x, z: path.start.z, path, lastUsed: -Infinity });
+    }
+    for (const [x, z] of Object.values(map.spawnPoints).flat()) {
+      // A spawn point at a path's start is that path's site already.
+      if (this.sites.some((s) => Math.hypot(s.x - x, s.z - z) < 5)) continue;
+      this.sites.push({ x, z, path: null, lastUsed: -Infinity });
+    }
   }
 
-  /** Returns how many enemies were spawned this tick. */
-  update(dt: number, units: UnitManager): number {
-    let spawned = 0;
-    if (!this.started) {
-      this.started = true;
-      for (let g = 0; g < this.cfg.initialGroups; g++) spawned += this.spawnGroup(units);
-      return spawned;
-    }
-    this.timer -= dt;
-    if (this.timer > 0) return 0;
-    this.timer += this.cfg.waveInterval;
-    return this.spawnGroup(units);
+  /** Soldiers still waiting to appear. */
+  get queued(): number {
+    return this.pending.length;
   }
 
   /**
-   * One group, respecting the alive cap: at the start of a map approach path between `spawnMin`
-   * and `spawnMax` from the team (the group follows the path), else at a spawn point in that
-   * ring, else at a random bearing.
+   * Queues new groups on schedule and lets queued soldiers appear. `aim` is where the sensor
+   * is looking (no group appears near it). Returns how many soldiers appeared this tick.
    */
-  spawnGroup(units: UnitManager): number {
+  update(dt: number, units: UnitManager, aim: { x: number; z: number } | null = null): number {
+    this.time += dt;
+    if (!this.started) {
+      this.started = true;
+      for (let g = 0; g < this.cfg.initialGroups; g++) this.queueGroup(units, aim);
+    } else {
+      this.timer -= dt;
+      if (this.timer <= 0) {
+        this.timer += this.cfg.waveInterval;
+        this.queueGroup(units, aim);
+      }
+    }
+    let n = 0;
+    while (this.pending.length > 0 && this.pending[0].at <= this.time) {
+      const p = this.pending.shift()!;
+      if (units.aliveEnemies >= this.cfg.maxEnemies) continue;
+      const def = p.machineGunner ? INFANTRY.machineGunner : INFANTRY.rifleman;
+      if (units.spawnEnemy(def, p.x, p.z, { path: p.path })) n++;
+    }
+    return n;
+  }
+
+  /** Spawns one whole group right away (tests, tools). */
+  spawnGroup(units: UnitManager, aim: { x: number; z: number } | null = null): number {
+    this.queueGroup(units, aim, 0);
+    let n = 0;
+    for (const p of this.pending.splice(0)) {
+      const def = p.machineGunner ? INFANTRY.machineGunner : INFANTRY.rifleman;
+      if (units.spawnEnemy(def, p.x, p.z, { path: p.path })) n++;
+    }
+    return n;
+  }
+
+  /** Picks a site and queues one group there; returns its size. */
+  private queueGroup(
+    units: UnitManager,
+    aim: { x: number; z: number } | null,
+    interval = this.cfg.trickleInterval,
+  ): number {
     const c = this.cfg;
-    const room = c.maxEnemies - units.aliveEnemies;
+    const room = c.maxEnemies - units.aliveEnemies - this.pending.length;
     const size = Math.min(room, Math.round(range(this.rng, c.groupMin, c.groupMax)));
     if (size <= 0) return 0;
-    const team = units.teamPosition;
-    const inRing = (p: Vec2) => {
-      const d = Math.hypot(p[0] - team.x, p[1] - team.z);
-      return d >= c.spawnMin && d <= c.spawnMax;
-    };
+    const site = this.pickSite(units, aim);
     let cx: number;
     let cz: number;
     let path: Path | null = null;
-    const paths = this.paths.filter((p) => inRing([p.start.x, p.start.z]));
-    const spawns = this.map ? Object.values(this.map.spawnPoints).flat().filter(inRing) : [];
-    if (paths.length > 0) {
-      path = paths[Math.floor(this.rng() * paths.length)];
-      cx = path.start.x;
-      cz = path.start.z;
-    } else if (spawns.length > 0) {
-      [cx, cz] = spawns[Math.floor(this.rng() * spawns.length)];
+    if (site) {
+      site.lastUsed = this.time;
+      cx = site.x;
+      cz = site.z;
+      path = site.path;
     } else {
+      const team = units.teamPosition;
       const bearing = range(this.rng, 0, Math.PI * 2);
       const dist = range(this.rng, c.spawnMin, c.spawnMax);
       cx = clamp(team.x + Math.sin(bearing) * dist);
       cz = clamp(team.z + Math.cos(bearing) * dist);
     }
-    let n = 0;
+    // Queue after anything already waiting, so groups don't overlap in time either.
+    let at = Math.max(
+      this.time,
+      this.pending.length ? this.pending[this.pending.length - 1].at : 0,
+    );
     for (let k = 0; k < size; k++) {
-      const def = this.rng() < c.machineGunnerChance ? INFANTRY.machineGunner : INFANTRY.rifleman;
-      const x = clamp(cx + range(this.rng, -c.groupRadius, c.groupRadius));
-      const z = clamp(cz + range(this.rng, -c.groupRadius, c.groupRadius));
-      if (units.spawnEnemy(def, x, z, { path })) n++;
+      at += k === 0 ? 0 : interval * range(this.rng, 0.6, 1.4);
+      this.pending.push({
+        at,
+        x: clamp(cx + range(this.rng, -c.groupRadius, c.groupRadius)),
+        z: clamp(cz + range(this.rng, -c.groupRadius, c.groupRadius)),
+        path,
+        machineGunner: this.rng() < c.machineGunnerChance,
+      });
     }
-    return n;
+    return size;
+  }
+
+  /** A random rested site in the ring around the team, away from the sensor's aim point. */
+  private pickSite(units: UnitManager, aim: { x: number; z: number } | null): SpawnSite | null {
+    const c = this.cfg;
+    const team = units.teamPosition;
+    const ok = (s: SpawnSite, rested: boolean) => {
+      const d = Math.hypot(s.x - team.x, s.z - team.z);
+      if (d < c.spawnMin || d > c.spawnMax) return false;
+      if (aim && Math.hypot(s.x - aim.x, s.z - aim.z) < c.avoidAimRadius) return false;
+      return !rested || this.time - s.lastUsed >= c.spawnCooldown;
+    };
+    // Prefer rested sites; if every site in range was used recently, take any not in view.
+    let pool = this.sites.filter((s) => ok(s, true));
+    if (pool.length === 0) pool = this.sites.filter((s) => ok(s, false));
+    return pool.length ? pool[Math.floor(this.rng() * pool.length)] : null;
   }
 }
 

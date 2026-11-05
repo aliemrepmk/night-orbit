@@ -224,7 +224,7 @@ export class Game {
       );
     }
     if (playing) {
-      this.spawner.update(dt, this.units);
+      this.spawner.update(dt, this.units, this.sensor.aim);
       this.convoys.update(dt, this.units, this.vehicles);
       this.units.update(dt);
       this.vehicles.update(dt);

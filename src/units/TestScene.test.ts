@@ -34,17 +34,68 @@ describe('journeyRoute', () => {
 });
 
 describe('WaveSpawner', () => {
-  it('starts with a few groups at the configured distance from the team', () => {
+  /** Records where every soldier appears (they start walking right away). */
+  function recordSpawns(units: UnitManager) {
+    const at: { x: number; z: number; t: number }[] = [];
+    const orig = units.spawnEnemy.bind(units);
+    let t = 0;
+    units.spawnEnemy = (def, x, z, opts) => {
+      at.push({ x, z, t });
+      return orig(def, x, z, opts);
+    };
+    return { at, tick: (dt: number) => (t += dt) };
+  }
+
+  it('starts with a few groups at the configured distance from the team, trickling in', () => {
     const { units, spawner } = rig();
-    const n = spawner.update(DT, units);
-    expect(n).toBeGreaterThanOrEqual(cfg.initialGroups * cfg.groupMin);
-    expect(n).toBeLessThanOrEqual(cfg.initialGroups * cfg.groupMax);
+    const rec = recordSpawns(units);
+    expect(spawner.update(DT, units)).toBe(1); // one soldier at a time, not a whole group
+    for (let k = 0; k < 60 * 30; k++) {
+      rec.tick(DT);
+      spawner.update(DT, units);
+    }
+    const first = rec.at.filter((s) => s.t < cfg.waveInterval);
+    expect(first.length).toBeGreaterThanOrEqual(cfg.groupMin);
     const team = units.teamPosition;
-    for (const e of units.enemies) {
-      const d = Math.hypot(e.position.x - team.x, e.position.z - team.z);
+    for (const s of rec.at) {
+      const d = Math.hypot(s.x - team.x, s.z - team.z);
       expect(d).toBeGreaterThan(cfg.spawnMin - cfg.groupRadius * 1.5);
       expect(d).toBeLessThan(cfg.spawnMax + cfg.groupRadius * 1.5);
     }
+  });
+
+  it('never spawns where the sensor is looking (anti spawn-camping)', () => {
+    const { units, spawner } = rig();
+    const team = units.teamPosition;
+    // Stare at a real site in range of the team the whole time.
+    const sites = [
+      ...Object.values(MAP.enemyPaths).map((p) => p.points[0]),
+      ...Object.values(MAP.spawnPoints).flat(),
+    ].filter(([x, z]) => {
+      const d = Math.hypot(x - team.x, z - team.z);
+      return d >= cfg.spawnMin && d <= cfg.spawnMax;
+    });
+    expect(sites.length).toBeGreaterThan(1);
+    const aim = { x: sites[0][0], z: sites[0][1] };
+    const rec = recordSpawns(units);
+    for (let k = 0; k < 60 * 90; k++) spawner.update(DT, units, aim);
+    expect(rec.at.length).toBeGreaterThan(cfg.groupMin);
+    const margin = cfg.avoidAimRadius - cfg.groupRadius * Math.SQRT2;
+    for (const p of rec.at) expect(Math.hypot(p.x - aim.x, p.z - aim.z)).toBeGreaterThan(margin);
+  });
+
+  it('rests a site after using it, so the next groups come from elsewhere', () => {
+    const { units, spawner } = rig();
+    const rec = recordSpawns(units);
+    for (let k = 0; k < 60 * 25; k++) spawner.update(DT, units);
+    // Cluster the spawns by site (within 2 × groupRadius) and look at the first three groups.
+    const centers: { x: number; z: number }[] = [];
+    for (const s of rec.at) {
+      if (!centers.some((c) => Math.hypot(c.x - s.x, c.z - s.z) < cfg.groupRadius * 2.9)) {
+        centers.push(s);
+      }
+    }
+    expect(centers.length).toBeGreaterThanOrEqual(Math.min(3, cfg.initialGroups));
   });
 
   it('never has more than maxEnemies alive, and adds a group every wave interval', () => {
