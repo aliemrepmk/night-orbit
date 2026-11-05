@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { WEAPONS } from '../gunship/weaponDefs';
 import { WeaponState } from '../gunship/Weapons';
-import { bar, countdown, failReasonText, gunLine, teamLine, type GunReadout } from './hudFormat';
+import {
+  bar,
+  countdown,
+  failReasonText,
+  gunLine,
+  inboundLine,
+  strikeLine,
+  teamLine,
+  type GunReadout,
+} from './hudFormat';
 
 function readout(w: WeaponState): GunReadout {
   return {
@@ -69,5 +78,18 @@ describe('failReasonText', () => {
   it('names every fail reason', () => {
     expect(failReasonText('friendly_fire')).toContain('FRIENDLY FIRE');
     expect(failReasonText('team_overrun')).toContain('OVERRUN');
+  });
+});
+
+describe('HUD air-support lines', () => {
+  it('shows READY or the rearm countdown (rounded up), with ▶ on the strike being aimed', () => {
+    expect(strikeLine('GUN RUN', 0, true)).toBe('▶ GUN RUN READY');
+    expect(strikeLine('BOMB', 41.2, false)).toBe('  BOMB    REARM 42');
+    expect(strikeLine('BOMB', 0.01, false)).toBe('  BOMB    REARM 1');
+  });
+
+  it('counts an inbound strike down in whole seconds, never showing 0', () => {
+    expect(inboundLine('HAMMER 1-1', 4.2)).toBe('HAMMER 1-1 INBOUND 5');
+    expect(inboundLine('SABRE 2-2', 0.05)).toBe('SABRE 2-2 INBOUND 1');
   });
 });

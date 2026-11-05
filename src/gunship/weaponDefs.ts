@@ -1,4 +1,8 @@
 export type WeaponId = '25' | '40' | '105';
+/** Air-support strikes called in from other aircraft (PLAN.md §7.19, M5+). */
+export type StrikeId = 'gunrun' | 'bomb';
+/** Anything that explodes on the ground: the gunship's guns and the air-support strikes. */
+export type OrdnanceId = WeaponId | StrikeId;
 
 /**
  * - `auto`: fires while the trigger is held, limited by a barrel-heat bar (no clip).
@@ -16,8 +20,9 @@ export interface ImpactFx {
   /** Smoke puffs and how big they grow. */
   readonly smoke: number;
   readonly smokeSize: number;
+  /** 0 = no crater (e.g. the many small gun-run impacts, which would use up the crater pool). */
   readonly craterRadius: number;
-  /** Expanding hot ring on the ground (105 mm only). */
+  /** Expanding hot ring on the ground (105 mm and bombs). */
   readonly shockwave: boolean;
   /** Camera shake in degrees when the impact is at the aim point. */
   readonly shakeDeg: number;
@@ -25,7 +30,21 @@ export interface ImpactFx {
   readonly whiteout: number;
 }
 
-export interface WeaponDef {
+/** What one impact of any ordnance does: damage, radii, morale and looks (`Explosions`). */
+export interface Ordnance {
+  readonly id: OrdnanceId;
+  readonly damage: number;
+  /** Full damage inside `innerRadius`, falling smoothly to zero at `blastRadius` (meters). */
+  readonly innerRadius: number;
+  readonly blastRadius: number;
+  /** Friendlies inside this distance of an impact trigger a danger-close warning (M4). */
+  readonly dangerClose: number;
+  /** Surviving enemies within this distance panic and run for a few seconds (§7.11 morale). */
+  readonly panicRadius: number;
+  readonly fx: ImpactFx;
+}
+
+export interface WeaponDef extends Ordnance {
   readonly id: WeaponId;
   readonly label: string;
   /** Vertical field of view of the sensor while this weapon is selected. */
@@ -47,17 +66,6 @@ export interface WeaponDef {
   /** Impact points scatter uniformly within this radius (meters) around the aimed point. */
   readonly spread: number;
   readonly tracer: boolean;
-
-  readonly damage: number;
-  /** Full damage inside `innerRadius`, falling smoothly to zero at `blastRadius` (meters). */
-  readonly innerRadius: number;
-  readonly blastRadius: number;
-  /** Friendlies inside this distance of an impact trigger a danger-close warning (M4). */
-  readonly dangerClose: number;
-  /** Surviving enemies within this distance panic and run for a few seconds (§7.11 morale). */
-  readonly panicRadius: number;
-
-  readonly fx: ImpactFx;
 }
 
 /** Balance values from PLAN.md §9. These WILL be tuned in playtesting. */

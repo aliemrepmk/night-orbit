@@ -7,7 +7,8 @@ import type { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
 import { range, type Rng } from '../core/rng';
 import type { Target } from '../combat/Explosions';
-import { WEAPONS, type WeaponId } from '../gunship/weaponDefs';
+import { ORDNANCE } from '../gunship/airSupportDefs';
+import type { OrdnanceId } from '../gunship/weaponDefs';
 import { Infantry } from './Infantry';
 import { SpatialGrid } from './SpatialGrid';
 import { Squad, type RoutePoint } from './Squad';
@@ -472,8 +473,8 @@ export class UnitManager {
   }
 
   /** Survivors near a blast with a panic radius (105 mm) run from it for a few seconds. */
-  private onImpact(pos: Vector3, weapon: WeaponId): void {
-    const r = WEAPONS[weapon].panicRadius;
+  private onImpact(pos: Vector3, weapon: OrdnanceId): void {
+    const r = ORDNANCE[weapon].panicRadius;
     if (r <= 0) return;
     const ai = this.cfg.ai;
     this.neighbors.length = 0;

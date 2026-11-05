@@ -1,4 +1,4 @@
-import type { WeaponId } from '../gunship/weaponDefs';
+import type { OrdnanceId, WeaponId } from '../gunship/weaponDefs';
 
 /**
  * PLACEHOLDER procedural sounds (M3); M9 replaces them with the full audio design.
@@ -17,7 +17,7 @@ export interface SoundDef {
   readonly thumpEnd: number;
 }
 
-export type SoundId = `fire${WeaponId}` | `impact${WeaponId}`;
+export type SoundId = `fire${WeaponId}` | `impact${OrdnanceId}`;
 
 export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
   fire25: {
@@ -74,6 +74,26 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
     thumpGain: 0.5,
     thumpStart: 45,
     thumpEnd: 18,
+  },
+  // Air support (M5+): a gun-run hit is a short crack (40 of them make the ripping sound);
+  // the bomb is the longest, deepest rumble in the game.
+  impactgunrun: {
+    duration: 0.12,
+    noiseGain: 0.05,
+    cutoffStart: 900,
+    cutoffEnd: 250,
+    thumpGain: 0.03,
+    thumpStart: 90,
+    thumpEnd: 50,
+  },
+  impactbomb: {
+    duration: 2.6,
+    noiseGain: 0.4,
+    cutoffStart: 350,
+    cutoffEnd: 40,
+    thumpGain: 0.7,
+    thumpStart: 38,
+    thumpEnd: 12,
   },
 };
 

@@ -1,5 +1,5 @@
 import { WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
-import { gunLine, teamLine, type GunReadout } from './hudFormat';
+import { gunLine, inboundLine, strikeLine, teamLine, type GunReadout } from './hudFormat';
 
 export interface HudData {
   altitude: number;
@@ -22,6 +22,13 @@ export interface HudData {
   underFire: boolean;
   /** An impact just landed danger close to a friendly. */
   dangerClose: boolean;
+  /** Air support (PLAN.md §7.19): each strike's state, strikes inbound, and the aiming preview. */
+  air: {
+    strikes: readonly { label: string; cooldownLeft: number; selected: boolean }[];
+    inbound: readonly { callsign: string; eta: number }[];
+    /** Footprint outline in CSS pixels while aiming a strike; `danger` = friendlies too close. */
+    preview: { points: readonly (readonly [number, number])[]; danger: boolean } | null;
+  };
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
@@ -65,19 +72,24 @@ export class HUD {
           <div data-k="alt"></div>
           <div data-k="hdg"></div>
         </div>
-        <div class="hud-block center" data-k="obj">OBJ: COVER RIDGEBACK</div>
+        <div class="hud-block center">
+          <div data-k="obj">OBJ: COVER RIDGEBACK</div>
+          <div class="hud-inbound" data-k="inbound"></div>
+        </div>
         <div class="hud-block right">
           <div data-k="pol">WHT HOT</div>
           <div data-k="rng"></div>
           <div data-k="gimbal"></div>
         </div>
       </div>
+      <svg class="footprint" data-k="footprint"><polygon data-k="footprintShape"/></svg>
       <svg class="reticle" viewBox="-100 -100 200 200" data-k="reticle"></svg>
       <div class="hud-alert" data-k="alert"></div>
       <div class="hud-row bottom">
         <div class="hud-block">
           <div class="hud-team" data-k="team"></div>
           <div data-k="weapons"></div>
+          <div class="hud-air" data-k="air"></div>
         </div>
         <div class="hud-block center" data-k="coords"></div>
         <div class="hud-block right">
@@ -108,7 +120,17 @@ export class HUD {
     this.set('fov', `FOV ${d.fov.toFixed(1)}`);
     this.set('clock', clock(d.clock));
     this.set('team', teamLine(d.team, d.teamMax, d.underFire));
-    this.set('alert', d.dangerClose ? 'DANGER CLOSE' : '');
+    const preview = d.air.preview;
+    this.set(
+      'alert',
+      d.dangerClose ? 'DANGER CLOSE' : preview?.danger ? 'FRIENDLIES DANGER CLOSE' : '',
+    );
+    this.set(
+      'air',
+      d.air.strikes.map((s) => strikeLine(s.label, s.cooldownLeft, s.selected)).join('\n'),
+    );
+    this.set('inbound', d.air.inbound.map((s) => inboundLine(s.callsign, s.eta)).join('\n'));
+    this.setFootprint(preview);
     this.set('weapons', WEAPON_ORDER.map((id) => gunLine(d.guns[id], id === d.weapon)).join('\n'));
 
     if (this.reticleWeapon !== d.weapon) {
@@ -123,6 +145,17 @@ export class HUD {
         ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}`
         : '',
     );
+  }
+
+  /** Draws (or hides) the strike footprint outline on the ground. */
+  private setFootprint(p: HudData['air']['preview']): void {
+    const points = p ? p.points.map(([x, y]) => `${x.toFixed(0)},${y.toFixed(0)}`).join(' ') : '';
+    const key = `${points}|${p?.danger ? 1 : 0}`;
+    if (this.cache.get('footprint') === key) return;
+    this.cache.set('footprint', key);
+    this.el.footprintShape.setAttribute('points', points);
+    this.el.footprint.classList.toggle('danger', p?.danger === true);
+    this.el.footprint.classList.toggle('hidden', p === null);
   }
 
   private set(key: string, text: string): void {

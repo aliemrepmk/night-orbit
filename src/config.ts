@@ -281,6 +281,15 @@ export const CONFIG = {
     wreckMinAge: 60,
   },
 
+  /** Air support (PLAN.md §7.19; strike stats live in `gunship/airSupportDefs.ts`). */
+  airSupport: {
+    /** One wheel notch turns the gun-run direction by this much (15°). */
+    axisStepRad: Math.PI / 12,
+    /** The jet drawn as a long hot streak: length (m) and sprite size. */
+    jetStreakLength: 40,
+    jetStreakSize: 3.5,
+  },
+
   /** Enemy and friendly tracers on the ground (short, purely visual). */
   groundFire: {
     tracerSpeed: 380,

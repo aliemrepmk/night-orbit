@@ -72,6 +72,8 @@ body {
 }
 
 [data-k='weapons'],
+.hud-air,
+.hud-inbound,
 .hud-team {
   white-space: pre;
 }
@@ -181,4 +183,38 @@ body {
   50% {
     opacity: 0.35;
   }
+}
+
+/* Air support (M5+): strike lines under the guns, inbound callouts under the objective. */
+.hud-air {
+  margin-top: 0.6em;
+}
+
+.hud-inbound {
+  margin-top: 0.4em;
+  animation: blink 1s steps(2) infinite;
+}
+
+/* The strike footprint drawn on the ground while aiming (monochrome, like the rest of the HUD). */
+.footprint {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--hud);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+
+.footprint.danger {
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+  animation: blink 0.5s steps(2) infinite;
+}
+
+.footprint.hidden {
+  display: none;
 }

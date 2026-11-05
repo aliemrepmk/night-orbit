@@ -4,7 +4,7 @@ import type { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
 import type { Effects } from '../fx/Effects';
 import type { Sensor } from '../gunship/Sensor';
-import type { WeaponDef } from '../gunship/weaponDefs';
+import type { Ordnance } from '../gunship/weaponDefs';
 import type { SensorFX } from '../render/SensorFX';
 import { applyRadial, falloff, type Damageable } from './Damage';
 
@@ -20,7 +20,7 @@ export interface Target extends Damageable {
  * Camera shake for an impact `distanceToAim` meters from where the sensor is looking: full
  * strength within the blast radius, fading to zero `shakeReach` blast radii away.
  */
-export function shakeFor(w: WeaponDef, distanceToAim: number): number {
+export function shakeFor(w: Ordnance, distanceToAim: number): number {
   const r = w.blastRadius;
   return w.fx.shakeDeg * falloff(distanceToAim, r, r * CONFIG.fx.shakeReach);
 }
@@ -29,7 +29,7 @@ export function shakeFor(w: WeaponDef, distanceToAim: number): number {
  * Sensor whiteout for an impact in view: stronger the more of the picture the blast fills
  * (`viewHalfHeight` = meters from the screen center to the top edge at the target).
  */
-export function whiteoutFor(w: WeaponDef, viewHalfHeight: number, inView: boolean): number {
+export function whiteoutFor(w: Ordnance, viewHalfHeight: number, inView: boolean): number {
   if (!inView || w.fx.whiteout <= 0) return 0;
   const fill = Math.min(1, (w.blastRadius * CONFIG.fx.whiteoutReach) / viewHalfHeight);
   return w.fx.whiteout * fill;
@@ -51,7 +51,7 @@ export class Explosions {
     private readonly targetsNear: (center: Vector3, radius: number) => readonly Target[],
   ) {}
 
-  detonate(point: Vector3, w: WeaponDef, onGround: boolean): void {
+  detonate(point: Vector3, w: Ordnance, onGround: boolean): void {
     // Query out to the danger-close distance: it is wider than the blast.
     const near = this.targetsNear(point, Math.max(w.blastRadius, w.dangerClose));
     let friendlyKilled = false;
@@ -83,7 +83,7 @@ export class Explosions {
    */
   private checkFriendlies(
     point: Vector3,
-    w: WeaponDef,
+    w: Ordnance,
     near: readonly Target[],
     friendlyKilled: boolean,
   ): void {

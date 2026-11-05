@@ -5,6 +5,8 @@ import { impactVolume } from '../audio/sounds';
 import { Explosions } from '../combat/Explosions';
 import { CONFIG } from '../config';
 import { Effects } from '../fx/Effects';
+import { AirSupport, footprint, footprintDistance } from '../gunship/AirSupport';
+import { STRIKE_ORDER, STRIKES } from '../gunship/airSupportDefs';
 import { flightTime, muzzlePosition, offsetAcrossView, sampleDisc } from '../gunship/ballistics';
 import { Gunship } from '../gunship/Gunship';
 import { Projectiles } from '../gunship/Projectiles';
@@ -59,6 +61,7 @@ export class Game {
   private readonly vehicleView = new VehicleRenderer();
   private readonly audio = new AudioEngine();
   private readonly spreadRng = createRng(31337);
+  private readonly air = new AirSupport(createRng(8080));
   /** Trigger state gathered per frame, consumed by the next fixed step. */
   private fireHeld = false;
   private fireClicks = 0;
@@ -125,6 +128,7 @@ export class Game {
     this.bus.on('impact', (e) =>
       this.audio.play(`impact${e.weapon}`, impactVolume(e.distanceToAim)),
     );
+    this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
 
     this.hud = new HUD(hudRoot);
     this.input = new Input(canvas);
@@ -192,6 +196,12 @@ export class Game {
     this.projectiles.update(dt, (s) =>
       this.explosions.detonate(s.to, WEAPONS[s.weapon], s.hitKind === 'ground'),
     );
+    // Air strikes land on the ground under their marked point (PLAN.md §7.19).
+    if (playing) {
+      this.air.update(dt, (x, z, o) =>
+        this.explosions.detonate(new Vector3(x, this.terrain.heightAt(x, z), z), o, true),
+      );
+    }
     if (playing) {
       this.spawner.update(dt, this.units);
       this.convoys.update(dt, this.units, this.vehicles);
@@ -262,6 +272,17 @@ export class Game {
         this.tracerDir.subVectors(s.to, s.from).normalize();
         emit(this.tracerHead, this.tracerDir);
       });
+      // Air-support jets: a long hot streak crossing the feed.
+      for (const j of this.air.jets) {
+        if (!this.air.jetPosition(j, this.terrain.heightAt(j.x, j.z), this.tracerHead)) continue;
+        this.tracerDir.set(Math.sin(j.heading), 0, Math.cos(j.heading));
+        emit(
+          this.tracerHead,
+          this.tracerDir,
+          CONFIG.airSupport.jetStreakLength,
+          CONFIG.airSupport.jetStreakSize,
+        );
+      }
       // Small-arms tracers between the soldiers on the ground.
       for (const tr of this.units.tracers) {
         if (!tr.active || tr.age < 0) continue;
@@ -277,18 +298,46 @@ export class Game {
     const { dx, dy } = this.input.consumeMouse();
     this.sensor.slew(dx, dy, this.viewportHeight);
 
-    this.fireHeld = this.input.isFireHeld;
-    this.fireClicks += this.input.consumeFireClicks();
-
+    const clicks = this.input.consumeFireClicks();
+    const wheel = this.input.consumeWheel();
     const weaponBefore = this.sensor.weapon;
+
+    // T: aim a strike (gun run → bomb → back to the guns). While aiming, the trigger calls the
+    // strike on the marked ground point and the wheel turns the gun run's direction.
+    if (this.input.wasPressed('KeyT')) {
+      const before = this.air.mode;
+      if (this.air.cycleMode() === 'gunrun' && before === null) {
+        // Start with the run heading away from the aircraft (up the screen).
+        const g = this.gunship.position;
+        this.air.axis = Math.atan2(this.sensor.aim.x - g.x, this.sensor.aim.z - g.z);
+      }
+    }
+    if (this.air.mode !== null) {
+      this.fireHeld = false;
+      if (wheel !== 0) this.air.rotateAxis(Math.sign(wheel) * CONFIG.airSupport.axisStepRad);
+      if (clicks > 0) {
+        const def = this.air.call(this.sensor.aim.x, this.sensor.aim.z);
+        if (def)
+          this.bus.emit('strikeCalled', {
+            strike: def.id,
+            x: this.sensor.aim.x,
+            z: this.sensor.aim.z,
+          });
+      }
+    } else {
+      this.fireHeld = this.input.isFireHeld;
+      this.fireClicks += clicks;
+      if (wheel !== 0) this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
+    }
 
     if (this.input.wasPressed('Digit1')) this.sensor.selectWeapon('25');
     if (this.input.wasPressed('Digit2')) this.sensor.selectWeapon('40');
     if (this.input.wasPressed('Digit3')) this.sensor.selectWeapon('105');
     if (this.input.wasPressed('KeyQ')) this.sensor.cycleWeapon(1);
-    const wheel = this.input.consumeWheel();
-    if (wheel !== 0) this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
-    if (this.sensor.weapon !== weaponBefore) this.sensorFx.triggerSwitch();
+    if (this.sensor.weapon !== weaponBefore) {
+      this.sensorFx.triggerSwitch();
+      this.air.mode = null; // picking a gun takes the trigger back from air support
+    }
 
     // F cycles WHT HOT → BLK HOT → NV; switching sensors flashes static like an optic switch.
     if (this.input.wasPressed('KeyF')) {
@@ -319,6 +368,7 @@ export class Game {
       teamMax: this.units.team.max,
       underFire: this.units.team.underFire,
       dangerClose: this.dangerCloseLeft > 0,
+      air: this.airReadout(),
       debug: this.debug
         ? {
             fps: this.fps,
@@ -331,6 +381,43 @@ export class Game {
           }
         : null,
     });
+  }
+
+  private readonly projected = new Vector3();
+
+  /** Strike lines, inbound callouts and the footprint preview (projected to screen pixels). */
+  private airReadout() {
+    const a = this.air;
+    let preview: { points: [number, number][]; danger: boolean } | null = null;
+    if (a.mode !== null && this.state === 'playing') {
+      const def = STRIKES[a.mode];
+      const aim = this.sensor.aim;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const points: [number, number][] = [];
+      for (const p of footprint(def, aim.x, aim.z, a.axis)) {
+        this.projected
+          .set(p.x, this.terrain.heightAt(p.x, p.z) + 0.5, p.z)
+          .project(this.sensor.camera);
+        points.push([((this.projected.x + 1) / 2) * w, ((1 - this.projected.y) / 2) * h]);
+      }
+      const danger = this.units.friendlies.some(
+        (f) =>
+          f.alive &&
+          footprintDistance(def, aim.x, aim.z, a.axis, f.position.x, f.position.z) <
+            def.dangerClose,
+      );
+      preview = { points, danger };
+    }
+    return {
+      strikes: STRIKE_ORDER.map((id) => ({
+        label: STRIKES[id].label,
+        cooldownLeft: a.cooldownLeft(id),
+        selected: a.mode === id,
+      })),
+      inbound: a.inbound().map((s) => ({ callsign: s.strike.callsign, eta: s.eta })),
+      preview,
+    };
   }
 
   private gunReadouts(): Record<WeaponId, GunReadout> {

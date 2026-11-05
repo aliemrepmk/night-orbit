@@ -179,7 +179,7 @@ describe('UnitManager', () => {
       kind: 'vehicle' as const,
       side: 'enemy' as const,
       position: new Vector3(300, 0, 300),
-      armor: { '25': 0.5, '40': 1, '105': 1 },
+      armor: { '25': 0.5, '40': 1, '105': 1, gunrun: 1, bomb: 1 },
       hp: 300,
       get alive() {
         return this.hp > 0;

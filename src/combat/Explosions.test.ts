@@ -7,6 +7,7 @@ import { createRng } from '../core/rng';
 import { Effects } from '../fx/Effects';
 import { Gunship } from '../gunship/Gunship';
 import { Sensor } from '../gunship/Sensor';
+import { STRIKES } from '../gunship/airSupportDefs';
 import { WEAPONS } from '../gunship/weaponDefs';
 import { SensorFX } from '../render/SensorFX';
 import { ARMOR } from './Damage';
@@ -152,5 +153,29 @@ describe('Explosions.detonate', () => {
     const b = friendlyRig(10);
     b.ex.detonate(b.sensor.aim.clone(), WEAPONS['25'], true);
     expect(b.log).toEqual([]);
+  });
+
+  it('air strikes follow the same rules: a bomb on a friendly fails the mission', () => {
+    const { sensor, friendly, ex, log } = friendlyRig(30); // well inside the bomb's 40 m blast
+    ex.detonate(sensor.aim.clone(), STRIKES.bomb.ordnance, true);
+    expect(friendly.alive).toBe(false);
+    expect(log).toEqual(['friendlyKilled:bomb', 'failed:friendly_fire']);
+  });
+
+  it('a bomb 70 m from a friendly hurts nobody but warns danger close (100 m)', () => {
+    const { sensor, friendly, ex, log } = friendlyRig(70);
+    ex.detonate(sensor.aim.clone(), STRIKES.bomb.ordnance, true);
+    expect(friendly.hp).toBe(100);
+    expect(log).toEqual(['dangerClose:bomb:70']);
+  });
+
+  it('a gun-run hit on an enemy counts as the player’s kill', () => {
+    const r = rig();
+    const enemy = target('infantry', r.sensor.aim.clone(), 100);
+    const ex = new Explosions(r.effects, r.sensor, r.sensorFx, r.bus, () => [enemy]);
+    const kills: string[] = [];
+    r.bus.on('unitKilled', (e) => kills.push(e.by));
+    ex.detonate(r.sensor.aim.clone(), STRIKES.gunrun.ordnance, true);
+    expect(kills).toEqual(['gunrun']);
   });
 });

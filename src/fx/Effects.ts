@@ -11,7 +11,7 @@ import {
 } from 'three';
 import { CONFIG } from '../config';
 import { range, type Rng } from '../core/rng';
-import type { WeaponDef } from '../gunship/weaponDefs';
+import type { Ordnance } from '../gunship/weaponDefs';
 import { ThermalMaterial } from '../render/ThermalMaterial';
 import { CRATER_COOLING, FIRE, HEAT, coolingHeat } from './Heat';
 import { GLOW } from './Light';
@@ -99,7 +99,7 @@ export class Effects {
   }
 
   /** Spawns one impact. `onGround` adds a crater (roof hits don't leave one). */
-  explosion(p: Vector3, w: WeaponDef, onGround: boolean): void {
+  explosion(p: Vector3, w: Ordnance, onGround: boolean): void {
     const fx = w.fx;
     const rng = this.rng;
     const wind = CONFIG.fx.wind;
@@ -188,7 +188,7 @@ export class Effects {
     }
 
     if (fx.shockwave) this.shockwave(p, w.blastRadius * CONFIG.fx.shockwaveScale);
-    if (onGround) this.crater(p, fx.craterRadius);
+    if (onGround && fx.craterRadius > 0) this.crater(p, fx.craterRadius);
   }
 
   /** A rifle / machine-gun burst on the ground: a tiny, very short hot flash. */

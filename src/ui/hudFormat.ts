@@ -53,6 +53,20 @@ export function teamLine(health: number, max: number, underFire: boolean): strin
   return `RIDGEBACK ${bar(f, 10)} ${pct}%${underFire ? '  UNDER FIRE' : ''}`;
 }
 
+/**
+ * One HUD line per air-support strike (PLAN.md §7.19), e.g. `▶ GUN RUN READY` or
+ * `  BOMB    REARM 42`. The strike being aimed is marked with ▶.
+ */
+export function strikeLine(label: string, cooldownLeft: number, selected: boolean): string {
+  const status = cooldownLeft > 0 ? `REARM ${Math.ceil(cooldownLeft - 1e-9)}` : 'READY';
+  return `${selected ? '▶' : ' '} ${label.padEnd(8)}${status}`;
+}
+
+/** A strike on its way, e.g. `HAMMER 1-1 INBOUND 5` (seconds rounded up, never 0). */
+export function inboundLine(callsign: string, eta: number): string {
+  return `${callsign} INBOUND ${Math.max(1, Math.ceil(eta - 1e-9))}`;
+}
+
 /** What the fail screen says for each way the mission can be lost. */
 export function failReasonText(reason: FailReason): string {
   switch (reason) {
