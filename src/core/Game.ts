@@ -1,4 +1,5 @@
 import { Vector3 } from 'three';
+import { coverFromBoxes } from '../ai/CoverPoints';
 import { AudioEngine } from '../audio/AudioEngine';
 import { impactVolume } from '../audio/sounds';
 import { Explosions } from '../combat/Explosions';
@@ -80,12 +81,16 @@ export class Game {
     private readonly screen: HTMLElement,
   ) {
     const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
-    this.units = new UnitManager(ground, this.bus, createRng(4040), TEST_ROUTE);
+    // The world first: its houses are what soldiers take cover behind and can't see through.
+    this.world = new PlaceholderWorld(this.terrain, this.collision);
+    this.units = new UnitManager(ground, this.bus, createRng(4040), TEST_ROUTE, {
+      world: this.collision,
+      cover: coverFromBoxes(this.collision.boxes, CONFIG.ai.coverMargin),
+    });
     this.gunship.snapTo(this.units.teamPosition.x, this.units.teamPosition.z);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
 
     this.renderer = new Renderer(canvas, this.sensor.camera);
-    this.world = new PlaceholderWorld(this.terrain, this.collision);
     this.renderer.scene.add(this.world.root);
     for (const truck of this.world.targets) this.units.addTarget(truck);
     this.renderer.scene.add(this.infantryView.root);

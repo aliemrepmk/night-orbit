@@ -10,6 +10,8 @@ export const ARMOR = {
   truck: { '25': 0.5, '40': 1, '105': 1 },
   technical: { '25': 0.6, '40': 1, '105': 1 },
   apc: { '25': 0.05, '40': 0.4, '105': 1 },
+  /** A soldier crouched in cover: walls soak up cannon splinters, not a 105 mm blast. */
+  cover: { '25': 0.5, '40': 0.7, '105': 1 },
 } as const satisfies Record<string, Armor>;
 
 /** Who dealt damage: one of the gunship's weapons, or Ridgeback's return fire. */

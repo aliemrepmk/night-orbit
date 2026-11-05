@@ -1,17 +1,21 @@
 import { Vector3 } from 'three';
+import type { CoverPoint } from '../ai/CoverPoints';
+import type { BrainAction } from '../ai/EnemyBrain';
+import type { Path } from '../ai/Paths';
 import { CONFIG } from '../config';
-import { ARMOR, type DamageSource } from '../combat/Damage';
+import { ARMOR, type Armor, type DamageSource } from '../combat/Damage';
 import type { Side, Target } from '../combat/Explosions';
 import { BODY_COOLING, HEAT, coolingHeat } from '../fx/Heat';
 import type { InfantryDef } from './unitDefs';
 
 /**
  * - `moving` / `idle`: alive, walking or standing (the manager steers via `velocity`)
- * - `firing`: alive, standing and shooting at `target`
+ * - `firing`: alive, standing (or crouched in cover) and shooting at `target`
+ * - `fleeing`: alive, running away (panic after a big blast, or its nerve broke)
  * - `flung`: just killed, flying away from the blast (~0.6 s arc), then `dead`
  * - `dead`: lying flat, cooling
  */
-export type InfantryState = 'idle' | 'moving' | 'firing' | 'flung' | 'dead';
+export type InfantryState = 'idle' | 'moving' | 'firing' | 'fleeing' | 'flung' | 'dead';
 
 const GRAVITY = 9.8;
 
@@ -24,7 +28,6 @@ export type InfantryConfig = { readonly [K in keyof typeof CONFIG.infantry]: num
  */
 export class Infantry implements Target {
   readonly kind = 'infantry' as const;
-  readonly armor = ARMOR.none;
   readonly position = new Vector3();
   /** Ground velocity while alive (set by steering); fling velocity while flung. */
   readonly velocity = new Vector3();
@@ -45,8 +48,34 @@ export class Infantry implements Target {
   standoff = 0.8;
   /** Who it is shooting at while `firing`. */
   target: Infantry | null = null;
-  /** True for one tick after a player weapon kills it (lets the manager tell kills apart). */
+  /** What killed it (a gunship weapon or Ridgeback), or null while alive. */
   killedBy: DamageSource | null = null;
+
+  // --- Enemy brain state (PLAN.md §7.11), driven by UnitManager ---
+  action: BrainAction = 'advance';
+  /** Cover point it holds (walking to it, or crouched in it once `inCover`). */
+  cover: CoverPoint | null = null;
+  inCover = false;
+  /** Cover point it just left because it couldn't see from there (not picked again right away). */
+  rejectedCover = -1;
+  /** Allies killed nearby since its last morale check; `wounded` = hurt but alive. */
+  stress = 0;
+  wounded = false;
+  /** Seconds left running, and where it runs to. */
+  fleeLeft = 0;
+  readonly fleeTo = new Vector3();
+  /** Where it came from (a broken soldier runs back here). */
+  readonly home = new Vector3();
+  /** Optional approach path, followed before heading straight for the target. */
+  path: Path | null = null;
+  pathS = 0;
+  /** Wall it bumped into (outward normal) and how long it keeps sliding along it. */
+  readonly wallNormal = new Vector3();
+  wallLeft = 0;
+  /** Which way along the wall it slides (±1; 0 = not chosen yet). */
+  slideSign = 0;
+  /** The manager has reacted to this death (morale, cover release). */
+  deathHandled = false;
 
   constructor(
     readonly id: number,
@@ -67,12 +96,35 @@ export class Infantry implements Target {
     this.walkPhase = 0;
     this.target = null;
     this.killedBy = null;
+    this.action = 'advance';
+    this.cover = null;
+    this.inCover = false;
+    this.rejectedCover = -1;
+    this.stress = 0;
+    this.wounded = false;
+    this.fleeLeft = 0;
+    this.path = null;
+    this.pathS = 0;
+    this.wallLeft = 0;
+    this.slideSign = 0;
+    this.deathHandled = false;
     this.velocity.set(0, 0, 0);
     this.position.set(x, this.groundAt(x, z) + this.cfg.lift, z);
+    this.home.set(x, 0, z);
   }
 
   get alive(): boolean {
     return this.hp > 0;
+  }
+
+  /** Crouched behind cover (and not walking): harder to hit, drawn lower. */
+  get crouched(): boolean {
+    return this.alive && this.inCover && this.state !== 'moving';
+  }
+
+  /** Cover soaks up some 25/40 mm damage (PLAN.md §7.10-style multipliers). */
+  get armor(): Armor {
+    return this.crouched ? ARMOR.cover : ARMOR.none;
   }
 
   /** Warm while alive; bodies cool 0.95 → 0.35 over 60 s (PLAN.md §7.5). */
@@ -83,7 +135,10 @@ export class Infantry implements Target {
   takeDamage(amount: number, source: DamageSource, from: Vector3): void {
     if (!this.alive) return;
     this.hp -= amount;
-    if (this.hp > 0) return;
+    if (this.hp > 0) {
+      this.wounded = true;
+      return;
+    }
     this.hp = 0;
     this.sinceDeath = 0;
     this.killedBy = source;
@@ -113,7 +168,8 @@ export class Infantry implements Target {
         this.turnToward(Math.atan2(vx, vz), dt);
         this.walkPhase += speed * dt * c.stridesPerMeter * Math.PI * 2;
       }
-      if (this.state !== 'firing') this.state = speed > 0.2 ? 'moving' : 'idle';
+      if (this.state === 'moving' || this.state === 'idle')
+        this.state = speed > 0.2 ? 'moving' : 'idle';
       return;
     }
 

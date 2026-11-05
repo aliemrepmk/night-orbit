@@ -19,7 +19,7 @@ const ROUTE = [
 
 function rig(cfg: UnitsConfig = CONFIG) {
   const bus = new EventBus<GameEvents>();
-  const units = new UnitManager(flat, bus, createRng(1), ROUTE, cfg);
+  const units = new UnitManager(flat, bus, createRng(1), ROUTE, { cfg });
   const log: string[] = [];
   bus.on('missionFailed', (e) => log.push(`failed:${e.reason}`));
   bus.on('unitKilled', (e) => log.push(`killed:${e.by}`));
@@ -114,7 +114,9 @@ describe('UnitManager', () => {
   it('Ridgeback shoots back while holding and slowly kills enemies (counted as team kills)', () => {
     const short: UnitsConfig = { ...CONFIG, ridgeback: { ...CONFIG.ridgeback, holdTime: 1e9 } };
     const bus = new EventBus<GameEvents>();
-    const units = new UnitManager(flat, bus, createRng(4), [ROUTE[0], { x: 0, z: -1 }], short);
+    const units = new UnitManager(flat, bus, createRng(4), [ROUTE[0], { x: 0, z: -1 }], {
+      cfg: short,
+    });
     const kills: string[] = [];
     bus.on('unitKilled', (e) => kills.push(e.by));
     step(units, 1); // reach the 1 m waypoint and hold

@@ -54,6 +54,8 @@ export interface WeaponDef {
   readonly blastRadius: number;
   /** Friendlies inside this distance of an impact trigger a danger-close warning (M4). */
   readonly dangerClose: number;
+  /** Surviving enemies within this distance panic and run for a few seconds (§7.11 morale). */
+  readonly panicRadius: number;
 
   readonly fx: ImpactFx;
 }
@@ -77,6 +79,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     innerRadius: 0.8,
     blastRadius: 2.5,
     dangerClose: 4,
+    panicRadius: 0,
     fx: {
       flashSize: 2.5,
       debris: 6,
@@ -106,6 +109,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     innerRadius: 3,
     blastRadius: 8,
     dangerClose: 12,
+    panicRadius: 10,
     fx: {
       flashSize: 8,
       debris: 24,
@@ -135,6 +139,7 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     innerRadius: 8,
     blastRadius: 22,
     dangerClose: 33,
+    panicRadius: 45,
     fx: {
       flashSize: 26,
       debris: 70,

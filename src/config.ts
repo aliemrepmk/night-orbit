@@ -171,7 +171,43 @@ export const CONFIG = {
     /** Walk animation: vertical bob (m), forward lean (rad), and strides per meter walked. */
     bobHeight: 0.09,
     leanRad: 0.12,
+    /** Running away leans further; crouching in cover drops the body and bends it forward. */
+    fleeLeanRad: 0.35,
+    crouchDrop: 0.45,
+    crouchLeanRad: 0.3,
     stridesPerMeter: 0.7,
+  },
+
+  /** Enemy decisions: cover, line of sight and morale (PLAN.md §7.11). */
+  ai: {
+    /** Line-of-sight checks run from this far above a soldier's body center (eye level). */
+    eyeHeight: 0.5,
+    /** Soldiers keep this far from walls (they slide along houses instead of through them). */
+    bodyRadius: 0.6,
+    /** Seconds a soldier keeps sliding along a wall after bumping into it. */
+    wallSlideTime: 0.6,
+    /** Look for cover within this radius, once within range × `coverEngageFactor` of the target. */
+    coverSearchRadius: 40,
+    coverEngageFactor: 1.25,
+    /** A cover point must be within range × this of the target (and not farther than the soldier). */
+    coverReach: 0.9,
+    /** Close enough to count as in cover (m), and how far from walls corners are placed. */
+    coverArrive: 0.8,
+    coverMargin: 1.4,
+    /** Ridgeback's chance to hit a crouched enemy, relative to one in the open. */
+    coverHitFactor: 0.5,
+    /** Morale: this many allies killed within `moraleRadius` (or being wounded) shakes a soldier, who then breaks with `fleeChance`. */
+    lossesToBreak: 3,
+    moraleRadius: 25,
+    fleeChance: 0.3,
+    /** Fleeing soldiers run this much faster than they walk. */
+    fleeSpeedFactor: 1.6,
+    /** Panic after a big blast (weapon `panicRadius`): run away for 3–5 s (PLAN.md §7.11). */
+    panicMin: 3,
+    panicMax: 5,
+    /** A broken soldier runs back toward where it came from for this long, then rallies. */
+    routMin: 8,
+    routMax: 12,
   },
 
   /** Enemy small-arms fire at Ridgeback (PLAN.md §7.8: no real bullets, damage to team health). */
