@@ -955,7 +955,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
   - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
 
-### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–D done (A–B play-tested)
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–E done (A–B play-tested)
 
 The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
 grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
@@ -1003,7 +1003,7 @@ Phase A (its two screen fixes).
 - Budgets: PLAN §11 (60 FPS, ≤ 100 draw calls).
 - 🧪 `validateMap` for the new data, the forest blocks line of sight, the depot blast.
 
-**Phase E — Anti-aircraft, strike jets and gunship damage (3 days; items 2, 5)**
+**Phase E — Anti-aircraft, strike jets and gunship damage (3 days; items 2, 5)** — ✅ done 2026-11-09 (AA fires only within 470 m of the orbit center so every shooter can be shot back; X = flares)
 
 - **Strike jets:** a low-poly instanced ground-attack jet (A-10-style) for the gun run and a
   fighter (F-16-style) for the bomb. They fly real attack runs (dive, fire or release, pull off);
