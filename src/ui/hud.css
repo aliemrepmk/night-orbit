@@ -123,26 +123,72 @@ body {
   text-align: right;
 }
 
-/* ---------- Title / pause screen ---------- */
+/* ---------- Screens (M8): title, briefing, pause, settings, failed, complete ---------- */
 .screen {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.55);
-  cursor: pointer;
+  background: rgba(0, 0, 0, 0.6);
   padding: 16px;
+  overflow-y: auto;
+  text-shadow: var(--shadow);
+}
+
+.screen[data-state='title'] {
+  cursor: pointer;
+}
+
+.screen[data-state='briefing'] {
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.screen > .panel {
+  display: none;
+}
+
+.screen[data-state='title'] > [data-screen='title'],
+.screen[data-state='briefing'] > [data-screen='briefing'],
+.screen[data-state='paused'] > [data-screen='paused'],
+.screen[data-state='settings'] > [data-screen='settings'],
+.screen[data-state='failed'] > [data-screen='failed'],
+.screen[data-state='complete'] > [data-screen='complete'] {
+  display: block;
 }
 
 .panel {
   text-align: center;
-  max-width: 520px;
+  width: min(520px, 100%);
+}
+
+.panel[data-screen='title'] {
+  width: auto;
+  max-width: 100%;
+}
+
+.panel.wide {
+  width: min(980px, 100%);
 }
 
 .panel h1 {
   margin: 0 0 8px;
   font-size: clamp(32px, 7vw, 64px);
   letter-spacing: 0.3em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.panel h2 {
+  margin: 0 0 20px;
+  font-size: clamp(20px, 4vw, 30px);
+  letter-spacing: 0.25em;
+  font-weight: 600;
+}
+
+.panel h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.2em;
   font-weight: 600;
 }
 
@@ -157,33 +203,257 @@ body {
   animation: blink 1.2s steps(2) infinite;
 }
 
+
+.panel .hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.panel .hint:empty {
+  display: none;
+}
+
+.panel .reason {
+  color: var(--hud);
+  letter-spacing: 0.2em;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 22px;
+}
+
+.panel button {
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--hud);
+  background: transparent;
+  border: 1px solid var(--hud-dim);
+  padding: 10px 18px;
+  min-width: 150px;
+  cursor: pointer;
+  text-shadow: var(--shadow);
+}
+
+.panel button:hover,
+.panel button:focus-visible {
+  background: rgba(242, 242, 242, 0.12);
+  border-color: var(--hud);
+  outline: none;
+}
+
+.panel button.primary {
+  border-color: var(--hud);
+}
+
+/* Briefing: map sketch beside the text (stacked on narrow screens). */
+.brief {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  text-align: left;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 760px) {
+  .brief {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brief-text p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+}
+
+.brief-map {
+  width: 100%;
+  height: auto;
+  max-height: 56vh;
+  border: 1px solid var(--hud-dim);
+  background: rgba(242, 242, 242, 0.03);
+}
+
+.brief-map * {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.brief-map .road {
+  stroke: rgba(242, 242, 242, 0.35);
+  stroke-width: 1;
+}
+
+.brief-map .road.paved {
+  stroke: rgba(242, 242, 242, 0.6);
+  stroke-width: 2;
+}
+
+.brief-map .stream {
+  stroke: rgba(242, 242, 242, 0.5);
+  stroke-width: 3;
+  stroke-dasharray: 2 4;
+}
+
+.brief-map .zone {
+  stroke: var(--hud-dim);
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+}
+
+.brief-map .route {
+  stroke: var(--hud);
+  stroke-width: 2.5;
+  stroke-dasharray: 10 6;
+}
+
+.brief-map .clinic {
+  stroke: var(--hud);
+  stroke-width: 3;
+}
+
+.brief-map text {
+  fill: var(--hud);
+  font-family: var(--font);
+  font-size: 34px;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+}
+
+/* Settings */
+.settings {
+  display: grid;
+  gap: 12px;
+  margin: 0 auto 22px;
+  max-width: 440px;
+}
+
+.setting {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 160px) 56px;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.setting input[type='range'] {
+  width: 100%;
+  accent-color: var(--hud);
+}
+
+.setting input[type='checkbox'] {
+  justify-self: end;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--hud);
+}
+
+.setting .value {
+  color: var(--hud-dim);
+  text-align: right;
+}
+
+/* Stats and rating (failed / complete) */
+.stats,
 .controls {
-  margin: 0 auto;
+  margin: 0 auto 22px;
   border-collapse: collapse;
   font-size: 13px;
   color: var(--hud-dim);
 }
 
+.stats td,
 .controls td {
   padding: 3px 12px;
   text-align: left;
 }
 
+.stats td:first-child,
 .controls td:first-child {
   color: var(--hud);
   text-align: right;
 }
 
-.screen:not([data-state='title']) .only-title,
-.screen:not([data-state='paused']) .only-paused,
-.screen:not([data-state='failed']) .only-failed,
-.screen:not([data-state='complete']) .only-complete {
-  display: none;
+.rating {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 18px;
+  letter-spacing: 0.2em;
 }
 
-.panel .fail-reason {
-  color: var(--hud);
+.rating [data-k='grade'] {
+  font-size: 56px;
+  font-weight: 600;
+}
+
+/* Off-screen friendly arrows (M8): positioned by translate(); the tip rotates. */
+.hud-arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.hud-arrow .tip {
+  position: absolute;
+  left: -8px;
+  top: -10px;
+  width: 16px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  font-size: 18px;
+  animation: blink 1s steps(2) infinite;
+}
+
+.hud-arrow .label {
+  position: absolute;
+  left: 16px;
+  top: -8px;
+}
+
+.hud-arrow.label-left .label {
+  left: auto;
+  right: 16px;
+}
+
+.hud-arrow.label-up .label {
+  top: -28px;
+}
+
+/* Help overlay (H) */
+.hud-help {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 18px 22px 4px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--hud-dim);
+  max-width: calc(100vw - 32px);
+}
+
+.hud-help .title {
+  text-align: center;
+  margin-bottom: 12px;
   letter-spacing: 0.2em;
+  font-size: 13px;
 }
 
 @keyframes blink {
@@ -329,5 +599,16 @@ body {
 }
 
 .clinic-mark.hidden {
+  display: none;
+}
+
+/* A menu is on top (pause, settings, end screens): keep the edges, drop the middle of the view. */
+#hud.behind-screen .reticle,
+#hud.behind-screen .hud-alert,
+#hud.behind-screen .hud-subtitle,
+#hud.behind-screen .footprint,
+#hud.behind-screen .clinic-mark,
+#hud.behind-screen .hud-arrow,
+#hud.behind-screen .hud-help {
   display: none;
 }

@@ -23,13 +23,18 @@ export class Input {
   dragMode = false;
   /** Called whenever pointer lock is gained or lost. */
   onLockChange: (locked: boolean) => void = () => {};
+  /** Pointer lock was refused after it had worked before (Chrome's ~1 s cooldown after Esc). */
+  onLockRefused: () => void = () => {};
+  /** Lock has worked at least once: a later refusal is a cooldown, not a missing feature. */
+  private everLocked = false;
 
   constructor(private readonly target: HTMLElement) {
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.target;
+      if (this.locked) this.everLocked = true;
       this.onLockChange(this.locked);
     });
-    document.addEventListener('pointerlockerror', () => this.enableDragMode());
+    document.addEventListener('pointerlockerror', () => this.lockFailed());
 
     window.addEventListener('mousemove', (e) => {
       if (this.locked || (this.dragMode && this.aimDragHeld)) {
@@ -83,9 +88,9 @@ export class Input {
     }
     try {
       const result = this.target.requestPointerLock() as unknown;
-      if (result instanceof Promise) result.catch(() => this.enableDragMode());
+      if (result instanceof Promise) result.catch(() => this.lockFailed());
     } catch {
-      this.enableDragMode();
+      this.lockFailed();
     }
   }
 
@@ -128,6 +133,11 @@ export class Input {
   /** Clears per-frame state that nobody consumed. */
   endFrame(): void {
     this.pressed.clear();
+  }
+
+  private lockFailed(): void {
+    if (this.everLocked) this.onLockRefused();
+    else this.enableDragMode();
   }
 
   private enableDragMode(): void {

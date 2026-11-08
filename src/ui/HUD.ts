@@ -1,5 +1,15 @@
 import { WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
+import { controlsTable } from './controls';
+import type { EdgeArrow } from './edgeArrow';
 import { gunLine, inboundLine, strikeLine, teamLine, type GunReadout } from './hudFormat';
+
+/** An off-screen friendly marker (M8): where on the edge, which way, and its label. */
+export interface FriendlyArrow extends EdgeArrow {
+  readonly label: string;
+}
+
+/** Off-screen friendlies drawn at once: Ridgeback and Kestrel 6. */
+const MAX_ARROWS = 2;
 
 export interface HudData {
   altitude: number;
@@ -36,6 +46,10 @@ export interface HudData {
   subtitle: string;
   timers: readonly string[];
   clinicMark: readonly (readonly [number, number])[] | null;
+  /** Off-screen friendly arrows (M8). */
+  arrows: readonly FriendlyArrow[];
+  /** The controls overlay (`H`, M8). */
+  help: boolean;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
@@ -111,14 +125,18 @@ export class HUD {
           <div data-k="clock"></div>
         </div>
       </div>
-      <div class="hud-debug" data-k="debug"></div>`;
+      <div class="hud-debug" data-k="debug"></div>
+      ${Array.from({ length: MAX_ARROWS }, (_, i) => `<div class="hud-arrow hidden" data-k="arrow${i}"><span class="tip">▶</span><span class="label"></span></div>`).join('')}
+      <div class="hud-help hidden" data-k="help"><div class="title">CONTROLS · H TO CLOSE</div>${controlsTable()}</div>`;
     for (const node of root.querySelectorAll<HTMLElement>('[data-k]')) {
       this.el[node.dataset.k!] = node;
     }
   }
 
-  show(visible: boolean): void {
+  /** `behindScreen`: a menu is on top, so the middle of the view (reticle, alerts, subtitles) hides. */
+  show(visible: boolean, behindScreen = false): void {
     this.root.classList.toggle('hidden', !visible);
+    this.root.classList.toggle('behind-screen', behindScreen);
   }
 
   update(d: HudData): void {
@@ -152,6 +170,9 @@ export class HUD {
     this.setFootprint(preview);
     this.set('weapons', WEAPON_ORDER.map((id) => gunLine(d.guns[id], id === d.weapon)).join('\n'));
 
+    this.setArrows(d.arrows);
+    this.el.help.classList.toggle('hidden', !d.help);
+
     if (this.reticleWeapon !== d.weapon) {
       this.reticleWeapon = d.weapon;
       this.el.reticle.innerHTML = RETICLES[d.weapon];
@@ -164,6 +185,27 @@ export class HUD {
         ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}\n${d.debug.mission}  ${d.debug.cheats}`
         : '',
     );
+  }
+
+  /** Places the off-screen friendly arrows (rounded to whole pixels / degrees, so idle frames don't touch the DOM). */
+  private setArrows(arrows: readonly FriendlyArrow[]): void {
+    for (let i = 0; i < MAX_ARROWS; i++) {
+      const a = arrows[i];
+      const el = this.el[`arrow${i}`];
+      const key = a
+        ? `${Math.round(a.x)},${Math.round(a.y)},${Math.round(a.angle)},${a.label}`
+        : '';
+      if (this.cache.get(`arrow${i}`) === key) continue;
+      this.cache.set(`arrow${i}`, key);
+      el.classList.toggle('hidden', !a);
+      if (!a) continue;
+      el.style.transform = `translate(${Math.round(a.x)}px, ${Math.round(a.y)}px)`;
+      (el.firstElementChild as HTMLElement).style.transform = `rotate(${Math.round(a.angle)}deg)`;
+      (el.lastElementChild as HTMLElement).textContent = a.label;
+      // Keep the label inside the screen: put it on the side away from the edge.
+      el.classList.toggle('label-left', Math.cos((a.angle * Math.PI) / 180) > 0.5);
+      el.classList.toggle('label-up', Math.sin((a.angle * Math.PI) / 180) > 0.5);
+    }
   }
 
   /** Draws (or hides) the strike footprint outline on the ground. */

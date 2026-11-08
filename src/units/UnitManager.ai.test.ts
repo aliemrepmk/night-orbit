@@ -158,7 +158,7 @@ describe('UnitManager enemy AI (M5)', () => {
     const group = [0, 1, 2].map((i) => units.spawnEnemy(INFANTRY.rifleman, 180, i * 4)!);
     step(units, 1);
     const blast = new Vector3(180, 0, 30); // 26–30 m away: hurt nobody, inside 45 m panic radius
-    bus.emit('impact', { pos: blast, weapon: '105', distanceToAim: 0 });
+    bus.emit('impact', { pos: blast, weapon: '105', distanceToAim: 0, enemiesHit: 0 });
     step(units, 0.5);
     for (const e of group) {
       expect(e.state).toBe('fleeing');
@@ -175,7 +175,12 @@ describe('UnitManager enemy AI (M5)', () => {
     const { bus, units } = rig();
     const e = units.spawnEnemy(INFANTRY.rifleman, 180, 0)!;
     step(units, 1);
-    bus.emit('impact', { pos: new Vector3(181, 0, 0), weapon: '25', distanceToAim: 0 });
+    bus.emit('impact', {
+      pos: new Vector3(181, 0, 0),
+      weapon: '25',
+      distanceToAim: 0,
+      enemiesHit: 0,
+    });
     step(units, 0.2);
     expect(e.state).not.toBe('fleeing');
   });

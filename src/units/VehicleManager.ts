@@ -140,7 +140,8 @@ export class VehicleManager {
         if (Math.abs(side) < c.blockWidth && ahead < this.clearance(v, o)) blocked = true;
         continue;
       }
-      if (o.alive && o.state === 'driving') blocked = true; // queue behind a moving vehicle
+      if (o.alive && o.state === 'driving')
+        blocked = true; // queue behind a moving vehicle
       else if (ahead < nearest) {
         nearest = ahead;
         obstacle = o;

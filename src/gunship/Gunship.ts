@@ -25,6 +25,13 @@ export class Gunship {
     this.targetCenter.set(x, 0, z);
   }
 
+  /** A fresh run (M8 restart): back to the start of the orbit, centered on (x, z). */
+  reset(x: number, z: number): void {
+    this.angle = 0;
+    this.time = 0;
+    this.snapTo(x, z);
+  }
+
   /** Jump instantly (used at mission start). */
   snapTo(x: number, z: number): void {
     this.targetCenter.set(x, 0, z);

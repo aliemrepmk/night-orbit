@@ -30,157 +30,166 @@ import {
   type GunReadout,
 } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
+import { createBattle, createWorld, type StaticWorld } from '../mission/battle';
+import { rateMission, summaryRows, type MissionStats } from '../mission/stats';
+import { edgeArrow } from '../ui/edgeArrow';
+import type { FriendlyArrow } from '../ui/HUD';
+import { ScreenFlow, type ScreenAction } from '../ui/screenFlow';
+import { Screens, type ScreenButton } from '../ui/Screens';
+import { browserStorage, loadSettings, saveSettings, type Settings } from '../ui/settings';
 import { DebugOverlay } from '../debug/DebugOverlay';
 import { formatPlacement, mapOverlay, nextTourStop } from '../debug/mapOverlay';
-import { WaveSpawner } from '../units/spawning';
 import { HelicopterRenderer } from '../units/HelicopterRenderer';
 import { CHEAT_KEYS, nextTimeScale, phaseFromUrl } from '../debug/cheats';
-import { MissionHost } from '../mission/MissionHost';
 import { MISSION } from '../mission/missionDef';
-import { largestFootprint, type Footprint } from '../mission/clinic';
-import { toPathPoints } from '../world/mapTypes';
-import { UnitManager } from '../units/UnitManager';
-import { VehicleManager } from '../units/VehicleManager';
+import { largestFootprint } from '../mission/clinic';
+import type { MissionHost } from '../mission/MissionHost';
+import type { UnitManager } from '../units/UnitManager';
+import type { VehicleManager } from '../units/VehicleManager';
+import type { EventBus } from './EventBus';
 import { VehicleRenderer } from '../units/VehicleRenderer';
-import { Collision } from '../world/Collision';
-import { StreamCrossings } from '../world/crossings';
 import { MAP } from '../world/MapData';
 import type { ZoneId } from '../world/mapTypes';
-import { Terrain } from '../world/Terrain';
-import { mapHeightField } from '../world/terrainShape';
-import { WorldBuilder } from '../world/WorldBuilder';
-import { EventBus } from './EventBus';
 import type { FailReason, GameEvents } from './events';
 import { FixedStepper } from './FixedStepper';
 import { Input } from './Input';
 import { createRng } from './rng';
 
-export type GameState = 'title' | 'playing' | 'paused' | 'failed' | 'complete';
-
-/** Owns every system and runs them in a fixed order (see PLAN.md §6). */
+/**
+ * Owns every system and runs them in a fixed order (see PLAN.md §6).
+ *
+ * Two lifetimes: the static world, renderer, screens and input live for the whole page; a
+ * "run" (event bus, soldiers, vehicles, mission script, guns, stats) is rebuilt by `newRun()`
+ * on every restart (M8), so a retry starts exactly like the first attempt.
+ */
 export class Game {
-  state: GameState = 'title';
+  /** The screen state machine (M8): title → briefing → playing ⇄ paused → failed | complete. */
+  readonly flow = new ScreenFlow();
 
   private readonly renderer: Renderer;
-  // The handcrafted map (PLAN.md §7.12): terrain shaped by MapData, then everything on it.
-  private readonly terrain = new Terrain(CONFIG.terrain, mapHeightField(MAP));
-  // Ray hits can't be higher than the highest ground (+ margin); buildings are boxes on top.
-  private readonly collision = new Collision(this.terrain, this.terrain.maxHeight + 2);
-  private readonly world: WorldBuilder;
+  // The handcrafted map (PLAN.md §7.12): terrain, houses, collision, cover. Built once.
+  private readonly w: StaticWorld = createWorld();
+  private readonly terrain = this.w.terrain;
+  private readonly collision = this.w.collision;
+  private readonly world = this.w.world;
   /** Map-authoring overlay (F2) and placer (P): dev builds or `?debug=1` only. */
   private readonly overlay: DebugOverlay | null = null;
+  private readonly effects: Effects;
+  private readonly heliView = new HelicopterRenderer();
+  private readonly infantryView = new InfantryRenderer();
+  private readonly vehicleView = new VehicleRenderer();
+  private readonly audio = new AudioEngine();
+  private readonly gunship = new Gunship();
+  private readonly sensor: Sensor;
+  private readonly input: Input;
+  private readonly hud: HUD;
+  private readonly screens: Screens;
+  private readonly stepper = new FixedStepper(CONFIG.loop.step, CONFIG.loop.maxFrame);
+  private settings: Settings = loadSettings(browserStorage);
+
+  // ---- One run of the mission (rebuilt by `newRun`). ----
+  private bus!: EventBus<GameEvents>;
+  private units!: UnitManager;
+  private vehicles!: VehicleManager;
+  /** The mission script and its radio (M7). */
+  private host!: MissionHost;
+  private stats!: MissionStats;
+  private weapons!: Weapons;
+  private projectiles!: Projectiles;
+  private explosions!: Explosions;
+  private air!: AirSupport;
+  private spreadRng!: ReturnType<typeof createRng>;
+  private sensorFx!: SensorFX;
   /** Zone the F3 look-test tour has parked the orbit over (null = following Ridgeback). */
   private tourStop: ZoneId | null = null;
-  private readonly bus = new EventBus<GameEvents>();
-  private readonly weapons = new Weapons();
-  private readonly projectiles = new Projectiles();
-  private readonly effects: Effects;
-  private readonly explosions: Explosions;
-  private readonly units: UnitManager;
-  private readonly spawner = new WaveSpawner(createRng(5050));
-  /** The mission script and its radio (M7). */
-  private readonly host: MissionHost;
-  private readonly heliView = new HelicopterRenderer();
-  /** Dev cheats (PLAN.md §7.18): time scale and god mode. */
-  private timeScale = 1;
   /** Pixels the sensor has been slewed (calibration prompt). */
   private slewed = 0;
   /** Orbit focus the mission asked for last (null: following Ridgeback). */
   private focus: ZoneId | null = null;
-  private readonly vehicles: VehicleManager;
-  private readonly infantryView = new InfantryRenderer();
-  private readonly vehicleView = new VehicleRenderer();
-  private readonly audio = new AudioEngine();
-  private readonly spreadRng = createRng(31337);
-  private readonly air = new AirSupport(createRng(8080));
   /** Trigger state gathered per frame, consumed by the next fixed step. */
   private fireHeld = false;
   private fireClicks = 0;
-  private readonly gunship = new Gunship();
-  private readonly sensor: Sensor;
-  private readonly sensorFx = new SensorFX();
   private sensorMode: SensorMode = 'white';
-  private readonly input: Input;
-  private readonly hud: HUD;
-  private readonly stepper = new FixedStepper(CONFIG.loop.step, CONFIG.loop.maxFrame);
-
-  private viewportHeight = window.innerHeight;
   private missionClock = 0;
+  /** Seconds the "DANGER CLOSE" warning stays on screen. */
+  private dangerCloseLeft = 0;
+
+  /** Dev cheats (PLAN.md §7.18): time scale (kept across restarts). */
+  private timeScale = 1;
+  /** The controls overlay (`H`). */
+  private help = false;
+  /** True once the first run has been deployed (the HUD stays hidden behind title/briefing). */
+  private deployed = false;
+  private viewportHeight = window.innerHeight;
   private lastFrame = performance.now();
   private debug = new URLSearchParams(location.search).has('debug');
   private fps = 60;
-  /** Kills by the player's guns so far (F1 stats and the mission-complete screen). */
-  private kills = 0;
-  /** Seconds the "DANGER CLOSE" warning stays on screen. */
-  private dangerCloseLeft = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     hudRoot: HTMLElement,
-    private readonly screen: HTMLElement,
+    screenRoot: HTMLElement,
   ) {
     const ground = (x: number, z: number) => this.terrain.heightAt(x, z);
-    // The world first: its houses are what soldiers take cover behind and can't see through.
-    this.world = new WorldBuilder(MAP, this.terrain, this.collision);
-    // Soldiers walk on the surface (over the bridge deck, not through the stream bed).
-    const surface = (x: number, z: number) => this.world.surfaceAt(x, z);
-    const crossings = new StreamCrossings(MAP.stream, MAP.bridges);
-    // Ridgeback starts at the OP and walks only when the mission says so (`moveTeam`).
-    const startRoute = toPathPoints(MAP.friendlyRoutes[MAP.routeOrder[0]]);
-    this.units = new UnitManager(surface, this.bus, createRng(4040), startRoute, {
-      loopRoute: false,
-      // Houses and hills block sight and walking; the stream can only be crossed on the bridge.
-      world: {
-        lineOfSight: (a, b) => this.collision.lineOfSight(a, b),
-        pushOut: (x, z, r, out) => this.collision.pushOut(x, z, r, out),
-        detour: (fx, fz, tx, tz, out) => crossings.detour(fx, fz, tx, tz, out),
-      },
-      cover: this.world.cover,
-    });
-    this.units.squad.halt();
-    this.vehicles = new VehicleManager(
-      this.units,
-      ground,
-      this.bus,
-      createRng(6060),
-      CONFIG.vehicles,
-      CONFIG.spawning.machineGunnerChance,
-    );
-    const footprints: Footprint[] = this.world.protectedBoxes.map((i) => {
-      const b = this.collision.boxes[i];
-      return {
-        center: { x: b.center.x, z: b.center.z },
-        half: { x: b.half.x, z: b.half.z },
-        rotY: b.rotY,
-      };
-    });
-    this.host = new MissionHost(MISSION, {
-      map: MAP,
-      bus: this.bus,
-      units: this.units,
-      vehicles: this.vehicles,
-      spawner: this.spawner,
-      groundAt: ground,
-      protectedFootprints: footprints,
-      rng: createRng(9090),
-    });
-    this.gunship.snapTo(this.units.teamPosition.x, this.units.teamPosition.z);
     this.sensor = new Sensor(this.gunship, this.terrain, window.innerWidth / window.innerHeight);
 
     this.renderer = new Renderer(canvas, this.sensor.camera);
     this.renderer.scene.add(this.world.root);
     this.renderer.scene.add(this.infantryView.root, this.vehicleView.mesh, this.heliView.mesh);
-
     this.effects = new Effects(ground, createRng(77));
     this.renderer.scene.add(this.effects.root);
-    this.units.onMuzzleFlash = (p) => this.effects.muzzleFlash(p);
+
+    this.hud = new HUD(hudRoot);
+    if (import.meta.env.DEV || this.debug) {
+      this.overlay = new DebugOverlay(hudRoot, mapOverlay(MAP, this.world.cover.points), ground);
+    }
+    this.input = new Input(canvas);
+    this.input.onLockChange = (locked) => this.go(locked ? 'lockGained' : 'lockLost');
+    this.input.onLockRefused = () =>
+      this.screens.setLockHint('The browser needs a moment after Esc: click RESUME again.');
+
+    this.screens = new Screens(screenRoot, MAP, this.settings);
+    this.screens.onButton = (b) => this.button(b);
+    this.screens.onSettings = (s) => this.applySettings(s, true);
+    this.applySettings(this.settings, false);
+
+    window.addEventListener('resize', () => this.resize());
+    this.resize();
+    this.newRun();
+    this.go('lockLost'); // shows the title screen
+  }
+
+  /**
+   * Starts a fresh run on the same world: new bus, soldiers, vehicles, mission, guns and stats
+   * (seeded the same way every time), effects cleared, and the orbit back over the OP.
+   */
+  private newRun(): void {
+    this.effects.clear();
+    const b = createBattle(this.w);
+    this.bus = b.bus;
+    this.units = b.units;
+    this.vehicles = b.vehicles;
+    this.host = b.host;
+    this.stats = b.stats;
+    this.weapons = new Weapons();
+    this.projectiles = new Projectiles();
+    this.air = new AirSupport(createRng(8080));
+    this.spreadRng = createRng(31337);
+    this.sensorFx = new SensorFX();
     this.explosions = new Explosions(this.effects, this.sensor, this.sensorFx, this.bus, (c, r) =>
       this.units.targetsNear(c, r),
     );
+    this.units.onMuzzleFlash = (p) => this.effects.muzzleFlash(p);
+    this.tourStop = null;
+    this.slewed = 0;
+    this.focus = null;
+    this.fireHeld = false;
+    this.fireClicks = 0;
+    this.sensorMode = 'white';
+    this.missionClock = 0;
+    this.dangerCloseLeft = 0;
+    this.help = false;
 
-    this.bus.on('unitKilled', (e) => {
-      if (e.by !== 'team') this.kills++;
-    });
     this.bus.on('dangerClose', () => (this.dangerCloseLeft = CONFIG.hud.dangerCloseSeconds));
     this.bus.on('missionFailed', (e) => this.fail(e.reason));
     // Placeholder sounds react to events; nobody else needs to know about audio.
@@ -190,28 +199,6 @@ export class Game {
     );
     this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
 
-    this.hud = new HUD(hudRoot);
-    if (import.meta.env.DEV || this.debug) {
-      this.overlay = new DebugOverlay(hudRoot, mapOverlay(MAP, this.world.cover.points), ground);
-    }
-    this.input = new Input(canvas);
-    this.input.onLockChange = (locked) => {
-      if (this.state !== 'failed' && this.state !== 'complete')
-        this.setState(locked ? 'playing' : 'paused');
-    };
-
-    screen.addEventListener('click', () => {
-      // Retry = reload for now (M8 adds a proper restart that resets every system).
-      if (this.state === 'failed' || this.state === 'complete') {
-        location.reload();
-        return;
-      }
-      this.audio.unlock(); // browsers allow audio only after a user gesture
-      this.input.requestLock();
-    });
-    window.addEventListener('resize', () => this.resize());
-    this.resize();
-    this.setState('title');
     // `?phase=village` starts at a phase (dev builds or ?debug=1).
     const cheats = import.meta.env.DEV || this.debug;
     this.host.start(
@@ -222,7 +209,50 @@ export class Game {
           )
         : undefined,
     );
-    if (this.host.mission.phaseIndex > 0) this.lookAtTeam();
+    const t = this.units.teamPosition;
+    this.gunship.reset(t.x, t.z);
+    this.sensor.reset(t.x, t.z);
+  }
+
+  /** What a screen button does. */
+  private button(b: ScreenButton): void {
+    this.audio.unlock(); // browsers allow audio only after a user gesture
+    switch (b) {
+      case 'begin':
+        this.go('begin');
+        break;
+      case 'deploy':
+      case 'resume':
+        this.screens.setLockHint('');
+        this.input.requestLock(); // aiming starts play (`lockGained`)
+        break;
+      case 'restart':
+      case 'retry':
+      case 'again':
+        this.newRun();
+        this.go('restart');
+        this.screens.setLockHint('');
+        this.input.requestLock();
+        break;
+      case 'settings':
+        this.go('openSettings');
+        break;
+      case 'back':
+        this.go('closeSettings');
+        break;
+    }
+  }
+
+  private applySettings(s: Settings, save: boolean): void {
+    this.settings = s;
+    this.sensor.sensitivityScale = s.sensitivity;
+    this.sensor.shakeScale = s.screenShake ? 1 : 0;
+    this.audio.setVolume(s.volume);
+    if (save && !saveSettings(browserStorage, s)) {
+      this.screens.setStorageHint(
+        'This browser blocks saving: settings last until the page closes.',
+      );
+    }
   }
 
   start(): void {
@@ -238,7 +268,7 @@ export class Game {
     this.lastFrame = now;
     if (elapsed > 0) this.fps += (1 / elapsed - this.fps) * 0.05;
 
-    if (this.state === 'playing') this.handleInput();
+    if (this.flow.playing) this.handleInput();
 
     const steps = this.stepper.advance(elapsed * this.timeScale);
     for (let i = 0; i < steps; i++) this.update(CONFIG.loop.step);
@@ -253,9 +283,10 @@ export class Game {
 
   /** One fixed simulation step (PLAN.md §6 update order). */
   private update(dt: number): void {
-    if (this.state === 'paused') return;
-    // After a failure the world keeps drifting behind the fail screen, but nobody fights.
-    const playing = this.state === 'playing';
+    // Paused (or in settings from the pause menu): the world holds still.
+    if (this.deployed && (this.flow.state === 'paused' || this.flow.state === 'settings')) return;
+    // Behind the title and end screens the orbit keeps drifting, but nobody fights.
+    const playing = this.flow.playing;
     this.gunship.update(dt);
     this.sensor.update(dt);
 
@@ -386,7 +417,8 @@ export class Game {
   }
 
   private handleInput(): void {
-    const { dx, dy } = this.input.consumeMouse();
+    const { dx, dy: rawDy } = this.input.consumeMouse();
+    const dy = this.settings.invertY ? -rawDy : rawDy;
     this.sensor.slew(dx, dy, this.viewportHeight);
     // Calibration prompts (mission phase 0) complete when the player does each thing.
     this.slewed += Math.abs(dx) + Math.abs(dy);
@@ -445,6 +477,7 @@ export class Game {
       this.host.playerDid('sensor');
     }
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
+    if (this.input.wasPressed('KeyH')) this.help = !this.help;
     if (this.overlay) {
       this.handleCheats();
       if (this.input.wasPressed('F2')) this.overlay.toggle();
@@ -468,7 +501,7 @@ export class Game {
       }
     }
     // With pointer lock the browser handles Esc (and we get a lock-change event); in drag mode we must.
-    if (this.input.dragMode && this.input.wasPressed('Escape')) this.setState('paused');
+    if (this.input.dragMode && this.input.wasPressed('Escape')) this.go('lockLost');
   }
 
   /** Dev cheats (PLAN.md §7.18); `overlay` exists exactly when cheats are allowed. */
@@ -505,16 +538,12 @@ export class Game {
     this.sensor.aim.set(t.x, this.terrain.heightAt(t.x, t.z), t.z);
   }
 
-  /** Mission complete: Ridgeback is out. Freeze the fight and show the result. */
+  /** Mission complete: Ridgeback is out. Freeze the fight and show the stats and rating. */
   private complete(): void {
-    if (this.state === 'complete' || this.state === 'failed') return;
-    const stats = this.screen.querySelector<HTMLElement>('[data-complete-stats]');
-    if (stats) {
-      const t = Math.floor(this.missionClock);
-      const time = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-      stats.textContent = `KILLS ${this.kills}  ·  TIME ${time}  ·  RIDGEBACK ${Math.ceil(this.units.team.value)}%`;
-    }
-    this.setState('complete');
+    if (this.flow.ended) return;
+    const s = this.stats.summary(this.units.team.taken, this.missionClock);
+    this.screens.setComplete(rateMission(s), summaryRows(s));
+    this.go('complete');
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
@@ -533,6 +562,8 @@ export class Game {
       guns: this.gunReadouts(),
       sensorMode: sensorModeLabel(this.sensorMode),
       clock: this.missionClock,
+      arrows: this.friendlyArrows(),
+      help: this.help && this.flow.playing,
       kestrel: this.host.helicopter.alive
         ? kestrelLine(
             this.host.helicopter.hp,
@@ -546,9 +577,10 @@ export class Game {
       dangerClose: this.dangerCloseLeft > 0,
       air: this.airReadout(),
       objective: objectiveLine(this.host.mission.objective),
-      subtitle: this.host.radio.current
-        ? subtitleLine(this.host.radio.current.speaker, this.host.radio.current.text)
-        : '',
+      subtitle:
+        this.settings.subtitles && this.host.radio.current
+          ? subtitleLine(this.host.radio.current.speaker, this.host.radio.current.text)
+          : '',
       timers: this.host.mission.timers
         .filter((t) => t.left > 0)
         .map((t) => timerLine(t.label, t.left)),
@@ -559,7 +591,7 @@ export class Game {
             gpuMs: this.renderer.gpuMs,
             calls: this.renderer.drawCalls,
             triangles: this.renderer.triangles,
-            kills: this.kills,
+            kills: this.stats.kills,
             enemies: this.units.aliveEnemies,
             vehicles: this.vehicles.alive,
             mission: this.host.mission.debugLine,
@@ -570,6 +602,36 @@ export class Game {
   }
 
   private readonly projected = new Vector3();
+  private readonly viewSpace = new Vector3();
+
+  /** Edge arrows toward Ridgeback and Kestrel 6 while they are off-screen (M8). */
+  private friendlyArrows(): FriendlyArrow[] {
+    const out: FriendlyArrow[] = [];
+    if (!this.flow.playing) return out;
+    const add = (p: Vector3, name: string) => {
+      const cam = this.sensor.camera;
+      const behind = this.viewSpace.copy(p).applyMatrix4(cam.matrixWorldInverse).z > 0;
+      this.projected.copy(p).project(cam);
+      const a = edgeArrow(
+        this.projected.x,
+        this.projected.y,
+        behind,
+        window.innerWidth,
+        window.innerHeight,
+        CONFIG.hud.arrowMargin,
+      );
+      if (!a) return;
+      const d = Math.hypot(p.x - this.sensor.aim.x, p.z - this.sensor.aim.z);
+      out.push({ ...a, label: `${name} ${Math.round(d)} M` });
+    };
+    this.teamPoint.copy(this.units.teamPosition);
+    this.teamPoint.y = this.terrain.heightAt(this.teamPoint.x, this.teamPoint.z) + 1;
+    add(this.teamPoint, 'RIDGEBACK');
+    if (this.host.helicopter.alive) add(this.host.helicopter.position, 'KESTREL 6');
+    return out;
+  }
+
+  private readonly teamPoint = new Vector3();
 
   /** The protected clinic's outline in screen pixels (the "do not engage" marker). */
   private clinicOutline(): [number, number][] {
@@ -602,7 +664,7 @@ export class Game {
   private airReadout() {
     const a = this.air;
     let preview: { points: [number, number][]; danger: boolean } | null = null;
-    if (a.mode !== null && this.state === 'playing') {
+    if (a.mode !== null && this.flow.playing) {
       const def = STRIKES[a.mode];
       const aim = this.sensor.aim;
       const w = window.innerWidth;
@@ -668,22 +730,22 @@ export class Game {
     };
   }
 
-  /** Mission failed (friendly fire or team overrun): freeze the fight and show why. */
+  /** Mission failed (friendly fire, overrun, clinic, Kestrel 6): freeze the fight and show why. */
   private fail(reason: FailReason): void {
-    if (this.state === 'failed') return;
-    const reasonEl = this.screen.querySelector<HTMLElement>('[data-fail-reason]');
-    if (reasonEl) reasonEl.textContent = failReasonText(reason);
-    this.setState('failed');
+    if (this.flow.ended) return;
+    const s = this.stats.summary(this.units.team.taken, this.missionClock);
+    this.screens.setFailed(failReasonText(reason), summaryRows(s));
+    this.go('fail');
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
-  private setState(state: GameState): void {
-    // Losing pointer lock on the title screen should not show "paused".
-    if (state === 'paused' && this.state === 'title') return;
-    this.state = state;
-    this.hud.show(state !== 'title');
-    this.screen.classList.toggle('hidden', state === 'playing');
-    this.screen.dataset.state = state;
+  /** Feeds the screen state machine and shows whatever screen it lands on. */
+  private go(action: ScreenAction): void {
+    const state = this.flow.dispatch(action);
+    if (state === 'playing') this.deployed = true;
+    // The HUD shows from the first deploy on (behind pause, settings and the end screens).
+    this.hud.show(this.deployed && state !== 'title' && state !== 'briefing', state !== 'playing');
+    this.screens.show(state);
     this.input.consumeMouse(); // drop movement made while not aiming
     this.input.consumeFireClicks(); // the click that starts / resumes the game isn't a shot
     this.fireClicks = 0;

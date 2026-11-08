@@ -91,6 +91,21 @@ describe('Explosions.detonate', () => {
     expect(effects.activeCraters).toBe(1);
   });
 
+  it('reports how many enemies the blast hurt (mission accuracy, M8), never friendlies', () => {
+    const { sensor, bus, effects } = rig();
+    const near = [
+      target('infantry', new Vector3(sensor.aim.x + 1, 0, sensor.aim.z), 1e6),
+      target('vehicle', new Vector3(sensor.aim.x - 2, 0, sensor.aim.z), 1e6),
+      target('infantry', new Vector3(sensor.aim.x, 0, sensor.aim.z + 15), 1e6, 'friendly'),
+    ];
+    const ex = new Explosions(effects, sensor, new SensorFX(), bus, () => near);
+    const hits: number[] = [];
+    bus.on('impact', (e) => hits.push(e.enemiesHit));
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    ex.detonate(new Vector3(sensor.aim.x + 300, 0, sensor.aim.z), WEAPONS['40'], true);
+    expect(hits).toEqual([2, 0]);
+  });
+
   it('does not report a kill twice for a target that is already dead', () => {
     const { sensor, bus, ex } = rig();
     let kills = 0;

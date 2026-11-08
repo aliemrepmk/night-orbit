@@ -63,6 +63,13 @@ export class Particles {
     this.alpha0 = new Float32Array(capacity);
   }
 
+  /** Kills every particle (a restart, M8). */
+  clear(): void {
+    this.life.fill(0);
+    this.age.fill(0);
+    this.next = 0;
+  }
+
   spawn(p: ParticleSpec): void {
     const i = this.next;
     this.next = (this.next + 1) % this.capacity;

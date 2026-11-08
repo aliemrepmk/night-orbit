@@ -12,6 +12,16 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  /** Player volume 0–1 (M8 settings), kept until the context exists. */
+  private volume = 1;
+  setVolume(v: number): void {
+    this.volume = Math.min(1, Math.max(0, v));
+    if (this.master) this.master.gain.value = MASTER * this.volume;
+  }
+
+  get playerVolume(): number {
+    return this.volume;
+  }
 
   unlock(): void {
     if (this.ctx) {
@@ -22,7 +32,7 @@ export class AudioEngine {
     if (!Ctor) return;
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
-    this.master.gain.value = MASTER;
+    this.master.gain.value = MASTER * this.volume;
     this.master.connect(this.ctx.destination);
 
     // One second of white noise, reused by every sound.

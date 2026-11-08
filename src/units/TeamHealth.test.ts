@@ -64,3 +64,20 @@ describe('TeamHealth god mode (dev cheat G)', () => {
     expect(t.overrun).toBe(false);
   });
 });
+
+describe('TeamHealth.taken (M8 damage-taken stat)', () => {
+  it('adds up the health actually lost: not past 0, not while invulnerable, regen does not undo it', () => {
+    const t = new TeamHealth(cfg);
+    t.damage(30);
+    step(t, 10); // regenerates back toward 100
+    t.damage(20);
+    expect(t.taken).toBe(50);
+    const left = t.value;
+    t.damage(500); // only what was left counts
+    expect(t.taken).toBeCloseTo(50 + left);
+    const god = new TeamHealth(cfg);
+    god.invulnerable = true;
+    god.damage(40);
+    expect(god.taken).toBe(0);
+  });
+});

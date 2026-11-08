@@ -27,7 +27,12 @@ describe('MissionHost: every fail path ends the mission', () => {
     const g = headlessGame();
     g.host.start('village');
     const c = largestFootprint(g.footprints)!.center;
-    g.bus.emit('impact', { pos: new Vector3(c.x, 0, c.z), weapon: '105', distanceToAim: 0 });
+    g.bus.emit('impact', {
+      pos: new Vector3(c.x, 0, c.z),
+      weapon: '105',
+      distanceToAim: 0,
+      enemiesHit: 0,
+    });
     expect(g.failures).toEqual(['clinic_hit']);
     expect(g.host.mission.status).toBe('failed');
   });
@@ -39,7 +44,12 @@ describe('MissionHost: every fail path ends the mission', () => {
     const f = largestFootprint(g.footprints)!;
     // Just outside the 40 mm's full-damage radius from the clinic's wall.
     const z = f.center.z + f.half.z + ORDNANCE['40'].innerRadius + 2;
-    g.bus.emit('impact', { pos: new Vector3(f.center.x, 0, z), weapon: '40', distanceToAim: 0 });
+    g.bus.emit('impact', {
+      pos: new Vector3(f.center.x, 0, z),
+      weapon: '40',
+      distanceToAim: 0,
+      enemiesHit: 0,
+    });
     step(g, 12); // let the story lines play out
     expect(g.failures).toEqual([]);
     expect(lines.some((l) => POOLS.clinicNearMiss.lines.includes(l))).toBe(true);

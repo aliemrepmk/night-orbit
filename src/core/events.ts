@@ -15,7 +15,8 @@ export type FailReason =
 /** Everything that can "happen" in the game (PLAN.md §6). Extend as systems are added. */
 export type GameEvents = {
   shotFired: { weapon: WeaponId };
-  impact: { pos: Vector3; weapon: OrdnanceId; distanceToAim: number };
+  /** `enemiesHit`: enemy soldiers and vehicles the blast hurt (mission accuracy, M8). */
+  impact: { pos: Vector3; weapon: OrdnanceId; distanceToAim: number; enemiesHit: number };
   /** An enemy died; `by` is the gunship weapon, or `team` for Ridgeback's return fire. */
   unitKilled: { kind: 'infantry' | 'vehicle'; by: DamageSource };
   /** The player's fire killed a Ridgeback member (always followed by missionFailed). */

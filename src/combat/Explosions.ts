@@ -57,8 +57,10 @@ export class Explosions {
     const near = this.targetsNear(point, Math.max(w.blastRadius, w.dangerClose));
     let friendlyKilled = false;
     let aircraftKilled = false;
+    let enemiesHit = 0;
     for (const hit of applyRadial(point, w, near)) {
       const t = hit.target as Target;
+      if (t.side !== 'friendly' && t.kind !== 'aircraft') enemiesHit++;
       if (t.alive) continue;
       if (t.kind === 'aircraft') aircraftKilled = true;
       else if (t.side === 'friendly') friendlyKilled = true;
@@ -82,7 +84,7 @@ export class Explosions {
     const halfHeight = this.sensor.slantRange * Math.tan((this.sensor.fovDeg * Math.PI) / 360);
     this.sensorFx.triggerWhiteout(whiteoutFor(w, halfHeight, inView));
 
-    this.bus.emit('impact', { pos: point, weapon: w.id, distanceToAim });
+    this.bus.emit('impact', { pos: point, weapon: w.id, distanceToAim, enemiesHit });
   }
 
   /**

@@ -27,6 +27,9 @@ export class Sensor {
   private time = 0;
   /** Current camera shake amplitude in degrees (decays exponentially). */
   shakeDeg = 0;
+  /** Player settings (M8): mouse sensitivity multiplier, and 0 turns camera shake off. */
+  sensitivityScale = 1;
+  shakeScale = 1;
 
   constructor(
     private readonly gunship: Gunship,
@@ -84,7 +87,7 @@ export class Sensor {
       dyPx,
       this.fovDeg,
       viewportHeight,
-      this.cfg.sensitivity,
+      this.cfg.sensitivity * this.sensitivityScale,
       this.cfg.minDepressionSin,
     );
     this.constrainAim();
@@ -92,6 +95,8 @@ export class Sensor {
 
   /** Adds camera shake (impacts, 105 mm recoil). Shakes don't stack beyond the strongest + 50%. */
   addShake(deg: number): void {
+    deg *= this.shakeScale;
+    if (deg <= 0) return;
     this.shakeDeg = Math.max(this.shakeDeg, deg) + 0.5 * Math.min(this.shakeDeg, deg);
   }
 
@@ -135,6 +140,16 @@ export class Sensor {
   setAspect(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** A fresh run (M8 restart): 105 mm, fully zoomed out, no shake, aiming at (x, z). */
+  reset(x: number, z: number): void {
+    this.weapon = '105';
+    this.fovDeg = this.targetFovDeg;
+    this.shakeDeg = 0;
+    this.aim.set(x, 0, z);
+    this.constrainAim();
+    this.syncCamera();
   }
 
   private constrainAim(): void {

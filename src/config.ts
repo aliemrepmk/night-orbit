@@ -424,6 +424,43 @@ export const CONFIG = {
     dangerCloseSeconds: 2.5,
     /** Calibration: the "slew the sensor" prompt completes after this much mouse movement (px). */
     calibrationSlewPx: 400,
+    /** Off-screen friendly arrows (M8): distance from the screen edge (CSS px). */
+    arrowMargin: 36,
+  },
+
+  /**
+   * Mission rating (M8, PLAN.md §7.16): start at 100 and lose points for damage taken, danger-close
+   * impacts and a slow finish; accuracy adds or removes up to `accuracyMax`.
+   */
+  rating: {
+    /** Points lost per point of Ridgeback health taken from enemy fire, up to `damageMax`. */
+    damagePerPoint: 0.15,
+    damageMax: 40,
+    perDangerClose: 4,
+    dangerCloseMax: 20,
+    /** Accuracy (impacts that hurt an enemy / gun impacts) at which the bonus is zero. */
+    accuracyPar: 0.3,
+    accuracyScale: 50,
+    accuracyMax: 15,
+    /** Seconds before the time penalty starts, points lost per minute after, and its cap. */
+    parSeconds: 15 * 60,
+    perMinuteOver: 2,
+    timeMax: 10,
+    /** Lowest score for each grade, best first; anything below the last is the final grade. */
+    grades: [
+      { grade: 'S', min: 95, label: 'FLAWLESS OVERWATCH' },
+      { grade: 'A', min: 85, label: 'OUTSTANDING' },
+      { grade: 'B', min: 70, label: 'SOLID WORK' },
+      { grade: 'C', min: 55, label: 'THEY MADE IT' },
+      { grade: 'D', min: 0, label: 'BARELY' },
+    ],
+  },
+
+  /** Player settings (M8): defaults and ranges; saved in localStorage when it is available. */
+  settings: {
+    storageKey: 'night-orbit.settings.v1',
+    sensitivity: { default: 1, min: 0.25, max: 3, step: 0.05 },
+    volume: { default: 0.8, min: 0, max: 1, step: 0.05 },
   },
 
   fx: {

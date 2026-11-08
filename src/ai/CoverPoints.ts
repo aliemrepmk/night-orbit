@@ -45,6 +45,11 @@ export class CoverSet {
     if (this.owners[p.id] === unitId) this.owners[p.id] = FREE;
   }
 
+  /** Frees every point (a restart, M8: the cover set outlives the soldiers). */
+  releaseAll(): void {
+    this.owners.fill(FREE);
+  }
+
   /** Nearest free point within `radius` of (x, z) that `accept` approves, or null. */
   nearestFree(
     x: number,

@@ -8,57 +8,7 @@
   <body>
     <canvas id="view"></canvas>
     <div id="hud" class="hidden"></div>
-    <div id="screen" class="screen" data-state="title">
-      <div class="panel">
-        <h1>NIGHT ORBIT</h1>
-        <p class="only-title">Gunship overwatch · Varesh Valley</p>
-        <p class="only-paused">PAUSED</p>
-        <p class="only-failed">MISSION FAILED</p>
-        <p class="only-failed fail-reason" data-fail-reason></p>
-        <p class="only-complete">MISSION COMPLETE · RIDGEBACK IS OUT</p>
-        <p class="only-complete fail-reason" data-complete-stats></p>
-        <p class="cta">
-          <span class="only-title">CLICK TO BEGIN</span>
-          <span class="only-paused">CLICK TO RESUME</span>
-          <span class="only-failed">CLICK TO RETRY</span>
-          <span class="only-complete">CLICK TO PLAY AGAIN</span>
-        </p>
-        <table class="controls">
-          <tr>
-            <td>MOUSE</td>
-            <td>Slew sensor</td>
-          </tr>
-          <tr>
-            <td>LEFT CLICK</td>
-            <td>Fire (hold for 25 mm)</td>
-          </tr>
-          <tr>
-            <td>1 / 2 / 3</td>
-            <td>25 mm / 40 mm / 105 mm</td>
-          </tr>
-          <tr>
-            <td>Q · WHEEL</td>
-            <td>Cycle weapon</td>
-          </tr>
-          <tr>
-            <td>T</td>
-            <td>Air support: gun run / bomb (click calls it)</td>
-          </tr>
-          <tr>
-            <td>F</td>
-            <td>Sensor: white-hot / black-hot / night vision</td>
-          </tr>
-          <tr>
-            <td>ESC</td>
-            <td>Pause</td>
-          </tr>
-          <tr>
-            <td>F1</td>
-            <td>Debug stats</td>
-          </tr>
-        </table>
-      </div>
-    </div>
+    <div id="screen" class="screen" data-state="title"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

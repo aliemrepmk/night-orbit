@@ -294,6 +294,16 @@ export class Effects {
     this.craterMesh.count = Math.max(this.craterMesh.count, i + 1);
   }
 
+  /** Removes every particle, crater and shockwave (a restart, M8). */
+  clear(): void {
+    this.hot.clear();
+    this.smoke.clear();
+    for (const c of this.craters) c.active = false;
+    this.craterMesh.count = 0;
+    this.nextCrater = 0;
+    for (const sw of this.shockwaves) sw.mesh.visible = false;
+  }
+
   /** Fixed-step update: particles, shockwaves, crater cooling. */
   update(dt: number): void {
     this.hot.update(dt);

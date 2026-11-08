@@ -77,3 +77,17 @@ describe('coverAlongBox', () => {
     }
   });
 });
+
+describe('CoverSet.releaseAll (M8 restart)', () => {
+  it('frees every reservation so a new run starts with all cover open', () => {
+    const set = new CoverSet();
+    const a = set.add(0, 0);
+    const b = set.add(5, 0);
+    set.reserve(a, 1);
+    set.reserve(b, 2);
+    set.releaseAll();
+    expect(set.isFree(a)).toBe(true);
+    expect(set.isFree(b)).toBe(true);
+    expect(set.reserve(a, 7)).toBe(true);
+  });
+});

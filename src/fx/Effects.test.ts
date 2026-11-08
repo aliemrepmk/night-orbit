@@ -84,3 +84,19 @@ describe('Effects', () => {
     expect(fx.tracerSprites).toBe(6);
   });
 });
+
+describe('Effects.clear (M8 restart)', () => {
+  it('removes every particle, crater and shockwave, and recycles from slot 0 again', () => {
+    const fx = new Effects(flat, createRng(9));
+    for (let i = 0; i < 5; i++) fx.explosion(new Vector3(i * 30, 0, 0), WEAPONS['105'], true);
+    expect(fx.particleCount).toBeGreaterThan(0);
+    expect(fx.activeCraters).toBe(5);
+    fx.clear();
+    expect(fx.particleCount).toBe(0);
+    expect(fx.activeCraters).toBe(0);
+    fx.explosion(new Vector3(), WEAPONS['40'], true);
+    expect(fx.activeCraters).toBe(1);
+    fx.update(DT);
+    expect(fx.craterHeat(0)).toBeCloseTo(CRATER_COOLING.from, 1);
+  });
+});

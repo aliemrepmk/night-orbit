@@ -153,3 +153,36 @@ describe('Sensor shake', () => {
     expect(sensor.aim.distanceTo(before)).toBeLessThan(1e-6);
   });
 });
+
+describe('Sensor settings and reset (M8)', () => {
+  it('scales the slew by the sensitivity setting', () => {
+    const a = setup().sensor;
+    const b = setup().sensor;
+    b.sensitivityScale = 2;
+    const a0 = a.aim.clone();
+    const b0 = b.aim.clone();
+    a.slew(40, 0, VIEW_H);
+    b.slew(40, 0, VIEW_H);
+    expect(b.aim.distanceTo(b0)).toBeCloseTo(2 * a.aim.distanceTo(a0), 1);
+  });
+
+  it('shakes not at all with screen shake turned off', () => {
+    const { sensor } = setup();
+    sensor.shakeScale = 0;
+    sensor.addShake(0.5);
+    expect(sensor.shakeDeg).toBe(0);
+  });
+
+  it('reset: 105 mm, zoomed out, no shake, aiming at the given point', () => {
+    const { gunship, sensor } = setup();
+    sensor.selectWeapon('25');
+    for (let i = 0; i < 120; i++) sensor.update(DT);
+    sensor.addShake(0.4);
+    sensor.reset(gunship.center.x + 30, gunship.center.z - 20);
+    expect(sensor.weapon).toBe('105');
+    expect(sensor.fovDeg).toBe(sensor.targetFovDeg);
+    expect(sensor.shakeDeg).toBe(0);
+    expect(sensor.aim.x).toBeCloseTo(gunship.center.x + 30);
+    expect(sensor.aim.z).toBeCloseTo(gunship.center.z - 20);
+  });
+});
