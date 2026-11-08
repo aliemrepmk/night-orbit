@@ -181,6 +181,9 @@ export class AudioEngine {
     if (d.noiseGain > 0) {
       const src = ctx.createBufferSource();
       src.buffer = noise;
+      // Loop: the noise buffer is 1 s, so a longer sound (the bomb) used to lose its noise after
+      // ~0.5–1 s and leave only the sub-bass thump: it "cut off immediately" (M8+ play test).
+      src.loop = true;
       src.playbackRate.value = 0.8 + Math.random() * 0.4; // no two shots identical
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
