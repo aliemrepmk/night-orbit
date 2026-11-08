@@ -1,3 +1,4 @@
+import { AirDefense, type AAShooter } from '../combat/AirDefense';
 import { CONFIG } from '../config';
 import { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
@@ -79,6 +80,21 @@ export function createBattle(w: StaticWorld) {
     CONFIG.spawning.machineGunnerChance,
   );
   const spawner = new WaveSpawner(createRng(5050));
+  // Enemy air defense (M8+ Phase E): AA emplacements (targets for every blast), AA trucks among
+  // the vehicles, and MANPADS teams launching at the gunship.
+  const airDefense = new AirDefense(
+    MAP.aaSites.map((a) => ({
+      id: a.id,
+      x: a.pos[0],
+      y: ground(a.pos[0], a.pos[1]) + 1.2,
+      z: a.pos[1],
+    })),
+    bus,
+    createRng(7070),
+  );
+  for (const g of airDefense.guns) units.addTarget(g);
+  airDefense.trucks = () => aaTrucks(vehicles);
+  units.onLaunch = (from) => airDefense.launch(from);
   const host = new MissionHost(MISSION, {
     map: MAP,
     bus,
@@ -88,12 +104,23 @@ export function createBattle(w: StaticWorld) {
     groundAt: ground,
     protectedFootprints: w.footprints,
     rng: createRng(9090),
+    airDefense,
   });
   const stats = new MissionStats(bus);
   // The fuel depot's tanks: every impact near them hurts them (fresh each run).
   const depot = new Explosives(w.world.explosives);
   bus.on('impact', (e) => depot.hit(e.pos.x, e.pos.z, ORDNANCE[e.weapon]));
-  return { bus, units, vehicles, spawner, host, stats, ground, depot };
+  return { bus, units, vehicles, spawner, host, stats, ground, depot, airDefense };
+}
+
+/** Live AA trucks as air-defense shooters (they fire once in place or on the move). */
+function* aaTrucks(vehicles: VehicleManager): Generator<AAShooter> {
+  for (let i = 0; i < vehicles.vehicles.length; i++) {
+    const v = vehicles.vehicles[i];
+    if (v.inUse && v.alive && v.def.antiAir) {
+      yield { id: `aaa${i}`, position: v.position, firing: true };
+    }
+  }
 }
 
 export type Battle = ReturnType<typeof createBattle>;

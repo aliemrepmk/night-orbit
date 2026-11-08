@@ -1,3 +1,4 @@
+import type { InfantryType } from '../units/unitDefs';
 import type { VehicleType } from '../units/vehicleDefs';
 import type { Vec2, ZoneId } from '../world/mapTypes';
 
@@ -8,7 +9,8 @@ import type { Vec2, ZoneId } from '../world/mapTypes';
  */
 
 /** Who speaks on the radio (PLAN.md §2): the fire-control officer, the navigator, Ridgeback, the helo. */
-export type Speaker = 'FCO' | 'NAV' | 'RIDGEBACK' | 'KESTREL';
+/** `PILOT`: LANTERN 2-1's pilot (M8+ Phase E: hull damage, engines). */
+export type Speaker = 'FCO' | 'NAV' | 'PILOT' | 'RIDGEBACK' | 'KESTREL';
 
 /** Radio priorities (PLAN.md §7.15): story > warnings > reactive chatter. */
 export type Priority = 1 | 2 | 3;
@@ -46,7 +48,15 @@ export type Action =
   /** Glide the orbit over a zone (null: follow Ridgeback again). */
   | { readonly kind: 'setOrbitFocus'; readonly zone: ZoneId | null }
   /** A group of `count` at a named site: an enemy path id, or `zone:index` (a spawn point). */
-  | { readonly kind: 'spawnWave'; readonly site: string; readonly count: number }
+  | {
+      readonly kind: 'spawnWave';
+      readonly site: string;
+      readonly count: number;
+      /** Every soldier of this type (default: riflemen and the odd machine gunner). */
+      readonly type?: InfantryType;
+    }
+  /** Bring the AA gun emplacement `site` into action (M8+ Phase E). */
+  | { readonly kind: 'activateAA'; readonly site: string }
   /** Vehicles in a column along a map vehicle path, lead first, each carrying `tag`. */
   | {
       readonly kind: 'spawnConvoy';

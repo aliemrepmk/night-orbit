@@ -1,3 +1,4 @@
+import type { AirDefense } from '../combat/AirDefense';
 import { Path } from '../ai/Paths';
 import { CONFIG } from '../config';
 import type { EventBus } from '../core/EventBus';
@@ -31,6 +32,8 @@ export interface MissionHostDeps {
   readonly protectedFootprints: readonly Footprint[];
   readonly rng: Rng;
   readonly cfg?: MissionHostConfig;
+  /** Enemy air defense (M8+ Phase E): `activateAA` and the air-defense radio calls. */
+  readonly airDefense?: AirDefense;
 }
 
 /**
@@ -74,6 +77,7 @@ export class MissionHost implements MissionWorld {
     const bus = d.bus;
     bus.on('unitKilled', (e) => {
       if (e.by === 'team') return;
+      if (e.aa) return; // the "Triple-A destroyed" call comes from `aaDestroyed`
       if (e.kind === 'vehicle') this.chatter.vehicleKilled();
       else this.chatter.infantryKilled();
     });
@@ -83,6 +87,19 @@ export class MissionHost implements MissionWorld {
     });
     bus.on('impact', (e) => this.onImpact(e.pos.x, e.pos.z, e.weapon));
     bus.on('missionFailed', () => this.mission.fail());
+    // Air defense (M8+ Phase E): the crew calls what is happening to the aircraft.
+    bus.on('aaFiring', () => this.chatter.say('aaFiring'));
+    bus.on('aaDestroyed', () => this.chatter.say('aaDestroyed'));
+    bus.on('hullHit', (e) => this.chatter.say(e.by === 'missile' ? 'missileHit' : 'hullHit'));
+    bus.on('engineLost', () => this.chatter.say('engineLost'));
+    bus.on('missileLaunch', () => this.chatter.say('missileLaunch'));
+    bus.on('missileDefeated', () => this.chatter.say('missileDefeated'));
+    bus.on('flares', (e) => {
+      if (e.result === 'wasted') this.chatter.say('flaresWasted');
+      else if (e.result === 'empty') this.chatter.say('flaresEmpty');
+    });
+    bus.on('jetHit', () => this.chatter.say('jetHit'));
+    bus.on('strikeAborted', () => this.chatter.say('strikeAborted'));
   }
 
   /** Starts the mission (at a phase, for `?phase=` and tests). */
@@ -164,7 +181,10 @@ export class MissionHost implements MissionWorld {
         this.focus = a.zone;
         return;
       case 'spawnWave':
-        spawner.queueAt(units, a.site, a.count);
+        spawner.queueAt(units, a.site, a.count, a.type);
+        return;
+      case 'activateAA':
+        this.d.airDefense?.activate(a.site);
         return;
       case 'spawnConvoy': {
         const road = this.roads.get(a.path);

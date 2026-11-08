@@ -1,3 +1,4 @@
+import type { InfantryType } from '../units/unitDefs';
 import type { VehicleType } from '../units/vehicleDefs';
 import type { Vec2, ZoneId } from '../world/mapTypes';
 import type { Action, Condition, Priority, Speaker } from './missionTypes';
@@ -41,11 +42,10 @@ export const say = (speaker: Speaker, text: string, priority: Priority = 3): Act
 });
 export const setObjective = (text: string): Action => ({ kind: 'setObjective', text });
 export const setOrbitFocus = (zone: ZoneId | null): Action => ({ kind: 'setOrbitFocus', zone });
-export const spawnWave = (site: string, count: number): Action => ({
-  kind: 'spawnWave',
-  site,
-  count,
-});
+export const spawnWave = (site: string, count: number, type?: InfantryType): Action =>
+  type ? { kind: 'spawnWave', site, count, type } : { kind: 'spawnWave', site, count };
+/** Bring an AA emplacement into action (M8+ Phase E). */
+export const activateAA = (site: string): Action => ({ kind: 'activateAA', site });
 export const spawnConvoy = (path: string, vehicles: VehicleType[], tag: string): Action => ({
   kind: 'spawnConvoy',
   path,

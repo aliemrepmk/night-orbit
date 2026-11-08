@@ -16,7 +16,19 @@ export type PoolId =
   | 'teamUnderFire'
   | 'teamHurt'
   | 'heloUnderFire'
-  | 'heloHurt';
+  | 'heloHurt'
+  // Air defense (M8+ Phase E)
+  | 'aaFiring'
+  | 'aaDestroyed'
+  | 'hullHit'
+  | 'missileHit'
+  | 'engineLost'
+  | 'missileLaunch'
+  | 'missileDefeated'
+  | 'flaresWasted'
+  | 'flaresEmpty'
+  | 'jetHit'
+  | 'strikeAborted';
 
 export interface Pool {
   readonly speaker: Speaker;
@@ -117,6 +129,90 @@ export const POOLS: Readonly<Record<PoolId, Pool>> = {
     lines: [
       "Kestrel's hit! We can't sit here much longer!",
       'Taking damage, Lantern. Clear that LZ!',
+    ],
+  },
+  // ---- Air defense (M8+ Phase E) ----
+  aaFiring: {
+    speaker: 'FCO',
+    priority: 2,
+    cooldown: 20,
+    lines: [
+      'Triple-A! Tracers coming up, find that gun.',
+      'AAA active below us. Kill it before it walks onto us.',
+      'Anti-aircraft fire, close. Look for the muzzle flash.',
+    ],
+  },
+  aaDestroyed: {
+    speaker: 'FCO',
+    priority: 1,
+    cooldown: 4,
+    lines: ['Triple-A destroyed. Good kill.', "That gun's done shooting.", 'AAA site is down.'],
+  },
+  hullHit: {
+    speaker: 'PILOT',
+    priority: 2,
+    cooldown: 8,
+    lines: ["We're taking hits!", 'Rounds in the airframe, kill that gun.', 'Hit! Still flying.'],
+  },
+  missileHit: {
+    speaker: 'PILOT',
+    priority: 2,
+    cooldown: 4,
+    lines: ["Missile hit! We're on fire back there.", "Impact! That one hurt, I'm fighting it."],
+  },
+  engineLost: {
+    speaker: 'PILOT',
+    priority: 2,
+    cooldown: 30,
+    lines: [
+      "Lost number three engine. We're slower now, one more of those and we're done.",
+      "Engine three is gone. I can hold the orbit, but we can't take much more.",
+    ],
+  },
+  missileLaunch: {
+    speaker: 'FCO',
+    priority: 2,
+    cooldown: 3,
+    lines: [
+      'Missile launch! Flares, flares!',
+      'Launch, launch! Pop flares!',
+      'Smoke trail coming up! Flares!',
+    ],
+  },
+  missileDefeated: {
+    speaker: 'PILOT',
+    priority: 1,
+    cooldown: 4,
+    lines: ["Missile's chasing the flares. Good.", 'Decoyed. It went for the flares.'],
+  },
+  flaresWasted: {
+    speaker: 'PILOT',
+    priority: 1,
+    cooldown: 10,
+    lines: ['No launch out there. Save the flares.', "Easy on the flares, we'll need them."],
+  },
+  flaresEmpty: {
+    speaker: 'PILOT',
+    priority: 2,
+    cooldown: 10,
+    lines: ["We're out of flares!", 'Dispensers are empty.'],
+  },
+  jetHit: {
+    speaker: 'NAV',
+    priority: 2,
+    cooldown: 10,
+    lines: [
+      'Striker took a hit from the triple-A, still in the fight.',
+      "The jet's taking fire off target.",
+    ],
+  },
+  strikeAborted: {
+    speaker: 'NAV',
+    priority: 2,
+    cooldown: 5,
+    lines: [
+      'Strike aborted: too much triple-A. Clear the guns first.',
+      "Pilot's aborting, the target area is too hot. Kill the AAA.",
     ],
   },
 };

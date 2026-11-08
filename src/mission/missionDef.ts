@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import { MAP } from '../world/MapData';
 import type { MissionDef } from './missionTypes';
 import {
+  activateAA,
   clearFlag,
   allOf,
   boardHelicopter,
@@ -144,6 +145,10 @@ export const MISSION: MissionDef = {
           do: [
             say('FCO', 'Checks complete. Ridgeback, Lantern is on station.'),
             say('RIDGEBACK', 'Good to hear you, Lantern. Moving out.'),
+            say(
+              'FCO',
+              'Intel says triple-A on the ridge north of the fields. Kill it before we bring the jets in. X for flares if anything launches.',
+            ),
             nextPhase(),
           ],
         },
@@ -157,6 +162,7 @@ export const MISSION: MissionDef = {
       onEnter: [
         setOrbitFocus(null),
         moveTeam('route_op_fields'),
+        activateAA('aa_ridge'), // M8+ Phase E
         say('FCO', 'Ridgeback is moving. You are cleared on anything without a strobe.'),
         spawnWave('fields_treeline', 10),
         say('NAV', 'Movement in the tree line, north of the fields. Far from friendlies.'),
@@ -210,6 +216,8 @@ export const MISSION: MissionDef = {
       teamStart: [-240, 131],
       onEnter: [
         moveTeam('route_bridge_village'),
+        activateAA('aa_village'), // M8+ Phase E
+        spawnWave('village_north', 2, 'manpads'),
         say(
           'FCO',
           'Be advised: the building with the generator heat on the square is a clinic. Do not engage it under any circumstances.',
@@ -293,6 +301,9 @@ export const MISSION: MissionDef = {
         setOrbitFocus('crossroads'),
         say('NAV', 'Multiple vehicles on the north road, heading your way.'),
         spawnConvoy('north_convoy', ['truck', 'truck', 'technical', 'apc'], 'convoy'),
+        // M8+ Phase E: an AA truck up the east road, and the gun at the crossroads.
+        spawnConvoy('east_convoy', ['aaa'], 'aaa'),
+        activateAA('aa_crossroads'),
         say('FCO', 'The APC will shrug off the forty. That is a job for the one-oh-five.', 2),
       ],
       steps: [
@@ -351,6 +362,8 @@ export const MISSION: MissionDef = {
         say('NAV', 'Kestrel 6 is three minutes out.'),
         startTimer('kestrel', 180, 'KESTREL 6'),
         spawnWave('lz_ne', 8),
+        activateAA('aa_lz'), // M8+ Phase E
+        spawnWave('lz_w', 2, 'manpads'),
         zoneWaves('lz', 18),
       ],
       steps: [
