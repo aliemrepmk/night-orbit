@@ -7,6 +7,8 @@ export interface Settings {
   invertY: boolean;
   /** Master volume 0–1. */
   volume: number;
+  /** The engine drone's own level 0–1, under the master volume (M8+ Phase B). */
+  engineVolume: number;
   /** Camera shake from impacts and 105 mm recoil. */
   screenShake: boolean;
   /** Radio subtitles low in the view. */
@@ -23,6 +25,7 @@ export function defaultSettings(cfg: SettingsConfig = CONFIG.settings): Settings
     sensitivity: cfg.sensitivity.default,
     invertY: false,
     volume: cfg.volume.default,
+    engineVolume: cfg.engineVolume.default,
     screenShake: true,
     subtitles: true,
   };
@@ -46,6 +49,7 @@ export function sanitizeSettings(raw: unknown, cfg: SettingsConfig = CONFIG.sett
     sensitivity: number(r.sensitivity, cfg.sensitivity),
     invertY: flag(r.invertY, d.invertY),
     volume: number(r.volume, cfg.volume),
+    engineVolume: number(r.engineVolume, cfg.engineVolume),
     screenShake: flag(r.screenShake, d.screenShake),
     subtitles: flag(r.subtitles, d.subtitles),
   };

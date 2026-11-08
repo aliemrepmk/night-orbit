@@ -69,6 +69,7 @@ export class Screens {
           ${slider('sensitivity', 'MOUSE SENSITIVITY')}
           ${toggle('invertY', 'INVERT MOUSE Y')}
           ${slider('volume', 'VOLUME')}
+          ${slider('engineVolume', 'ENGINE')}
           ${toggle('screenShake', 'SCREEN SHAKE')}
           ${toggle('subtitles', 'RADIO SUBTITLES')}
         </div>
@@ -155,7 +156,7 @@ export class Screens {
   private readInput(input: HTMLInputElement): void {
     const key = input.dataset.s as keyof Settings;
     const s = this.settings;
-    if (key === 'sensitivity' || key === 'volume') {
+    if (key === 'sensitivity' || key === 'volume' || key === 'engineVolume') {
       s[key] = stepValue(Number(input.value), 0, S[key]);
     } else {
       s[key] = input.checked;
@@ -174,6 +175,7 @@ export class Screens {
     }
     this.text('sensitivityValue', `${s.sensitivity.toFixed(2)}×`);
     this.text('volumeValue', `${Math.round(s.volume * 100)}%`);
+    this.text('engineVolumeValue', `${Math.round(s.engineVolume * 100)}%`);
   }
 
   private el(k: string): HTMLElement {
@@ -186,7 +188,7 @@ export class Screens {
   }
 }
 
-function slider(key: 'sensitivity' | 'volume', label: string): string {
+function slider(key: 'sensitivity' | 'volume' | 'engineVolume', label: string): string {
   const r = S[key];
   return `<label class="setting"><span>${label}</span>
     <input type="range" data-s="${key}" min="${r.min}" max="${r.max}" step="${r.step}"/>

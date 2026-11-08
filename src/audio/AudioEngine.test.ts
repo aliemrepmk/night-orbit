@@ -36,3 +36,16 @@ describe('AudioEngine', () => {
     expect(() => a.play('impact40', 0.5)).not.toThrow();
   });
 });
+
+describe('AudioEngine engine drone (M8+ Phase B)', () => {
+  it('accepts mode, tune and volume changes before audio exists (no-op, keeps the mode)', () => {
+    const a = new AudioEngine();
+    expect(a.engineState).toBe('off');
+    a.setEngineMode('on');
+    a.tuneEngine({ pitch: 1.01, pan: 0.1 });
+    a.setEngineVolume(2); // clamped
+    expect(a.engineState).toBe('on');
+    a.setEngineMode('muffled');
+    expect(a.engineState).toBe('muffled');
+  });
+});

@@ -461,6 +461,44 @@ export const CONFIG = {
     storageKey: 'night-orbit.settings.v1',
     sensitivity: { default: 1, min: 0.25, max: 3, step: 0.05 },
     volume: { default: 0.8, min: 0, max: 1, step: 0.05 },
+    /** The engine drone's own level (M8+ Phase B), under the master volume. */
+    engineVolume: { default: 0.7, min: 0, max: 1, step: 0.05 },
+  },
+
+  /**
+   * The gunship's engine drone (M8+ Phase B): four turboprops, always on while flying.
+   * Synthesized (no files): detuned saws per engine, a propeller beat, and airflow noise.
+   */
+  engineSound: {
+    /** Fundamental of each engine (Hz) and their detune (cents), so they beat against each other. */
+    baseHz: 54,
+    detuneCents: [-9, -3, 4, 11] as readonly number[],
+    /** Low-pass on the saws (Hz): a dull, through-the-airframe rumble. */
+    cutoffHz: 420,
+    /** The muffle filter over the whole drone while flying (Hz): wide open. */
+    openCutoffHz: 6000,
+    /** Propeller blade-pass throb: rate (Hz) and depth (0–1 of the level). */
+    beatHz: 17,
+    beatDepth: 0.35,
+    /** A faint high gearbox whine, as a multiple of the base pitch, and its level. */
+    whineHarmonic: 14,
+    whineGain: 0.035,
+    /** Airflow noise: band-pass center (Hz) and level. */
+    airHz: 650,
+    airGain: 0.22,
+    /** Overall level before the player's volumes. */
+    gain: 0.32,
+    /** Pitch drifts by ± this fraction around the orbit (the props loading up in the turn), plus a slow wander. */
+    pitchWobble: 0.012,
+    wanderSeconds: 37,
+    /** Stereo pan: the engines swing ± this as the aircraft circles (−1 = left, 1 = right). */
+    pan: 0.18,
+    /** Paused / end screens: the drone continues, muffled. Gain and low-pass cutoff (Hz). */
+    muffledGain: 0.4,
+    muffledCutoffHz: 160,
+    /** Seconds to fade in (DEPLOY), to muffle, and to fade out (back to the title). */
+    fadeSeconds: 2.5,
+    muffleSeconds: 0.4,
   },
 
   fx: {

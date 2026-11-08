@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
 import { AudioEngine } from '../audio/AudioEngine';
+import { engineTune } from '../audio/engineDrone';
 import { impactVolume } from '../audio/sounds';
 import { Explosions } from '../combat/Explosions';
 import { CONFIG } from '../config';
@@ -252,6 +253,7 @@ export class Game {
     this.sensor.sensitivityScale = s.sensitivity;
     this.sensor.shakeScale = s.screenShake ? 1 : 0;
     this.audio.setVolume(s.volume);
+    this.audio.setEngineVolume(s.engineVolume);
     if (save && !saveSettings(browserStorage, s)) {
       this.screens.setStorageHint(
         'This browser blocks saving: settings last until the page closes.',
@@ -281,6 +283,7 @@ export class Game {
     this.syncEffects();
     this.renderer.render(this.thermalFrame(now / 1000));
     this.updateHud();
+    this.audio.tuneEngine(engineTune(this.gunship.angle, now / 1000));
     this.overlay?.render(this.sensor.camera, window.innerWidth, window.innerHeight);
     this.input.endFrame();
   }
@@ -757,6 +760,10 @@ export class Game {
     // The HUD shows from the first deploy on (behind pause, settings and the end screens).
     this.hud.show(this.deployed && state !== 'title' && state !== 'briefing', state !== 'playing');
     this.screens.show(state);
+    // The engine drone: silent on the title and briefing, full in the air, muffled behind menus.
+    this.audio.setEngineMode(
+      state === 'playing' ? 'on' : this.deployed && state !== 'title' ? 'muffled' : 'off',
+    );
     this.input.consumeMouse(); // drop movement made while not aiming
     this.input.consumeFireClicks(); // the click that starts / resumes the game isn't a shot
     this.fireClicks = 0;

@@ -1,4 +1,16 @@
+import { CONFIG } from '../config';
+import { engineFrequencies, engineMix, type EngineMode, type EngineTune } from './engineDrone';
 import { SOUNDS, type SoundId } from './sounds';
+
+/** The live nodes of the engine drone (M8+ Phase B). */
+interface EngineNodes {
+  readonly saws: OscillatorNode[];
+  readonly whine: OscillatorNode;
+  readonly muffle: BiquadFilterNode;
+  readonly level: GainNode;
+  readonly bus: GainNode;
+  readonly pan: StereoPannerNode | null;
+}
 
 /** Master volume for the placeholder sounds. */
 const MASTER = 0.6;
@@ -14,6 +26,45 @@ export class AudioEngine {
   private noise: AudioBuffer | null = null;
   /** Player volume 0–1 (M8 settings), kept until the context exists. */
   private volume = 1;
+  /** The engine drone (M8+ Phase B): its nodes, mode and own volume. */
+  private engine: EngineNodes | null = null;
+  private engineMode: EngineMode = 'off';
+  private engineVolume = 1;
+
+  /** The engine drone's own level 0–1 (settings), under the master volume. */
+  setEngineVolume(v: number): void {
+    this.engineVolume = Math.min(1, Math.max(0, v));
+    if (this.engine && this.ctx) {
+      this.engine.bus.gain.setTargetAtTime(this.engineVolume, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  /** Off (title, briefing), on (flying) or muffled (pause, settings, end screens); ramps there. */
+  setEngineMode(mode: EngineMode): void {
+    if (mode === this.engineMode) return;
+    this.engineMode = mode;
+    this.applyEngineMode();
+  }
+
+  get engineState(): EngineMode {
+    return this.engineMode;
+  }
+
+  /** Per frame: the drone's pitch and pan follow the orbit. */
+  tuneEngine(t: EngineTune): void {
+    const { ctx, engine } = this;
+    if (!ctx || !engine) return;
+    const now = ctx.currentTime;
+    const f = engineFrequencies(t.pitch);
+    engine.saws.forEach((o, i) => o.frequency.setTargetAtTime(f[i], now, 0.2));
+    engine.whine.frequency.setTargetAtTime(
+      CONFIG.engineSound.baseHz * t.pitch * CONFIG.engineSound.whineHarmonic,
+      now,
+      0.2,
+    );
+    engine.pan?.pan.setTargetAtTime(t.pan, now, 0.3);
+  }
+
   setVolume(v: number): void {
     this.volume = Math.min(1, Math.max(0, v));
     if (this.master) this.master.gain.value = MASTER * this.volume;
@@ -40,6 +91,80 @@ export class AudioEngine {
     this.noise = this.ctx.createBuffer(1, n, n);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+    this.engine = this.buildEngine(this.ctx, this.master, this.noise);
+    this.applyEngineMode();
+  }
+
+  /**
+   * Four detuned saws (one per engine) through a low-pass, a faint gearbox whine and band-passed
+   * airflow noise, all throbbing with the propeller beat, then a muffle filter and the level.
+   */
+  private buildEngine(ctx: AudioContext, master: GainNode, noise: AudioBuffer): EngineNodes {
+    const E = CONFIG.engineSound;
+    const beat = ctx.createGain();
+    beat.gain.value = 1 - E.beatDepth / 2;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = E.beatHz;
+    const lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = E.beatDepth / 2;
+    lfo.connect(lfoDepth).connect(beat.gain);
+    lfo.start();
+
+    const sawLp = ctx.createBiquadFilter();
+    sawLp.type = 'lowpass';
+    sawLp.frequency.value = E.cutoffHz;
+    sawLp.connect(beat);
+    const saws = engineFrequencies(1).map((f) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = 0.25;
+      o.connect(g).connect(sawLp);
+      o.start();
+      return o;
+    });
+
+    const whine = ctx.createOscillator();
+    whine.frequency.value = E.baseHz * E.whineHarmonic;
+    const whineGain = ctx.createGain();
+    whineGain.gain.value = E.whineGain;
+    whine.connect(whineGain).connect(beat);
+    whine.start();
+
+    const air = ctx.createBufferSource();
+    air.buffer = noise;
+    air.loop = true;
+    const airBand = ctx.createBiquadFilter();
+    airBand.type = 'bandpass';
+    airBand.frequency.value = E.airHz;
+    airBand.Q.value = 0.7;
+    const airGain = ctx.createGain();
+    airGain.gain.value = E.airGain;
+    air.connect(airBand).connect(airGain).connect(beat);
+    air.start();
+
+    const muffle = ctx.createBiquadFilter();
+    muffle.type = 'lowpass';
+    const level = ctx.createGain();
+    level.gain.value = 0;
+    const bus = ctx.createGain();
+    bus.gain.value = this.engineVolume;
+    const pan = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null;
+    beat.connect(muffle).connect(level).connect(bus);
+    if (pan) bus.connect(pan).connect(master);
+    else bus.connect(master);
+    return { saws, whine, muffle, level, bus, pan };
+  }
+
+  private applyEngineMode(): void {
+    const { ctx, engine } = this;
+    if (!ctx || !engine) return;
+    const m = engineMix(this.engineMode);
+    const now = ctx.currentTime;
+    const tau = Math.max(0.01, m.rampSeconds / 3); // ~95 % of the way after rampSeconds
+    engine.level.gain.setTargetAtTime(m.gain, now, tau);
+    engine.muffle.frequency.setTargetAtTime(m.cutoffHz, now, tau);
   }
 
   get enabled(): boolean {

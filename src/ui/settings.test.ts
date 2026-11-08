@@ -66,6 +66,7 @@ describe('settings save / load', () => {
     const s = loadSettings(m.get);
     expect(s.sensitivity).toBe(CONFIG.settings.sensitivity.max);
     expect(s.volume).toBe(CONFIG.settings.volume.min);
+    expect(s.engineVolume).toBe(CONFIG.settings.engineVolume.default); // missing → default
     expect(s.invertY).toBe(false);
     expect('extra' in s).toBe(false);
     expect(sanitizeSettings(null)).toEqual(defaultSettings());
