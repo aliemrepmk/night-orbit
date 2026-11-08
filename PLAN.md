@@ -515,7 +515,7 @@ type InfantryState = 'idle' | 'moving' | 'inCover' | 'firing' | 'fleeing' | 'flu
 - Path following: constant speed along a road polyline, with slowdown at corners (based on the angle between segments) and smooth heading interpolation.
 - Visual: box-composite meshes. Engine block and exhaust are hot, wheels warm, body medium.
 - **Damage states:** `intact → smoking (below 50% HP) → destroyed (burning, wreck mesh, infantry inside die or bail out burning-hot)`.
-- Destroyed vehicles on the road **block it**; later vehicles stop behind them and unload early (emergent and fun).
+- Destroyed vehicles on the road **block the lane**: later vehicles slow and swerve around a wreck or a stopped vehicle (up to 7 m off the centerline), then return to the road and drive on. Only with no room to pass do they stop behind it and unload early. (M7 play test: wrecks used to plug the road for good, so nothing behind them ever reached Ridgeback.)
 
 ### 7.11 AI & Navigation
 
@@ -533,6 +533,7 @@ Keep it simple and authored; no navmesh needed.
   ```
 - **Morale (light touch):** a big 105 mm hit near an enemy group makes survivors break and run for 3–5 s. Fleeing enemies are bright moving targets, which feels good to hit. Losses nearby (3 within 25 m) or being wounded trigger the 30 % flee roll once; a broken soldier runs back toward where it came from for 8–12 s, then rallies (STATUS.md §5 decision 31).
 - **Stream:** soldiers never wade the stream: when the straight walk to their goal crosses it they detour over the bridge (`world/crossings.ts`), which makes the bridge a natural choke point.
+- **Assaulters:** 45 % of riflemen push in to 30–70 m of Ridgeback, bounding from cover to cover, and take cover only that close. The rest snipe from 120–190 m, and machine gunners always hang back (M7 play test: too few enemies got close, so the mission felt easy).
 - **Spawning (anti spawn-camping):** groups appear at a random rested site (path start or spawn point) 180–450 m from the team, never within 160 m of the sensor's aim, one soldier at a time; a site rests 30 s after use. M7's scripted spawns keep these rules.
 - **Spatial grid:** 20 m cells, rebuilt each tick, used for blast queries, separation and nearest-target lookups.
 
@@ -644,6 +645,15 @@ export const MISSION: MissionDef = {
 **Safety valve:** every "wait for zone clear" step also has a timeout (e.g. 90 s), after which
 the remaining enemies flee. A hidden enemy can then never soft-lock the mission.
 
+**As built (M7):** a phase's steps run **in order** (step k is checked only after step k−1 fired),
+matching the beat sheet in §8; each step may carry `timeout` + `onTimeout`. Extra vocabulary:
+`timeInStep(s)`, `timerBelow(id, s)`, `helicopter('landed' | 'boarded' | 'departed')`,
+`zoneWaves(zone, interval)` (background waves from a zone's sites), `routZone(zone)`,
+`spawnConvoy(path, types, tag)`, `boardHelicopter()`, `markClinic(seconds)`. `teamReached(route)`
+means Ridgeback walked that route to its end; spawn sites are enemy path ids or `zone:index`
+spawn points. Every step that waits on the world has a timeout; walks time out at twice the
+route's walking time. A new phase drops the radio lines the last phase didn't get to play.
+
 ### 7.15 Dialogue / Radio Chatter
 
 - `Radio` keeps a **priority queue** of lines: scripted story lines (priority 3) > warnings (2) > reactive chatter (1).
@@ -711,7 +721,7 @@ starts on the first click (browser autoplay rules).
 
 - **F1 overlay:** draws zones (circles), paths (lines), cover points, spawn points, friendly routes, plus FPS, draw calls, unit counts, and the current phase/step.
 - **Placer:** in debug mode, click the ground to copy `[x, z]` to the clipboard, which makes authoring `MapData` fast.
-- **Cheats (dev only):** `G` god mode for the team, `N` skip to next phase, `K` kill all enemies, time-scale ×0.25 / ×4.
+- **Cheats (dev only):** `G` god mode for the team, `N` skip to next phase, `K` kill all enemies (and vehicles), time-scale ×0.25 / ×4 with `[` / `]`.
 - URL flags: `?phase=village` to start at a phase, `?debug=1`.
 
 ### 7.19 Air Support (added during development, milestone M5+)
@@ -799,7 +809,7 @@ Target total duration: **12–15 minutes**. Enemy counts below are starting valu
   1. The team takes positions at the LZ. NAV: _"Kestrel 6 is three minutes out."_ A **countdown timer** appears in the HUD (180 s).
   2. Escalating waves from all three approaches; 1–2 technicals; the final minute is the most intense.
   3. At 30 s left, Kestrel 6 appears (a very hot helicopter crossing the map). Enemies try to rush the LZ.
-  4. The helicopter lands, the team boards (they walk to it), the helicopter lifts off.
+  4. The helicopter lands, the team boards (they walk to it), the helicopter lifts off. While it is low, enemies shoot at it (HUD health line, Kestrel's calls for help); if it is shot down, or hit by the player's own fire, the mission fails.
   5. FCO: _"Ridgeback is wheels up. Nice work, Lantern. Heading home."_ → mission complete screen.
 
 ### Rating (complete screen)
@@ -907,19 +917,27 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
 
 ### M6 — The Handcrafted Map (2–3 days) — ✅ signed off
 
-- Full `MapData`: fields, farmhouse, stream and bridge, village (~25 buildings + clinic), crossroads, north road, quarry LZ, tree lines.
+- Full `MapData`: fields, farmhouse, stream and bridge, village (~25 buildings + clinic; grew to 43 in the M6 look test and to 143 houses on 9 streets in the M7 play test), crossroads, north road, quarry LZ, tree lines.
 - Debug overlay + Placer tool built **first**, to speed up authoring.
 - As built: cover points are derived from the authored objects (building and prop corners, both faces of hedges, walls and quarry rock) rather than hand-placed per zone; the map is checked by `validateMap`; debug tools are F2 overlay, P placer and an F3 zone tour (dev builds or `?debug=1`). The temporary test scene now runs on the real map until M7's mission script replaces it.
 - 🧪 **Tests:** MapData validation (all referenced ids exist, paths inside the map, no buildings on roads, clinic marked protected).
 - ✅ **Done when:** flying the orbit over each zone shows a believable, readable place.
 
-### M7 — Mission Scripting & Dialogue (2–3 days)
+### M7 — Mission Scripting & Dialogue (2–3 days) — ✅ signed off
 
 - Mission runner, conditions/actions library, all four phases + calibration, timeouts, helicopter extraction.
 - Radio system with subtitles, priorities, cooldowns; all lines written.
 - Protected clinic logic and warnings.
 - 🧪 **Tests:** mission runner (conditions fire actions once, timeouts, phase advance); every fail path; radio priority queue and cooldowns; a headless "auto-play" test that runs the whole mission with a cheat-kill bot and asserts it completes.
 - ✅ **Done when:** the mission plays start-to-finish with no soft-locks, through both win and every fail path.
+- **Kestrel 6 is a target** (added before the play test): your own blasts can destroy it, and enemy soldiers shoot it while it is low at the LZ. Losing it either way fails the mission (`helicopter_friendly_fire`, `helicopter_lost`); its health shows on the HUD.
+- **M7 play-test changes:**
+  - Vehicles swerve around wrecks (§7.10).
+  - Assaulters close in on Ridgeback (§7.11).
+  - Waves are about 1.6× bigger, with extra groups in every phase. The crossroads now has foot soldiers with the convoy, and LZ background waves come every 18 s, then every 9 s.
+  - The village has 143 houses: 100 more along every street and two new outer lanes (`north_row`, `south_row`).
+  - Collision boxes are filed in a 32 m grid, so line-of-sight and wall checks scale with the bigger village.
+- **As built:** `src/mission/` (types, `script.ts` builders, `missionDef.ts`, `Mission` runner, `MissionHost` on the real systems, `Radio`, `Chatter`, `lines.ts`, `clinic.ts`); `units/Helicopter.ts`; `debug/cheats.ts`. The test scene became `units/spawning.ts` (scripted groups at named sites + per-zone background waves). A minimal mission-complete screen (kills, time, health) until M8.
 
 ### M8 — UI Screens & Settings (1–2 days)
 

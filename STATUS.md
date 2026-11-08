@@ -1,6 +1,6 @@
 # NIGHT ORBIT — Project Status & Handoff
 
-_Last updated: 2026-11-05_
+_Last updated: 2026-11-08_
 
 This file says **where the project is right now**, **what needs testing**, and **what comes next**.
 The full design and milestone list are in [`PLAN.md`](PLAN.md). Update this file at the end of
@@ -21,12 +21,13 @@ every session.
 | **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                  |
 | **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                     |
-| M7 – M10                                | ⬜ Not started                                                         |
+| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                     |
+| M8 – M10                                | ⬜ Not started                                                         |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **348 tests in 46 files**).
-`npm run build` works (≈666 kB JS, 178 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **451 tests in 55 files**).
+`npm run build` works (≈703 kB JS, 190 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M5+ are pushed; the M6 commits are local, with a push scheduled for 2026-11-06 00:30 (Turkish time). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -53,7 +54,8 @@ src/
   main.ts                  entry point (dev builds expose `window.nightOrbit` for debugging)
   config.ts                ALL tunable numbers (orbit, sensor, terrain, loop, thermal, NV, render,
                            sensorFx, gunnery, infantry, ai, enemyFire, ridgeback, vehicles,
-                           groundFire, testScene, hud, fx)
+                           groundFire, spawning, mission, radio, chatter, clinic,
+                           helicopter, hud, fx)
   config.test.ts           config sanity rules (M0 smoke test)
   core/
     Game.ts                owns systems; frame → input → fixed steps → camera sync → render → HUD
@@ -103,8 +105,11 @@ src/
                            bail-outs; pool of 12
     VehicleRenderer.ts     ONE InstancedMesh of boxes for every vehicle part + smoke/fire emission
     UnitManager.ai.test.ts M5 enemy behavior: cover, line of sight, walls, panic, morale, paths
-    TestScene.ts (+test)   TEMPORARY scene on the real map (M7 replaces): Ridgeback walks the whole
-                           journey; anti-camping waves on the map's paths/spawns (≤ 60); convoys
+    spawning.ts (+test)    where enemies come from (was TestScene.ts): anti-camping groups at the
+                           map's paths/spawns (≤ 60); `queueAt(site)` for the script, zone waves
+                           (`auto`, `zone`); `journeyRoute`; the old free-running `ConvoySpawner`
+    Helicopter.ts (+test)  Kestrel 6: scripted flight in → land → board → lift off → gone
+    HelicopterRenderer.ts  ONE InstancedMesh of hot boxes + spinning rotors
     mapScene.test.ts       headless run of the real map scene (enemies cross only on the bridge)
   world/
     mapTypes.ts            the MapData types (roads, stream, bridges, fields, buildings, walls,
@@ -115,12 +120,26 @@ src/
     Terrain.ts (+test)     heightmap mesh + exact heightAt() (takes a height field)
     groundHeat.ts (+test)  ground heat: soil patches, and per-field levels (plowed/grass/stubble/gravel)
     Collision.ts (+test)   raycast vs terrain + rotated building boxes (roofs before ground);
-                           line of sight (houses + hills) and push-out of building footprints
+                           line of sight (houses + hills) and push-out of building footprints,
+                           over a 32 m box grid (M7)
     Roads.ts (+test)       road ribbons draped over the terrain
     crossings.ts (+test)   stream crossings: walkers detour over the nearest bridge
     WorldBuilder.ts (+test) MapData → meshes (≈13 draw calls), collision boxes, cover, bridge surface
     InstancedSignature.ts  static InstancedMesh with a signature per instance
+  mission/                 (M7, PLAN.md §7.14–7.15, §8)
+    missionTypes.ts        the mission as data: phases → ordered steps (condition → actions)
+    script.ts              the vocabulary: timeInPhase, teamReached, zoneEnemiesBelow, say, spawnWave, …
+    missionDef.ts (+test)  THE Varesh Valley script: calibration, fields, village, vehicles, extraction
+    Mission.ts (+test)     the runner: steps fire once in order, timeouts (safety valve), phases, timers
+    MissionHost.ts (+test) runs the script on the real systems; radio, chatter, clinic rule, helo
+    Radio.ts (+test)       subtitled radio: priority queue, cut-off of chatter, stale lines dropped
+    Chatter.ts (+test)     reactive lines on events (kills, danger close, clinic, misses), cooldowns
+    lines.ts               every reactive radio line (pools; story lines live in missionDef.ts)
+    clinic.ts (+test)      protected-clinic rule: hit (fail) / near miss (warning) per ordnance
+    headlessGame.ts        the whole game without a screen (auto-play, host tests, tuning runs)
+    autoplay.test.ts       a cheat-kill bot plays the whole mission to MISSION COMPLETE
   debug/
+    cheats.ts (+test)      dev cheats: G god, N skip phase, K kill all, [ ] time scale; ?phase=
     mapOverlay.ts (+test)  overlay shapes from MapData; placer format; F3 zone-tour order
     DebugOverlay.ts        SVG overlay projected onto the sensor view (F2), placer mark
   render/
@@ -136,7 +155,8 @@ src/
   ui/
     HUD.ts                 telemetry, reticles, gun status, team health, DANGER CLOSE, clock,
                            F1 stats (incl. KIA, live enemies EN, live vehicles VEH)
-    hudFormat.ts (+test)   pure HUD text: gun status, team health line, fail reasons
+    hudFormat.ts (+test)   pure HUD text: gun status, team health, fail reasons, subtitles,
+                           objective, countdowns
     hud.css                HUD + title/pause screen styles
 ```
 
@@ -159,10 +179,44 @@ Mouse = slew sensor · **left click = fire (hold for 25 mm)** · `1`/`2`/`3` = 2
 right button and drag** to aim. Add `?debug=1` to the URL to start with stats on.
 Map authoring (dev builds, or `?debug=1`): `F2` = map overlay · `P` = log the crosshair point as
 `[x, z]` (console + clipboard) · `F3` = tour the orbit over each zone, then back to the team.
+Cheats (dev builds, or `?debug=1`): `G` = god mode · `N` = skip to the next phase · `K` = kill all
+enemies and vehicles · `[` / `]` = time ×0.25 / ×1 / ×4 · `?phase=fields|village|vehicles|extraction`
+starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ---
 
 ## 3. Manual checklists
+
+### 3.0 M7 play test (passed 2026-11-08): "the mission plays start-to-finish with no soft-locks, through both win and every fail path"
+
+Run `npm run dev`, click to begin, and play the whole mission (about 12–15 min; Claude's perfect
+bot took 14.5). Use `?phase=…`, `N` and `]` (×4) to revisit a part quickly.
+
+- [x] **Calibration:** the FCO asks you to slew, then press 1, 2, 3 and F; each prompt completes
+      when you do it (or moves on by itself after ~20 s).
+- [x] **Fields:** a group in the north tree line, then the farmhouse and barn; a flank up the
+      south hedgerow close to Ridgeback (25 mm lesson); Ridgeback crosses the bridge.
+- [x] **Village:** the clinic briefing and a blinking outline on the clinic (~6 s); groups in the
+      west streets; enemies next to the clinic; Ridgeback pinned in the square with waves from
+      north and east; a technical on the east road; then the east edge.
+- [x] **Vehicles:** the orbit shifts to the crossroads; a convoy (2 trucks, technical, APC) on the
+      north road; a second APC on the east road; then Ridgeback walks to the LZ.
+- [x] **Extraction:** `KESTREL 6  03:00` counts down; waves from all three approaches and two
+      technicals on the quarry track; Kestrel 6 (a very hot helicopter) flies in at 0:30, lands,
+      Ridgeback walks over and boards, it lifts off → MISSION COMPLETE with kills, time, health.
+- [x] **Fail paths:** a round on the clinic → `YOU FIRED ON THE PROTECTED CLINIC`; a round
+      next to it → FCO "Check fire!"; friendly fire and overrun still fail as before; a round
+      next to the landed Kestrel 6 → `FRIENDLY FIRE: YOU HIT KESTREL 6`; leaving the LZ to the
+      enemy → tracers climb at the helicopter, `KESTREL 6 … UNDER FIRE`, Kestrel's calls for
+      help, then `KESTREL 6 WAS SHOT DOWN` (Claude checked: an undefended LZ loses it).
+- [x] **Radio:** subtitles `[FCO] …` low in the view; reactive calls on kills ("Splash", "whole
+      group's gone"), danger close, misses, hovering on the clinic, Ridgeback under fire; never a
+      flood, never the same line twice in a row.
+- [x] **Pacing:** does each phase feel the right length, and is anything too hard or too empty?
+- [x] **Play-test fixes (2026-11-06), to re-check:**
+  - **Vehicles:** destroy the lead convoy truck. The vehicles behind should swerve around the wreck and still reach Ridgeback.
+  - **Pressure:** many more soldiers on foot, and about half of the riflemen push in to 30–70 m of Ridgeback. Is it still fair?
+  - **Village:** about 3× bigger (143 houses, two new outer lanes). Do the streets still read, and does the frame rate hold?
 
 ### 3.1 M6 look test (passed 2026-11-05): "flying the orbit over each zone shows a believable, readable place"
 
@@ -176,7 +230,7 @@ crosshair point (to paste into `src/world/MapData.ts`).
 - [ ] **Stream and bridge:** the cold (black in white-hot) stream runs north–south west of the
       village; the farm track crosses it on a small bridge. Ridgeback walks over it (Claude
       checked: nobody wades).
-- [ ] **Village:** 43 houses and a workshop on five streets (main road, north street, back
+- [ ] **Village:** 143 houses (decision 59) and a workshop on seven streets and two outer lanes (main road, north street, back
       street, west lane, east street), lit windows, chimneys, parked cars and crates, a square. The **clinic** on the square's east side has lit
       windows on every side and a hot generator next to it (it is protected; firing on it only
       fails the mission from M7).
@@ -352,11 +406,13 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M7: mission scripting & dialogue**: mission scripting & dialogue** (PLAN.md §7.14–7.15, §8): the mission runner
-   (phases, conditions, actions), the radio with subtitles, protected-clinic fail logic
-   (`WorldBuilder.protectedBoxes`), `moveTeam` on the map's route ids, scripted spawns at the
-   map's spawn points/paths, the extraction helicopter. Replaces `units/TestScene.ts`.
-2. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+1. **M8: UI screens & settings** (PLAN.md §7.16, §10 M8): title, briefing, pause, settings,
+   fail/complete with stats and rating (replacing M7's minimal complete screen), off-screen
+   friendly arrows, help overlay; a real restart. Tests: stats/rating, settings save/load with
+   storage unavailable. Done when a new player can start, understand the controls and finish
+   without outside help.
+2. Then M9 (audio) and M10 (polish, balance, performance).
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -528,10 +584,65 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     time. Now: random site among path starts + spawn points 180–450 m from the team, excluding
     sites within 160 m of the sensor aim and sites used in the last 30 s (falls back to any
     unwatched site, then to a random bearing); groups scatter over 18 m and appear one soldier
-    every ~0.7 s. Knobs in `CONFIG.testScene`. M7's scripted spawns should keep these rules.
+    every ~0.7 s. Knobs in `CONFIG.spawning (was testScene)`. M7's scripted spawns should keep these rules.
 49. **The village grew to 43 houses + a workshop** (user feedback) with a back street, a west
     lane and an east street, and the village zone/flat grew to match (radius 200 / 190 m). Three
     new approach paths (west lane, north-east, south lane) and extra spawn sites in every zone.
+50. **The mission is data with ordered steps** (M7): a phase's steps run in order (step k is
+    only checked after k−1 fired), which is how the §8 beat sheet reads; conditions and actions
+    are plain tagged objects (`script.ts` builders), so `missionDef.test.ts` checks every site,
+    route and vehicle path against the map. Added `timeInStep`, `timerBelow`, `helicopter(stage)`,
+    `zoneWaves`, `routZone`, `boardHelicopter` and `markClinic` to §7.14's vocabulary.
+51. **Safety valves everywhere** (M7): every step that waits on the world has a timeout; "zone
+    clear" steps rout the zone's last enemies (and drop queued ones) when it runs out; walk steps
+    time out at 2× the route's walking time + 30 s (`walkTimeout`). Zone counts include soldiers
+    still trickling in, so a wave is never "clear" before it appears.
+52. **The test scene is gone** (M7): `units/TestScene.ts` → `units/spawning.ts`, `CONFIG.testScene`
+    → `CONFIG.spawning`. The script asks for groups at named sites (`queueAt`: an enemy path id,
+    or `zone:index` for a spawn point) with the same trickle; background waves only run when the
+    script turns them on for a zone (the extraction). Ridgeback walks one way (`Squad.walk`).
+53. **Clinic rule** (M7): an impact whose full-damage radius (min 1.5 m) reaches the clinic or its
+    generator fails the mission (`clinic_hit`); one whose blast reaches within 15 m is a near
+    miss (FCO "Check fire!"). Same rule for guns and air strikes. The marker outlines the clinic,
+    the biggest protected box (bug found in Chrome: it outlined the generator).
+54. **Radio** (M7): story lines never go stale; warnings wait up to 10 s (longer than the longest
+    briefing line, bug found by a test: a near-miss warning was lost behind the clinic briefing);
+    chatter 2.5 s. A new phase drops the old phase's unplayed lines (bug found in Chrome: calibration
+    prompts still played in the village). Story lines and warnings cut off chatter on air.
+55. **Kestrel 6** (M7) is a real friendly target, with 400 HP and its own armor row (`ARMOR.helicopter`).
+    - **Your fire:** the gunship's blasts hurt it by 3D distance, so ground impacts can't touch it while
+      it flies high. One 105 mm next to it destroys it and fails the mission
+      (`helicopter_friendly_fire`). Near misses raise danger close.
+    - **Enemy fire:** while it is low (under 25 m: landing, on the pad, climbing out), soldiers in
+      range and in sight shoot it. Those closer to it than to the team switch to it, plus every
+      other one of the rest. Their damage is dps × accuracy × `CONFIG.enemyFire.vsAircraft`
+      (18; at 12 an undefended LZ still let it escape with 19%, Chrome).
+    - **Losing it:** being shot down fails the mission (`helicopter_lost`).
+    - **HUD and radio:** the HUD shows `KESTREL 6 ▮▮▮… %  UNDER FIRE`, and Kestrel calls for help
+      (heloUnderFire, heloHurt).
+    - **Cheats:** god mode (`G`) covers it.
+    - **Landing and boarding:** it lands at [582, 296] on the quarry floor. Ridgeback walks beside it,
+      and `units.boarded` takes the team off the ground (no targeting, no strobes). It leaves the
+      way it came.
+    - **Technicals:** a new map vehicle path, `lz_technical`, brings technicals up the quarry track.
+56. **Mission complete screen is minimal until M8**: kills, time and Ridgeback's health; click =
+    reload (as for the fail screen). The radio subtitle stays visible behind the end screens.
+57. **Vehicles swerve around wrecks** (M7 play test: "destroyed vehicles can block the roads").
+    - A vehicle with a wreck or a stopped vehicle in its lane picks the side away from it. It slides up to `swerveMax` 7 m off the centerline at 2.5 m/s, and drives at most 6 m/s while alongside. Once past, it returns to the road.
+    - It still queues behind moving vehicles.
+    - With no room to pass (two wrecks side by side), it stops and unloads as before.
+    - The swerve can graze a roadside house or prop; accepted.
+58. **Assaulters** (M7 play test: "a lot more enemies on foot can approach Ridgeback").
+    - `enemyFire.assaultChance` 0.45 of riflemen get a standoff of 0.15–0.35 × range, which is 30–70 m.
+    - Their cover must be within (standoff + 0.1) × range of the team, so they bound in instead of stopping in far cover.
+    - Machine gunners never assault.
+    - Scripted waves are about 1.6× bigger, with extra groups at more sites. The crossroads gets 4 foot groups; LZ background waves come every 18 s, then every 9 s (were 24 s, then 12 s).
+59. **The village has 143 houses** (M7 play test: "make the village a lot bigger").
+    - 100 more houses (`OUTER_VILLAGE` in `MapData.ts`) were placed by a one-off script along every village street and two new lanes, `north_row` and `south_row`. `south_lane` was extended to meet `south_row`.
+    - Placement rules: 14 m between houses, off the roads, and clear of routes, approach paths and spawn points. The square stays open.
+    - The village flat is now radius 215 with a 30 m falloff (was 190 + 80), so it stops short of the stream. The zone radius is now 240 (was 200).
+    - Memory was never the limit. The CPU cost was `Collision`'s loop over every box on each line-of-sight and wall check, so boxes are now filed in a 32 m grid. Tests check the grid gives the same answers as the full loop.
+    - Chrome: 60 FPS, GPU 3.3–3.6 ms, 36–38 draw calls.
 
 ---
 
@@ -539,36 +650,42 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 _(Fill in after testing.)_
 
-| Date       | Item                            | Result                                                                                                                                     | Action                                                                                                                         |
-| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-11-03 | M1 manual checklist             | User reported everything works                                                                                                             | None; M1 signed off                                                                                                            |
-| 2026-11-03 | M2 look (Claude, Chrome)        | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                                    | Added dark HUD outline; softened soil patches                                                                                  |
-| 2026-11-03 | M2 aiming (user)                | "Looking around feels a bit laggy"                                                                                                         | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                                           |
-| 2026-11-03 | NV look (Claude, Chrome)        | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                                   | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                                     |
-| 2026-11-03 | M2 look test (user)             | "It looks well for now"                                                                                                                    | None; M2 signed off                                                                                                            |
-| 2026-11-03 | NV look test (user)             | Approved ("mark it signed off")                                                                                                            | None; NV signed off                                                                                                            |
-| 2026-11-03 | M3 tracers (Claude)             | First meters of each tracer drew as huge white blobs near the camera                                                                       | Skip < 150 m from sensor, cap 7 px; regression test                                                                            |
-| 2026-11-03 | M3 smoke (Claude)               | 105 mm smoke too faint to read after the flash                                                                                             | Warmer, more opaque plume                                                                                                      |
-| 2026-11-03 | M3 lead test (scripted)         | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                                   | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                                      |
-| 2026-11-04 | M3 feel test (user)             | "M3 seems to be working well"; signed off                                                                                                  | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari                 |
-| 2026-11-04 | M4 scripted (Claude, Chrome)    | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                                   | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                                |
-| 2026-11-04 | M4 fail/warn (Claude, Chrome)   | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                                     | Works as designed                                                                                                              |
-| 2026-11-04 | M4 look (Claude, Chrome)        | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls                    | None                                                                                                                           |
-| 2026-11-05 | M4 feel test (user)             | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                                                | None; M4 signed off                                                                                                            |
-| 2026-11-05 | M5 cover (Claude, Chrome)       | No enemy ever took cover: hills blocked the view from every corner to the team                                                             | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover                             |
-| 2026-11-05 | M5 convoy (Claude, Chrome)      | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                                 |
-| 2026-11-05 | M5 scripted (Claude, Chrome)    | No player fire: convoys + waves overran the team at ~75 s                                                                                  | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                                     |
-| 2026-11-05 | M5 feel test (user)             | "M5 feel test seems good"                                                                                                                  | None; M5 signed off                                                                                                            |
-| 2026-11-05 | M5+ gun run (Claude, Chrome)    | 0 kills on a group of 9: first hits panicked them out of the strip; then ~30 % killed in the strip                                         | Panic radius 15 → 6 m, 30 × 120 → 40 × 200 damage: ~65 % (11 of 17) killed over 6 runs                                         |
-| 2026-11-05 | M5+ bomb + HUD (Claude, Chrome) | Bomb killed a truck outright; flash, shockwave, whiteout, jet streak; strip/circle previews, INBOUND and REARM lines OK                    | Controls-table row was too long (squashed the key column): shortened. 60 FPS, GPU ~8 ms, no console errors                     |
-| 2026-11-05 | M5+ feel test (user)            | "Feel test is good"                                                                                                                        | None; M5+ signed off                                                                                                           |
-| 2026-11-05 | M6 look (Claude, Chrome)        | Village, roads, clinic generator, fields and stream read well; the quarry was invisible (rock ≈ soil heat)                                 | Rock 0.14 → 0.27 and a warm gravel quarry floor: walls and floor now stand out                                                 |
-| 2026-11-05 | M6 bridge (Claude, Chrome)      | 3 of 4 Ridgeback members waded through the stream bed beside the 6 m bridge                                                                | Stream kept shallow around bridges, deck 6 → 8 m: nobody dips below the banks; regression test                                 |
-| 2026-11-05 | M6 play (Claude, Chrome)        | 58 of 64 enemies spawned on approach paths, 26 heading for cover, a convoy queued into the village; 60 FPS, 30–34 calls                    | Works; no console errors. GPU 7–8 ms (~10 ms with the F2 overlay)                                                              |
-| 2026-11-05 | M6 look test (user)             | "Enemies can be spawn killed (same point)", "village can be populated with more roads, houses", "enemies do not use the bridge"            | Anti-camping spawner, 43-house village on 5 streets, bridge detours (decisions 47–49); look test to repeat                     |
-| 2026-11-05 | M6 fixes (Claude, headless)     | Chrome extension was not connected, so checked headless: a 3-min real-map scene run, every enemy stream crossing on the bridge             | Regression test `mapScene.test.ts` (fails without the detour: an enemy waded 185 m from the bridge). Not yet seen in a browser |
-| 2026-11-05 | M6 fixes (Claude, Chrome)       | F3 tour of all 5 zones in WHT/BLK/NV at all zooms reads right; spawn camping: crosshair held on a spawn site, later groups 239–520 m away; 14 live enemy stream crossings, all ≤ 3.4 m from the bridge center (Ridgeback 1.6 m); bomb lands on its point; 60 FPS, GPU 7.6–8.2 ms (11.3 ms with F2), 30–38 calls; no console errors | Fixes confirmed in the browser; M6 look test (user) still to repeat |
-| 2026-11-05 | M6 look test (user)             | "Look test seems nice"                                                                                                                       | None; M6 signed off                                                                                                            |
+| Date       | Item                                      | Result                                                                                                                                                                                                                                                                                                                             | Action                                                                                                                         |
+| ---------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-11-03 | M1 manual checklist                       | User reported everything works                                                                                                                                                                                                                                                                                                     | None; M1 signed off                                                                                                            |
+| 2026-11-03 | M2 look (Claude, Chrome)                  | Thermal feed OK; HUD hard to read in black-hot; soil patches too strong                                                                                                                                                                                                                                                            | Added dark HUD outline; softened soil patches                                                                                  |
+| 2026-11-03 | M2 aiming (user)                          | "Looking around feels a bit laggy"                                                                                                                                                                                                                                                                                                 | GPU was ~23 ms/frame; capped pixel ratio 1.5, MSAA off → ~7.5 ms; GPU ms added to F1                                           |
+| 2026-11-03 | NV look (Claude, Chrome)                  | Trees/walls rendered darker than the ground (sideways surfaces got too little sky light)                                                                                                                                                                                                                                           | Flattened sky term, rebalanced moon/sky and albedos; regression test added                                                     |
+| 2026-11-03 | M2 look test (user)                       | "It looks well for now"                                                                                                                                                                                                                                                                                                            | None; M2 signed off                                                                                                            |
+| 2026-11-03 | NV look test (user)                       | Approved ("mark it signed off")                                                                                                                                                                                                                                                                                                    | None; NV signed off                                                                                                            |
+| 2026-11-03 | M3 tracers (Claude)                       | First meters of each tracer drew as huge white blobs near the camera                                                                                                                                                                                                                                                               | Skip < 150 m from sensor, cap 7 px; regression test                                                                            |
+| 2026-11-03 | M3 smoke (Claude)                         | 105 mm smoke too faint to read after the flash                                                                                                                                                                                                                                                                                     | Warmer, more opaque plume                                                                                                      |
+| 2026-11-03 | M3 lead test (scripted)                   | 25 mm 1.2 s bursts on walking soldiers: led 2/2 killed, unled 1/3 killed                                                                                                                                                                                                                                                           | Leading matters as intended; 105 mm led on a truck destroyed it (burning)                                                      |
+| 2026-11-04 | M3 feel test (user)                       | "M3 seems to be working well"; signed off                                                                                                                                                                                                                                                                                          | Not yet tried: sound, pause with shells in flight, roof hits, 2–3 min stress (GPU, crater cap), Firefox/Safari                 |
+| 2026-11-04 | M4 scripted (Claude, Chrome)              | No player fire: enemies reach 60 alive, team 96 → 0 by ~70 s, `RIDGEBACK OVERRUN` screen                                                                                                                                                                                                                                           | Works; difficulty to judge in the feel test (`CONFIG.enemyFire`, `unitDefs.ts`)                                                |
+| 2026-11-04 | M4 fail/warn (Claude, Chrome)             | 105 mm 28 m from the team → DANGER CLOSE, nobody hurt; 40 mm on a member → `FRIENDLY FIRE` fail screen                                                                                                                                                                                                                             | Works as designed                                                                                                              |
+| 2026-11-04 | M4 look (Claude, Chrome)                  | Team readable at 25 mm; strobes blink in WHT/BLK, bright in NV; NV tracers visible; 60 FPS, GPU 7.7–8.1 ms, 23–28 calls                                                                                                                                                                                                            | None                                                                                                                           |
+| 2026-11-05 | M4 feel test (user)                       | "M4 feels good"; strobes in thermal and the difficulty accepted as they are                                                                                                                                                                                                                                                        | None; M4 signed off                                                                                                            |
+| 2026-11-05 | M5 cover (Claude, Chrome)                 | No enemy ever took cover: hills blocked the view from every corner to the team                                                                                                                                                                                                                                                     | Added corner-to-corner bounding (decision 29); then up to 18 soldiers at once held or ran to cover                             |
+| 2026-11-05 | M5 convoy (Claude, Chrome)                | Convoy drove the west road, truck unloaded and parked, technical/APC fired heavy tracers; 105 mm on a truck → burning wreck, others queued                                                                                                                                                                                         | Works; 60 FPS, GPU ~7.9 ms, ≤ 35 draw calls, no console errors                                                                 |
+| 2026-11-05 | M5 scripted (Claude, Chrome)              | No player fire: convoys + waves overran the team at ~75 s                                                                                                                                                                                                                                                                          | Difficulty for the user's feel test; waves slowed 8 → 10 s                                                                     |
+| 2026-11-05 | M5 feel test (user)                       | "M5 feel test seems good"                                                                                                                                                                                                                                                                                                          | None; M5 signed off                                                                                                            |
+| 2026-11-05 | M5+ gun run (Claude, Chrome)              | 0 kills on a group of 9: first hits panicked them out of the strip; then ~30 % killed in the strip                                                                                                                                                                                                                                 | Panic radius 15 → 6 m, 30 × 120 → 40 × 200 damage: ~65 % (11 of 17) killed over 6 runs                                         |
+| 2026-11-05 | M5+ bomb + HUD (Claude, Chrome)           | Bomb killed a truck outright; flash, shockwave, whiteout, jet streak; strip/circle previews, INBOUND and REARM lines OK                                                                                                                                                                                                            | Controls-table row was too long (squashed the key column): shortened. 60 FPS, GPU ~8 ms, no console errors                     |
+| 2026-11-05 | M5+ feel test (user)                      | "Feel test is good"                                                                                                                                                                                                                                                                                                                | None; M5+ signed off                                                                                                           |
+| 2026-11-05 | M6 look (Claude, Chrome)                  | Village, roads, clinic generator, fields and stream read well; the quarry was invisible (rock ≈ soil heat)                                                                                                                                                                                                                         | Rock 0.14 → 0.27 and a warm gravel quarry floor: walls and floor now stand out                                                 |
+| 2026-11-05 | M6 bridge (Claude, Chrome)                | 3 of 4 Ridgeback members waded through the stream bed beside the 6 m bridge                                                                                                                                                                                                                                                        | Stream kept shallow around bridges, deck 6 → 8 m: nobody dips below the banks; regression test                                 |
+| 2026-11-05 | M6 play (Claude, Chrome)                  | 58 of 64 enemies spawned on approach paths, 26 heading for cover, a convoy queued into the village; 60 FPS, 30–34 calls                                                                                                                                                                                                            | Works; no console errors. GPU 7–8 ms (~10 ms with the F2 overlay)                                                              |
+| 2026-11-05 | M6 look test (user)                       | "Enemies can be spawn killed (same point)", "village can be populated with more roads, houses", "enemies do not use the bridge"                                                                                                                                                                                                    | Anti-camping spawner, 43-house village on 5 streets, bridge detours (decisions 47–49); look test to repeat                     |
+| 2026-11-05 | M6 fixes (Claude, headless)               | Chrome extension was not connected, so checked headless: a 3-min real-map scene run, every enemy stream crossing on the bridge                                                                                                                                                                                                     | Regression test `mapScene.test.ts` (fails without the detour: an enemy waded 185 m from the bridge). Not yet seen in a browser |
+| 2026-11-05 | M6 fixes (Claude, Chrome)                 | F3 tour of all 5 zones in WHT/BLK/NV at all zooms reads right; spawn camping: crosshair held on a spawn site, later groups 239–520 m away; 14 live enemy stream crossings, all ≤ 3.4 m from the bridge center (Ridgeback 1.6 m); bomb lands on its point; 60 FPS, GPU 7.6–8.2 ms (11.3 ms with F2), 30–38 calls; no console errors | Fixes confirmed in the browser; M6 look test (user) still to repeat                                                            |
+| 2026-11-05 | M6 look test (user)                       | "Look test seems nice"                                                                                                                                                                                                                                                                                                             | None; M6 signed off                                                                                                            |
+| 2026-11-05 | M7 auto-play (Claude, headless)           | Cheat-kill bot (reach 900 m) plays calibration → fields (4 s) → village (200 s) → vehicles (409 s) → extraction (668 s) → complete at 868 s (14.5 min); no step needed its timeout; Ridgeback never hurt. A 60 m-reach bot also finishes (safety valves)                                                                           | First runs timed out the vehicles phase: walk timeouts now scale with the route (`walkTimeout`)                                |
+| 2026-11-05 | M7 Kestrel 6 as a target (Claude, Chrome) | 4+ soldiers fire on it while it lands; HUD `KESTREL 6 69% UNDER FIRE`, tracers, Kestrel's calls. At `vsAircraft` 12 an undefended LZ (51 enemies) still let it escape with 19%; at 18 it is shot down → `KESTREL 6 WAS SHOT DOWN`, burning wreck. 60 FPS, GPU 7.6–7.8 ms                                                           | `vsAircraft` 12 → 18; the perfect-bot auto-play still completes                                                                |
+| 2026-11-05 | M7 (Claude, Chrome)                       | Calibration prompts advance on real key presses; village clinic briefing + marker; 105 mm on the clinic → `YOU FIRED ON THE PROTECTED CLINIC`; extraction at ×4: countdown, Kestrel 6 lands, team boards, lift-off, MISSION COMPLETE screen; 60 FPS, GPU 7.3–8.1 ms, 28–29 calls                                                   | Fixed: marker on the generator, stale calibration lines in the village, sensor not following a phase skip                      |
+| 2026-11-06 | M7 play test (user)                       | "Destroyed vehicles can block the roads so vehicles behind never get close to Ridgeback", "a lot more enemies on foot can approach Ridgeback, mission feels easy", "make the village a lot bigger"                                                                                                                                 | Swerving vehicles, assaulters + bigger waves, 143-house village with a collision grid (decisions 57–59); play test to repeat   |
+| 2026-11-08 | M7 play test (user)                       | "Play test passed" (after the swerve, assaulter and bigger-village fixes)                                                                                                                                                                                                                                                          | M7 signed off                                                                                                                  |
+| 2026-11-06 | M7 fixes (Claude, Chrome)                 | Convoy at ×4, lead truck destroyed at s≈508: the truck, technical and APC behind swerved past (lateral up to 3 m) and stopped 51–59 m from Ridgeback. Village phase with no player fire: team 100 → 48% in 2 min. Bigger village: 60 FPS, GPU 3.3–3.6 ms, 36–38 calls                                                              | Works; auto-play bot still completes with no timeouts                                                                          |
 
 ---
 
@@ -576,6 +693,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M6 look test, then M7)."
+> "Read STATUS.md and PLAN.md. Let's continue with M8."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
