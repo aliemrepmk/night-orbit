@@ -173,7 +173,7 @@ export const CONFIG = {
     leanRad: 0.12,
     /** Running away leans further; crouching in cover drops the body and bends it forward. */
     fleeLeanRad: 0.35,
-    crouchDrop: 0.45,
+    crouchDrop: 0.75, // deep enough to kneel (the soldier figure, M8+ Phase C; was 0.45)
     crouchLeanRad: 0.3,
     stridesPerMeter: 0.7,
   },

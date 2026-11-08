@@ -757,11 +757,13 @@ export class UnitManager {
     if (e.fireTimer <= 0) {
       e.fireTimer = range(this.rng, ef.burstMin, ef.burstMax);
       this.eyeA.copy(e.position).setY(e.position.y + 0.3);
+      e.sinceShot = 0;
       this.burstFrom(this.eyeA, air, e.def.burst, 'enemy');
     }
   }
 
   private burst(from: Infantry, to: Infantry, side: 'enemy' | 'friendly'): void {
+    from.sinceShot = 0; // recoil and a warm barrel (the soldier figure, M8+ Phase C)
     this.eyeA.copy(from.position).setY(from.position.y + 0.3);
     this.burstFrom(this.eyeA, to, from.def.burst, side);
   }

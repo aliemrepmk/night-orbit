@@ -44,6 +44,8 @@ export class Infantry implements Target {
   /** Seconds until the next AI decision / visible burst / friendly shot. */
   thinkTimer = 0;
   fireTimer = 0;
+  /** Seconds since it last fired a burst (recoil and a warm barrel in thermal, M8+ Phase C). */
+  sinceShot = Infinity;
   /** Fraction of its range at which this soldier stops to fire (varies per soldier). */
   standoff = 0.8;
   /** An assaulter closes in on Ridgeback instead of sniping from far off (`enemyFire.assaultChance`). */
@@ -98,6 +100,7 @@ export class Infantry implements Target {
     this.sinceDeath = Infinity;
     this.tumble = 0;
     this.walkPhase = 0;
+    this.sinceShot = Infinity;
     this.target = null;
     this.killedBy = null;
     this.action = 'advance';
@@ -162,6 +165,7 @@ export class Infantry implements Target {
   /** Integrates motion: walking on the ground while alive, the fling arc, then lying still. */
   update(dt: number): void {
     const c = this.cfg;
+    this.sinceShot += dt;
     if (this.alive) {
       const vx = this.velocity.x;
       const vz = this.velocity.z;
