@@ -505,6 +505,13 @@ export const CONFIG = {
     muffleSeconds: 0.4,
   },
 
+  /** The fuel depot's tanks (M8+ Phase D): HP, the delay before one goes up, how long it burns. */
+  depot: {
+    tankHp: 250,
+    fuse: 0.3,
+    burnSeconds: 90,
+  },
+
   fx: {
     /** Constant wind for the mission: smoke drifts with it (m/s). */
     wind: [1.6, 0, -0.9] as readonly [number, number, number],

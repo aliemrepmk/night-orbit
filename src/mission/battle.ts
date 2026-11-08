@@ -12,6 +12,8 @@ import { toPathPoints } from '../world/mapTypes';
 import { Terrain } from '../world/Terrain';
 import { mapHeightField } from '../world/terrainShape';
 import { WorldBuilder } from '../world/WorldBuilder';
+import { Explosives } from '../world/explosives';
+import { ORDNANCE } from '../gunship/airSupportDefs';
 import type { Footprint } from './clinic';
 import { MISSION } from './missionDef';
 import { MissionHost } from './MissionHost';
@@ -86,7 +88,10 @@ export function createBattle(w: StaticWorld) {
     rng: createRng(9090),
   });
   const stats = new MissionStats(bus);
-  return { bus, units, vehicles, spawner, host, stats, ground };
+  // The fuel depot's tanks: every impact near them hurts them (fresh each run).
+  const depot = new Explosives(w.world.explosives);
+  bus.on('impact', (e) => depot.hit(e.pos.x, e.pos.z, ORDNANCE[e.weapon]));
+  return { bus, units, vehicles, spawner, host, stats, ground, depot };
 }
 
 export type Battle = ReturnType<typeof createBattle>;

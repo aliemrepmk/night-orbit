@@ -32,6 +32,7 @@ import {
   type GunReadout,
 } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
+import { TANK_BLAST, type Explosives } from '../world/explosives';
 import { createBattle, createWorld, type StaticWorld } from '../mission/battle';
 import { rateMission, summaryRows, type MissionStats } from '../mission/stats';
 import { edgeArrow } from '../ui/edgeArrow';
@@ -56,6 +57,14 @@ import type { FailReason, GameEvents } from './events';
 import { FixedStepper } from './FixedStepper';
 import { Input } from './Input';
 import { createRng } from './rng';
+
+/** Where a burning fuel tank's flames sit, as fractions of its radius. */
+const BURN_SPOTS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [0.55, 0.2],
+  [-0.45, 0.4],
+  [0.1, -0.55],
+];
 
 /**
  * Owns every system and runs them in a fixed order (see PLAN.md §6).
@@ -96,6 +105,8 @@ export class Game {
   /** The mission script and its radio (M7). */
   private host!: MissionHost;
   private stats!: MissionStats;
+  /** The fuel depot's tanks (M8+ Phase D). */
+  private depot!: Explosives;
   private weapons!: Weapons;
   private projectiles!: Projectiles;
   private explosions!: Explosions;
@@ -173,6 +184,7 @@ export class Game {
     this.vehicles = b.vehicles;
     this.host = b.host;
     this.stats = b.stats;
+    this.depot = b.depot;
     this.weapons = new Weapons();
     this.projectiles = new Projectiles();
     this.air = new AirSupport(createRng(8080));
@@ -329,6 +341,15 @@ export class Game {
       this.vehicles.update(dt);
       this.followTeam();
       if (this.host.mission.status === 'complete') this.complete();
+    }
+    // The fuel depot: tanks that took enough damage go up in a fireball, then burn.
+    this.depot.update(dt, (at) => this.explosions.detonate(at, TANK_BLAST, true));
+    for (const { def, intensity } of this.depot.burning()) {
+      // Flames across the whole tank top (a fire is ~2 m across; a tank ~9 m).
+      for (const [ox, oz] of BURN_SPOTS) {
+        this.burnAt.set(def.x + ox * def.radius, def.y + 3.5, def.z + oz * def.radius);
+        this.effects.fire(this.burnAt, dt, 1.6 * intensity);
+      }
     }
     this.vehicleView.emitEffects(this.vehicles.vehicles, this.effects, dt);
     if (this.host.helicopter.state === 'destroyed')
@@ -622,6 +643,7 @@ export class Game {
   }
 
   private readonly projected = new Vector3();
+  private readonly burnAt = new Vector3();
   private readonly viewSpace = new Vector3();
 
   /** Edge arrows toward Ridgeback and Kestrel 6 while they are off-screen (M8). */
