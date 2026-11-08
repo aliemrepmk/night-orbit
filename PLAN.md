@@ -767,6 +767,8 @@ Aircraft are generic types with fictional callsigns (names are placeholders, lik
 
 Target total duration: **12–15 minutes**. Enemy counts below are starting values for tuning.
 
+> **M8+ Phase F reworked this mission** (backbone + seeded random twists, a forest phase to LZ SAWMILL): see §10 M8+ Phase F and STATUS.md decisions 75–77. The beats below are the original M7 script, which is still the backbone.
+
 ### Phase 0 — Briefing & Calibration (~1 min)
 
 - Briefing screen: Ridgeback's observation post was compromised; they must cross the Varesh Valley on foot to LZ QUARRY. LANTERN 2-1 provides overwatch.
@@ -955,7 +957,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
   - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
 
-### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–E done (A–B play-tested)
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; all phases done (A–B play-tested; C–F await the user's play test)
 
 The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
 grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
@@ -1034,7 +1036,7 @@ Phase A (its two screen fixes).
 - 🧪 AA targeting, range and hit chance; hull, engine loss and the shoot-down fail; the flare
   window (in time, late, wasted, empty); the jet abort rule.
 
-**Phase F — Mission rewrite with random twists (3–4 days; items 4, 9; the most important)**
+**Phase F — Mission rewrite with random twists (3–4 days; items 4, 9; the most important)** — ✅ done 2026-11-09 (as built: decisions 75–77 in STATUS.md; the auto-play pacing bar is 70 s with an instant-kill bot)
 
 _F1. Backbone, the same every run (about 14–17 min):_
 

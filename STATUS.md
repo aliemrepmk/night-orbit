@@ -10,24 +10,24 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                               | State                                                                             |
-| --------------------------------------- | --------------------------------------------------------------------------------- |
-| **M0** Project setup                    | ✅ Done                                                                           |
-| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                 |
-| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)            |
-| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                             |
-| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                             |
-| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                             |
-| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                             |
-| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                             |
-| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                                |
-| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                                |
-| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed         |
-| **M8+** Content & threat expansion      | 🟨 A–E committed (2026-11-09); F (mission rewrite with random twists, radio) next |
-| M9 – M10                                | ⬜ Not started                                                                    |
+| Milestone                               | State                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| **M0** Project setup                    | ✅ Done                                                                   |
+| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)         |
+| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)    |
+| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                     |
+| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                     |
+| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                        |
+| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                        |
+| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
+| **M8+** Content & threat expansion      | 🟨 A–F committed (2026-11-09); **user play test of C–F pending (§3.0)**   |
+| M9 – M10                                | ⬜ Not started                                                            |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **569 tests in 68 files**).
-`npm run build` works (≈757 kB JS, 208 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **612 tests in 71 files**).
+`npm run build` works (≈776 kB JS, 215 kB gzipped).
 
 **Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–C are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
@@ -142,6 +142,10 @@ src/
   mission/                 (M7, PLAN.md §7.14–7.15, §8)
     missionTypes.ts        the mission as data: phases → ordered steps (condition → actions)
     script.ts              the vocabulary: timeInPhase, teamReached, zoneEnemiesBelow, say, spawnWave, …
+    twists.ts (+test)      M8+: seeded random events: one extraction twist + 2–4 side events,
+                           conflicts, `?seed=` / `?twist=`, the end screen's EVENTS line
+    landmarks.ts (+test)   M8+: named places and "north of the barn" radio callouts
+    twistMechanics.test.ts M8+: mortar, wound, jam, fog, pilot, HVT, Kestrel abort, the bus
     missionDef.ts (+test)  THE Varesh Valley script: calibration, fields, village, vehicles, extraction
     Mission.ts (+test)     the runner: steps fire once in order, timeouts (safety valve), phases, timers
     MissionHost.ts (+test) runs the script on the real systems; radio, chatter, clinic rule, helo
@@ -214,7 +218,27 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M8+ Phases A + B play test (passed 2026-11-09; strikes made louder)
+### 3.0 M8+ Phases C–F play test (pending): "no stretch feels empty; two runs feel different; AA and missiles are a threat you manage"
+
+Run `npm run dev` and play two or three whole missions (each gets new random events; the end
+screen lists them with the seed). Dev flags to force things: `?seed=1234`, `?twist=mortar,bus`,
+`?phase=village` (extraction twists: `kestrelAbort`, `quarryOverrun`, `holdTheLine`; side events:
+`clinicAssault`, `mortar`, `downedPilot`, `hvt`, `bus`, `wounded`, `fog`, `jam`, `manpadsAmbush`).
+
+- [ ] **Soldiers (C):** jointed figures; walking, kneeling in cover, shouldered rifles, hot barrels.
+- [ ] **Map (D):** Black Pine Forest and the sawmill clearing, the radio mast, hamlet, orchard,
+      cemetery, wrecks, power line; the fuel depot goes up in a chain when hit.
+- [ ] **Air defense (E):** AA guns (sandbag rings) open up phase by phase; HULL drops, kill them
+      with the 40/105; MISSILE LAUNCH · FLARES (X) with a beep; a lost engine below 30 %; two AA
+      guns near a strike target abort it. Is it fair? (`CONFIG.airDefense`)
+- [ ] **Mission (F):** something to shoot on every walk; the twists play out (Kestrel abort → the
+      forest push to LZ SAWMILL; LZ overrun; hold the line); side events (clinic assault, mortar,
+      downed pilot, commander's car, civilian bus — don't hit it, wounded operator, fog, 105 jam,
+      MANPADS ambush). Length 14–20 min?
+- [ ] **Radio (F):** more varied lines, no repeats until a pool is used up, landmark callouts
+      ("north of the barn"), crew banter in quiet moments.
+
+### 3.0a M8+ Phases A + B play test (passed 2026-11-09; strikes made louder)
 
 - [x] **Strike aiming:** press `T`, hold the left button to call the strike and keep holding:
       the guns stay silent; release and press again: they fire. Clicking a strike that is still
@@ -477,11 +501,8 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    equal height) → B engine sound → C soldier models → D forest and fuller map → E AA, strike
    jets, gunship hull, MANPADS + flares → F mission rewrite with seeded random twists and more
    radio lines. User play tests after A+B, C+D, E and F.
-2. **Phase F next** (PLAN.md §10 M8+ F): the mission rewrite with the backbone, the seeded
-   random twists and more varied radio lines. Phase E left interim AA/MANPADS hooks in
-   `missionDef.ts` (ridge gun in the fields, village gun + a MANPADS pair, the crossroads gun + an
-   AA truck, the LZ gun + MANPADS) for F to fold into the new script. User gave full control:
-   implement, browser-test, split commits, never push.
+2. **M8+ play test (C–F) by the user** (§3.0), then tune and sign off M8+; then **M9: audio**
+   (PLAN.md §7.17; the engine drone, strike sounds and AA/missile sounds already exist).
 3. M8 is signed off and committed with M8+ A–B (2026-11-09); push when asked. Commit each later phase only when asked.
 4. Then M9 (audio) and M10 (polish, balance, performance).
 5. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
@@ -799,6 +820,25 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     mission fails (`gunship_lost`). Strikes: 2+ shooters within 650 m of the target abort it (back
     on cooldown); 1 shooter gives a 40 % chance the jet is hit (a radio call). Jets and AA guns
     are drawn by `render/AirRenderer.ts` (7 draw calls).
+75. **Random twists** (M8+ Phase F, `mission/twists.ts`): each run's seed rolls one extraction
+    twist (Kestrel abort 45 %, LZ overrun 35 %, hold the line 20 %) and 2–4 side events (each its
+    own chance; fog ↔ jam and HVT ↔ bus never together). `buildMission(roll)` builds the script
+    from it; the default roll for headless tests is "hold the line", no side events. A sawmill
+    twist adds a `forest` phase (`route_lz_sawmill`, LZ SAWMILL pad [586, −364]); after a Kestrel
+    abort the forest AA must die (`aaDown:aa_forest` flag) before Kestrel returns. RESTART/RETRY
+    replay the seed, PLAY AGAIN rolls a new one; dev `?seed=` and `?twist=`.
+76. **Twist mechanics** (M8+ Phase F, `CONFIG.twists`): mortar crews (`INFANTRY.mortar`, rounds
+    walk in from 60 m to 8 m, `enemyShell` → visuals + team damage); a wounded operator (team ×0.75
+    speed, ×1.3 damage); a 105 mm jam (`WeaponState.jam`); fog (`uHaze`, `fogEnvelope`); a downed
+    pilot (hold 70 s with no enemy within 20 m for 3 s → bonus); the commander's SUV (`hvt_escape`;
+    bonus if destroyed); the civilian bus (`bus_route`, side `civilian`: any hit fails
+    `civilian_hit`). Bonuses add 5 rating points each.
+77. **Pacing and radio** (M8+ Phase F): background patrols (every 26 s) on every walking leg,
+    switched off on arrival so "zone clear" steps still fire; Ridgeback walks 20 % faster
+    (2.65 m/s). Auto-play (an instant-kill bot) covers all twists in 3 runs: no quiet stretch over
+    70 s, 15–20 min. Chatter uses a shuffle bag (no repeats until a pool is used up), pools are ~3×
+    longer, background groups get landmark callouts (`landmarks.ts`), and the crew banters after
+    30 s of calm radio silence; callouts and banter are low-priority chatter.
 
 ---
 
@@ -840,6 +880,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M7 Kestrel 6 as a target (Claude, Chrome)      | 4+ soldiers fire on it while it lands; HUD `KESTREL 6 69% UNDER FIRE`, tracers, Kestrel's calls. At `vsAircraft` 12 an undefended LZ (51 enemies) still let it escape with 19%; at 18 it is shot down → `KESTREL 6 WAS SHOT DOWN`, burning wreck. 60 FPS, GPU 7.6–7.8 ms                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `vsAircraft` 12 → 18; the perfect-bot auto-play still completes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-11-05 | M7 (Claude, Chrome)                            | Calibration prompts advance on real key presses; village clinic briefing + marker; 105 mm on the clinic → `YOU FIRED ON THE PROTECTED CLINIC`; extraction at ×4: countdown, Kestrel 6 lands, team boards, lift-off, MISSION COMPLETE screen; 60 FPS, GPU 7.3–8.1 ms, 28–29 calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Fixed: marker on the generator, stale calibration lines in the village, sensor not following a phase skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-11-06 | M7 play test (user)                            | "Destroyed vehicles can block the roads so vehicles behind never get close to Ridgeback", "a lot more enemies on foot can approach Ridgeback, mission feels easy", "make the village a lot bigger"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Swerving vehicles, assaulters + bigger waves, 143-house village with a collision grid (decisions 57–59); play test to repeat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-11-09 | M8+ Phase F (Claude, Chrome)                   | `?twist=mortar`: a two-man crew sets up when Ridgeback reaches the farmhouse, rounds walk in, the NAV call says to find the tube flash; landmark callouts ("Heat signatures north-east of the barn"); fog: the feed washes to flat gray; Kestrel abort: Kestrel breaks off, the forest phase starts ("Get Ridgeback to LZ SAWMILL"), the forest AA goes active; complete screen with BONUS and EVENTS · SEED; PLAY AGAIN rolls a new seed, RESTART keeps it; the downed pilot's strobe east of the crossroads. No console errors                                                                                                                                                                                                                       | Tuned: the ridge AA took the hull to 55 % in ~70 s and two MANPADS + the village gun downed the gunship in 40 s without flares; AA hit chance ~halved (≈15 % hull a minute per ignored gun) and missiles 30 → 22 damage, reload 25 → 35 s                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-11-09 | M8+ Phase E (Claude, Chrome)                   | Fields phase: the ridge AA gun opens up as Ridgeback moves (tracer streams climbing at the camera; hull 94% after ~10 s); at 25 mm the sandbag ring and gun read clearly; one 105 mm shell destroyed it ("Triple-A destroyed"), and it burns. A MANPADS soldier: MISSILE LAUNCH · FLARES (X) alert, beep, a smoke trail climbing at the camera; X → a white-hot flare cloud and the missile decoyed (hull 100%, 5 flares left); ignored, repeated launches took the hull to 40% and ENGINE OUT. Attack-jet model seen up close (straight wings, twin hot engines). Bomb under two AA guns → "Strike aborted", back on cooldown. Hull to 0 → "LANTERN 2-1 SHOT DOWN". Vehicles phase with the AA truck: 60 FPS, GPU 7.4 ms, 57 calls; no console errors | Fixed: AA kills were called "Vehicle destroyed" (now "Triple-A destroyed")                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2026-11-09 | M8+ Phase D (Claude, Chrome)                   | Briefing shows Black Pine Forest. F3 to the forest: a dense pine stand with the logging road and forest track meeting in the open sawmill clearing; 60 FPS, GPU 8.4 ms, 51 calls, 260K tris. One 105 mm shell on a depot tank: all three tanks went up in a chain (3 fireballs), then burned under the smoke. Radio relay mast and compound on the hill. Village at 105 mm: 60 FPS, GPU 7.9 ms, 50 calls                                                                                                                                                                                                                                                                                                                                               | Found and fixed: the hip-roof pool held 80 roofs, so since M7's 143-house village most houses had no roof (pools now count drops; a test asserts none). Briefing label "LZ SAWMILL" → "BLACK PINE" (no spoiler)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-11-09 | M8+ Phase C (Claude, Chrome)                   | Soldiers are jointed figures: walking militia read as people at 25 mm (~20 px tall); a close-up (FOV narrowed in the console) shows walking strides, Ridgeback's helmets, NVGs, plate carriers and shouldered rifles, kneeling militia firing from cover with a hot barrel. 72 enemies + Ridgeback: 60 FPS, GPU ~8 ms, 48 draw calls (soldiers 11)                                                                                                                                                                                                                                                                                                                                                                                                     | The kneeling pose is the roughest from above (the forward thigh can read as an arm); for the C + D play test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -863,6 +904,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue with M8+ Phase F."
+> "Read STATUS.md and PLAN.md. Let's continue (M8+ play test, then M9)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
