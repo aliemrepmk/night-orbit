@@ -182,6 +182,7 @@ export function validateMap(map: MapData, mapSize: number): string[] {
   for (const [id, p] of Object.entries(map.enemyPaths)) inside(`enemy path ${id}`, p.points);
   for (const [id, pts] of Object.entries(map.vehiclePaths)) inside(`vehicle path ${id}`, pts);
   for (const [zone, pts] of Object.entries(map.spawnPoints)) inside(`spawn (${zone})`, pts);
+  for (const a of map.aaSites) inside(`AA site ${a.id}`, [a.pos]);
 
   // Ids
   const ids = new Set<string>();
@@ -260,6 +261,14 @@ export function validateMap(map: MapData, mapSize: number): string[] {
     }
   }
 
+  // AA emplacements sit beside the roads, not on them
+  for (const a of map.aaSites) {
+    for (const road of map.roads) {
+      if (distanceToPolyline(road.points, a.pos[0], a.pos[1]) < road.width / 2 + 5)
+        errors.push(`AA site ${a.id} is on road ${road.id}`);
+    }
+  }
+
   // Buildings and props don't overlap each other (1 m gap); walls may touch buildings
   const blocks = solids.filter(
     (s) => !s.what.startsWith('hedge') && !s.what.startsWith('wall') && !s.what.startsWith('rock'),
@@ -284,6 +293,7 @@ export function validateMap(map: MapData, mapSize: number): string[] {
     }
   };
   for (const [zone, pts] of Object.entries(map.spawnPoints)) open(`spawn (${zone})`, pts);
+  for (const a of map.aaSites) open(`AA site ${a.id}`, [a.pos]);
   for (const [id, pts] of Object.entries(map.friendlyRoutes))
     open(`route ${id}`, samplePolyline(pts, 2));
   for (const [id, p] of Object.entries(map.enemyPaths))

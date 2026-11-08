@@ -1,6 +1,7 @@
 import { ARMOR, type Armor } from '../combat/Damage';
 
-export type VehicleType = 'truck' | 'technical' | 'apc';
+/** `aaa`: a pickup with a twin AA gun (M8+ Phase E): fires at aircraft, never at Ridgeback. */
+export type VehicleType = 'truck' | 'technical' | 'apc' | 'aaa';
 
 /** What a box part of a vehicle is made of, which sets its heat (`VehicleRenderer`). */
 export type PartKind = 'body' | 'engine' | 'exhaust' | 'wheels' | 'gun';
@@ -30,6 +31,8 @@ export interface VehicleDef {
   readonly burst: number;
   /** The gun keeps firing on the move (APC turret) instead of only once stopped. */
   readonly firesWhileMoving: boolean;
+  /** An anti-aircraft gun: `AirDefense` fires it at the gunship and the strike jets. */
+  readonly antiAir?: boolean;
   /** Soldiers carried (trucks unload them). */
   readonly cargoMin: number;
   readonly cargoMax: number;
@@ -116,6 +119,33 @@ export const VEHICLES: Readonly<Record<VehicleType, VehicleDef>> = {
       part('engine', [0, 2.2, -2.4], [2.2, 0.15, 1.2]), // engine deck
       part('exhaust', [1.2, 1.9, -3.0], [0.3, 0.3, 0.4]),
       part('wheels', [0, 0.5, 0], [3.0, 0.9, 6.3]), // tracks
+    ],
+  },
+  // AA truck (M8+ Phase E): a pickup with a twin-barrel AA gun on the bed. Stops in a firing
+  // spot like a technical, but shoots at aircraft (via AirDefense), not at the team.
+  aaa: {
+    type: 'aaa',
+    hp: 220,
+    armor: ARMOR.technical,
+    speed: 10,
+    dps: 0,
+    range: 0,
+    burst: 0,
+    firesWhileMoving: false,
+    antiAir: true,
+    cargoMin: 0,
+    cargoMax: 0,
+    lift: 0.9,
+    gunHeight: 2.6,
+    length: 4.8,
+    parts: [
+      part('body', [0, 1.0, -0.9], [2.0, 0.6, 2.3]), // bed
+      part('body', [0, 1.3, 0.8], [1.9, 1.0, 1.5], false), // cab
+      part('engine', [0, 0.95, 1.95], [1.6, 0.5, 0.9]),
+      part('wheels', [0, 0.4, 0], [2.1, 0.7, 4.6]),
+      part('gun', [0, 1.75, -1.0], [1.2, 0.6, 1.2], false), // gun mount
+      part('gun', [-0.22, 2.75, -0.9], [0.16, 1.9, 0.16], false), // barrels, pointing up
+      part('gun', [0.22, 2.75, -0.9], [0.16, 1.9, 0.16], false),
     ],
   },
 };

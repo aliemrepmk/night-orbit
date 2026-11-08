@@ -3,7 +3,7 @@ import { CONFIG } from '../config';
 import { range, type Rng } from '../core/rng';
 import type { RoutePoint } from './Squad';
 import type { UnitManager } from './UnitManager';
-import { INFANTRY } from './unitDefs';
+import { INFANTRY, type InfantryType } from './unitDefs';
 import type { VehicleManager } from './VehicleManager';
 import { VEHICLES, type VehicleDef } from './vehicleDefs';
 import { MAP } from '../world/MapData';
@@ -52,7 +52,8 @@ interface Pending {
   x: number;
   z: number;
   path: Path | null;
-  machineGunner: boolean;
+  /** Soldier type (a machine gunner by chance, or what the mission asked for). */
+  type: InfantryType;
 }
 
 /**
@@ -113,11 +114,11 @@ export class WaveSpawner {
    * names a spawn point; a spawn point at a path's start resolves to that path. Returns how many
    * were queued (fewer near the enemy cap), or 0 for an unknown site.
    */
-  queueAt(units: UnitManager, id: string, count: number): number {
+  queueAt(units: UnitManager, id: string, count: number, type?: InfantryType): number {
     const site = this.siteById(id);
     if (!site) return 0;
     site.lastUsed = this.time;
-    return this.enqueue(units, site.x, site.z, site.path, count, this.cfg.trickleInterval);
+    return this.enqueue(units, site.x, site.z, site.path, count, this.cfg.trickleInterval, type);
   }
 
   /** Drops every soldier still waiting to appear (phase skips). */
@@ -163,7 +164,7 @@ export class WaveSpawner {
     while (this.pending.length > 0 && this.pending[0].at <= this.time) {
       const p = this.pending.shift()!;
       if (units.aliveEnemies >= this.cfg.maxEnemies) continue;
-      const def = p.machineGunner ? INFANTRY.machineGunner : INFANTRY.rifleman;
+      const def = INFANTRY[p.type];
       if (units.spawnEnemy(def, p.x, p.z, { path: p.path })) n++;
     }
     return n;
@@ -174,7 +175,7 @@ export class WaveSpawner {
     this.queueGroup(units, aim, 0);
     let n = 0;
     for (const p of this.pending.splice(0)) {
-      const def = p.machineGunner ? INFANTRY.machineGunner : INFANTRY.rifleman;
+      const def = INFANTRY[p.type];
       if (units.spawnEnemy(def, p.x, p.z, { path: p.path })) n++;
     }
     return n;
@@ -217,6 +218,7 @@ export class WaveSpawner {
     path: Path | null,
     count: number,
     interval: number,
+    type?: InfantryType,
   ): number {
     const c = this.cfg;
     const room = c.maxEnemies - units.aliveEnemies - this.pending.length;
@@ -234,7 +236,7 @@ export class WaveSpawner {
         x: clamp(cx + range(this.rng, -c.groupRadius, c.groupRadius)),
         z: clamp(cz + range(this.rng, -c.groupRadius, c.groupRadius)),
         path,
-        machineGunner: this.rng() < c.machineGunnerChance,
+        type: type ?? (this.rng() < c.machineGunnerChance ? 'machineGunner' : 'rifleman'),
       });
     }
     return size;

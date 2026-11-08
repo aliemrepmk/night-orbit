@@ -75,6 +75,11 @@ describe('validateMap catches mistakes', () => {
     expect(some(check(m), 'outside the map')).toBe(true);
   });
 
+  it('an AA site on a road', () => {
+    const m: MapData = { ...MAP, aaSites: [...MAP.aaSites, { id: 'oops', pos: [-60, 62] }] };
+    expect(some(check(m), 'AA site oops is on road main_road')).toBe(true);
+  });
+
   it('a building on a road', () => {
     const m: MapData = {
       ...MAP,

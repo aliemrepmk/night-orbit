@@ -141,6 +141,10 @@ export class UnitManager {
   boarded = false;
   /** The extraction helicopter, once there is one (enemies shoot it while it is low). */
   airTarget: AirTarget | null = null;
+  /** The gunship, for MANPADS teams (M8+ Phase E); null = nobody to launch at. */
+  plane: { readonly position: Vector3 } | null = null;
+  /** A MANPADS team launched a missile from `from` (wired to `AirDefense.launch`). */
+  onLaunch: (from: Vector3) => void = () => {};
   /** Called for every visible burst (Game hooks the muzzle-flash effect in). */
   onMuzzleFlash: (at: Vector3) => void = () => {};
 
@@ -219,6 +223,8 @@ export class UnitManager {
       : range(this.rng, ef.standoffMin, ef.standoffMax);
     u.thinkTimer = range(this.rng, 0, this.cfg.infantry.thinkInterval); // staggered thinking
     u.fireTimer = range(this.rng, 0, ef.burstMax);
+    // A missile team needs a moment to set up before its first launch.
+    if (def.launcher) u.launchCooldown = range(this.rng, 4, 9);
     if (opts.home) u.home.set(opts.home.x, 0, opts.home.z);
     u.path = opts.path ?? null;
     return u;
@@ -411,6 +417,7 @@ export class UnitManager {
 
   /** One enemy tick: think every `thinkInterval` (staggered), then carry out the decision. */
   private updateEnemy(e: Infantry, dt: number): void {
+    if (e.def.launcher && this.launcherStep(e, dt)) return;
     e.thinkTimer -= dt;
     if (e.thinkTimer <= 0 || !e.target) {
       e.thinkTimer += this.cfg.infantry.thinkInterval;
@@ -419,6 +426,38 @@ export class UnitManager {
     }
     this.act(e, dt);
     this.separate(e);
+  }
+
+  /**
+   * A MANPADS soldier (M8+ Phase E): once reloaded and with the gunship in reach (and not
+   * fleeing), it stops, kneels and aims for `manpadsAim` s (visible), then launches. Returns true
+   * while it is busy with the launcher (the normal AI waits).
+   */
+  private launcherStep(e: Infantry, dt: number): boolean {
+    const c = CONFIG.airDefense;
+    e.launchCooldown -= dt;
+    const plane = this.plane;
+    if (e.aimLeft < 0) {
+      if (!plane || e.launchCooldown > 0 || e.action === 'flee') return false;
+      if (e.position.distanceTo(plane.position) > c.manpadsRange) return false;
+      e.aimLeft = c.manpadsAim;
+    }
+    e.velocity.set(0, 0, 0);
+    e.state = 'firing';
+    if (plane) {
+      e.turnToward(
+        Math.atan2(plane.position.x - e.position.x, plane.position.z - e.position.z),
+        dt,
+      );
+    }
+    e.aimLeft -= dt;
+    if (e.aimLeft > 0) return true;
+    e.aimLeft = -1;
+    e.launchCooldown = c.manpadsReload;
+    e.sinceShot = 0;
+    this.eyeA.copy(e.position).setY(e.position.y + 0.6);
+    this.onLaunch(this.eyeA);
+    return true;
   }
 
   /** Gathers the situation and asks `EnemyBrain.decide` what to do (PLAN.md §7.11). */

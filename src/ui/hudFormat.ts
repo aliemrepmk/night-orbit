@@ -80,6 +80,8 @@ export function failReasonText(reason: FailReason): string {
       return 'FRIENDLY FIRE: YOU HIT KESTREL 6';
     case 'helicopter_lost':
       return 'KESTREL 6 WAS SHOT DOWN';
+    case 'gunship_lost':
+      return 'LANTERN 2-1 SHOT DOWN';
   }
 }
 
@@ -107,3 +109,4 @@ export function kestrelLine(hp: number, max: number, underFire: boolean): string
   const pct = String(Math.ceil(f * 100 - 1e-9)).padStart(3);
   return `KESTREL 6 ${bar(f, 10)} ${pct}%${underFire ? '  UNDER FIRE' : ''}`;
 }
+

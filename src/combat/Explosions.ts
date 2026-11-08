@@ -15,6 +15,8 @@ export interface Target extends Damageable {
   /** `aircraft`: the extraction helicopter (a friendly, M7). */
   readonly kind: 'infantry' | 'vehicle' | 'aircraft';
   readonly side: Side;
+  /** An AA gun (M8+ Phase E): its kill gets the "Triple-A destroyed" call, not "vehicle". */
+  readonly aa?: boolean;
 }
 
 /**
@@ -64,7 +66,7 @@ export class Explosions {
       if (t.alive) continue;
       if (t.kind === 'aircraft') aircraftKilled = true;
       else if (t.side === 'friendly') friendlyKilled = true;
-      else this.bus.emit('unitKilled', { kind: t.kind, by: w.id });
+      else this.bus.emit('unitKilled', { kind: t.kind, by: w.id, aa: t.aa });
     }
     if (aircraftKilled) {
       // Kestrel 6 (M7): the player's own round brought the extraction helicopter down.

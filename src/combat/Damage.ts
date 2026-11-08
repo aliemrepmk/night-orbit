@@ -15,6 +15,8 @@ export const ARMOR = {
   cover: { '25': 0.5, '40': 0.7, '105': 1, gunrun: 0.7, bomb: 1 },
   /** Kestrel 6 (M7): a light armored airframe; cannon splinters hurt less, but it is no APC. */
   helicopter: { '25': 0.6, '40': 1, '105': 1, gunrun: 1, bomb: 1 },
+  /** An AA gun behind sandbags (M8+ Phase E): the 25 mm chips at it, 40 / 105 mm wreck it. */
+  aaGun: { '25': 0.35, '40': 1, '105': 1, gunrun: 0.8, bomb: 1 },
 } as const satisfies Record<string, Armor>;
 
 /** Who dealt damage: the gunship's weapons or air support (both the player's), or Ridgeback's return fire. */

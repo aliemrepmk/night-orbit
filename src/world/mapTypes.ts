@@ -138,6 +138,8 @@ export interface MapData {
   readonly treeLines: readonly TreeLineDef[];
   readonly forests: readonly ForestDef[];
   readonly powerLines: readonly PowerLineDef[];
+  /** AA gun emplacements (M8+ Phase E): dormant until the mission activates them. */
+  readonly aaSites: readonly { readonly id: string; readonly pos: Vec2 }[];
   readonly buildings: readonly BuildingDef[];
   readonly walls: readonly WallDef[];
   readonly props: readonly PropDef[];

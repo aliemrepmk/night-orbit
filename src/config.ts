@@ -505,6 +505,50 @@ export const CONFIG = {
     muffleSeconds: 0.4,
   },
 
+  /**
+   * Enemy air defense (M8+ Phase E): AA guns and trucks shoot at the gunship (and at strike
+   * jets), MANPADS teams launch heat-seeking missiles, flares (X) decoy them. Hull damage is
+   * permanent; at 0 the gunship is shot down.
+   */
+  airDefense: {
+    /** Gunship hull points; below `engineOutAt` an engine is lost (slower, wobblier orbit). */
+    hull: 100,
+    engineOutAt: 30,
+    /** With an engine out the orbit slows to this fraction and the picture shakes this much more. */
+    engineOutSpeed: 0.8,
+    engineOutJitter: 2.5,
+    /** An AA gun fires while it is within this distance (ground) of the orbit center: the area the
+     * sensor can reach, so every gun that shoots at you can be shot back. */
+    engageRadius: 470,
+    /** Seconds between bursts (random in range) and tracers per burst. */
+    burstMin: 1.1,
+    burstMax: 2.0,
+    burstTracers: 6,
+    /** Chance a burst hits: best at `nearSlant` m, worst at `farSlant`, ramping up over
+     * `trackSeconds` of continuous firing (the gunner walks the rounds onto you). */
+    hitNear: 0.5,
+    hitFar: 0.12,
+    nearSlant: 750,
+    farSlant: 1500,
+    trackSeconds: 8,
+    hitDamage: 3,
+    /** AA gun hit points (one 105 mm, two 40 mm, a long 25 mm burst). */
+    gunHp: 300,
+    /** MANPADS: aim time, missile speed (m/s), damage on a hit, and launch reach (slant m). */
+    manpadsAim: 2,
+    manpadsReload: 25,
+    manpadsRange: 1700,
+    missileSpeed: 300,
+    missileDamage: 30,
+    /** Flares decoy a missile dropped at least this many seconds before it would hit. */
+    flareLead: 0.8,
+    flares: 6,
+    /** Strikes: AA within this distance of the target can hit the jet; this many abort it. */
+    strikeCover: 650,
+    abortAt: 2,
+    jetHitChance: 0.4,
+  },
+
   /** The fuel depot's tanks (M8+ Phase D): HP, the delay before one goes up, how long it burns. */
   depot: {
     tankHp: 250,

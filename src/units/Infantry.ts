@@ -46,6 +46,9 @@ export class Infantry implements Target {
   fireTimer = 0;
   /** Seconds since it last fired a burst (recoil and a warm barrel in thermal, M8+ Phase C). */
   sinceShot = Infinity;
+  /** MANPADS (M8+ Phase E): seconds until it may launch again, and aiming time left (< 0: not aiming). */
+  launchCooldown = 0;
+  aimLeft = -1;
   /** Fraction of its range at which this soldier stops to fire (varies per soldier). */
   standoff = 0.8;
   /** An assaulter closes in on Ridgeback instead of sniping from far off (`enemyFire.assaultChance`). */
@@ -101,6 +104,8 @@ export class Infantry implements Target {
     this.tumble = 0;
     this.walkPhase = 0;
     this.sinceShot = Infinity;
+    this.launchCooldown = 0;
+    this.aimLeft = -1;
     this.target = null;
     this.killedBy = null;
     this.action = 'advance';

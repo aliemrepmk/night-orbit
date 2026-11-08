@@ -1111,4 +1111,14 @@ export const MAP: MapData = {
       spacing: 45,
     },
   ],
+
+  // M8+ Phase E: AA gun emplacements near each zone (within the sensor's reach of the orbit
+  // there, so every gun that opens up on you can be shot back). `aa_forest` is hidden in the woods.
+  aaSites: [
+    { id: 'aa_ridge', pos: [-420, -160] },
+    { id: 'aa_village', pos: [20, -215] },
+    { id: 'aa_crossroads', pos: [450, -110] },
+    { id: 'aa_forest', pos: [700, -470] },
+    { id: 'aa_lz', pos: [705, 395] },
+  ],
 };
