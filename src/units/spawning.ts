@@ -67,6 +67,8 @@ export class WaveSpawner {
   auto = true;
   /** Background waves only use sites of this zone (null: any site around the team). */
   zone: ZoneId | null = null;
+  /** A background group was queued at (x, z) (M8+ Phase F: the radio calls it out). */
+  onGroup: (x: number, z: number, size: number) => void = () => {};
   /** Seconds between background waves (starts at the config's). */
   waveInterval: number;
   private timer: number;
@@ -207,7 +209,9 @@ export class WaveSpawner {
       cx = clamp(team.x + Math.sin(bearing) * dist);
       cz = clamp(team.z + Math.cos(bearing) * dist);
     }
-    return this.enqueue(units, cx, cz, path, size, interval);
+    const n = this.enqueue(units, cx, cz, path, size, interval);
+    if (n > 0) this.onGroup(cx, cz, n);
+    return n;
   }
 
   /** Queues `count` soldiers (capped by room under `maxEnemies`) scattered around (cx, cz). */

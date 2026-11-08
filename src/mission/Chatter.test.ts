@@ -71,3 +71,66 @@ describe('Chatter', () => {
     }
   });
 });
+
+describe('Chatter, M8+ Phase F (more varied radio)', () => {
+  it('uses every line of a pool once before any repeats, and never the same line twice in a row', () => {
+    const r = new Radio();
+    const said: string[] = [];
+    r.onLine = (l) => said.push(l.text);
+    const c = new Chatter(r, createRng(5));
+    const pool = POOLS.kill;
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < pool.lines.length; i++) {
+        c.update(pool.cooldown + 0.1, false);
+        c.say('kill');
+        for (let t = 0; t < 10; t += 0.5) r.update(0.5);
+      }
+    }
+    const n = pool.lines.length;
+    for (let round = 0; round < 3; round++) {
+      expect(new Set(said.slice(round * n, round * n + n)).size).toBe(n);
+    }
+    for (let i = 1; i < said.length; i++) expect(said[i]).not.toBe(said[i - 1]);
+  });
+
+  it('fills landmark callouts into the contact lines', () => {
+    const r = new Radio();
+    const said: string[] = [];
+    r.onLine = (l) => said.push(l.text);
+    const c = new Chatter(r, createRng(2));
+    expect(c.sayPlace('contact', 'north of the barn')).toBe(true);
+    r.update(0.1);
+    expect(said[0]).toContain('north of the barn');
+    expect(said[0]).not.toContain('{place}');
+  });
+
+  it('the crew banters after a calm silence, but never while the team is in a fight', () => {
+    const heard = (calm: boolean) => {
+      const r = new Radio();
+      const said: string[] = [];
+      r.onLine = (l) => said.push(l.text);
+      const c = new Chatter(r, createRng(3));
+      for (let t = 0; t < 40; t += 0.1) {
+        c.update(0.1, false, calm);
+        r.update(0.1);
+      }
+      return said;
+    };
+    expect(heard(true).some((l) => POOLS.banter.lines.includes(l))).toBe(true);
+    expect(heard(false)).toEqual([]);
+  });
+
+  it('has at least six lines in every common pool', () => {
+    for (const id of [
+      'kill',
+      'multiKill',
+      'vehicleKill',
+      'miss',
+      'teamUnderFire',
+      'teamHurt',
+      'banter',
+    ] as const) {
+      expect(POOLS[id].lines.length, id).toBeGreaterThanOrEqual(6);
+    }
+  });
+});

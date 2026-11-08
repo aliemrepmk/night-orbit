@@ -396,6 +396,8 @@ export const CONFIG = {
     multiKillCount: 3,
     /** Seconds the crosshair rests on the clinic before the FCO warns. */
     clinicHoverSeconds: 0.6,
+    /** Seconds of calm radio silence before the crew chats (M8+ Phase F). */
+    banterAfter: 30,
   },
 
   /** The protected clinic (PLAN.md §8 phase 2). */

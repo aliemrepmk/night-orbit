@@ -1,3 +1,4 @@
+import { describePlace, landmarks } from './landmarks';
 import { INFANTRY } from '../units/unitDefs';
 import type { AirDefense } from '../combat/AirDefense';
 import { Path } from '../ai/Paths';
@@ -84,6 +85,10 @@ export class MissionHost implements MissionWorld {
     }
     // The script decides when enemies come; no free-running waves.
     d.spawner.auto = false;
+    // Background groups get a landmark callout (M8+ Phase F): "Movement north of the barn."
+    const marks = landmarks(d.map);
+    d.spawner.onGroup = (x, z) =>
+      this.chatter.sayPlace('contact', describePlace(marks, x, z, d.units.teamPosition));
 
     const bus = d.bus;
     bus.on('unitKilled', (e) => {
@@ -159,7 +164,7 @@ export class MissionHost implements MissionWorld {
     this.clinicMarkLeft = Math.max(0, this.clinicMarkLeft - dt);
     const onClinic =
       nearestFootprint(this.d.protectedFootprints, aim.x, aim.z) < this.cfg.clinicHoverRadius;
-    this.chatter.update(dt, onClinic);
+    this.chatter.update(dt, onClinic, !units.team.underFire && units.aliveEnemies === 0);
     this.radio.update(dt);
   }
 
