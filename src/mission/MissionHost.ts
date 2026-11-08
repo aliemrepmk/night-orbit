@@ -16,7 +16,9 @@ import { Mission, type HelicopterStage, type MissionWorld } from './Mission';
 import type { Action, MissionDef, Phase } from './missionTypes';
 import { Radio } from './Radio';
 
-export type MissionHostConfig = { readonly [K in keyof typeof CONFIG.mission]: number };
+export type MissionHostConfig = {
+  readonly [K in Exclude<keyof typeof CONFIG.mission, 'calibrationLookAway'>]: number;
+} & { readonly calibrationLookAway: readonly [number, number] };
 
 export interface MissionHostDeps {
   readonly map: MapData;
@@ -101,7 +103,7 @@ export class MissionHost implements MissionWorld {
     this.mission.skipPhase();
   }
 
-  /** A player prompt was done (calibration: `slewed`, `weapon40`, `sensor`, …). */
+  /** A player prompt was done (calibration: `weapon25`, `weapon40`, `weapon105`, `sensor`). */
   playerDid(flag: string): void {
     this.mission.setFlag(flag);
   }
@@ -109,6 +111,12 @@ export class MissionHost implements MissionWorld {
   /** Per fixed step. `aim` is the sensor's ground point. */
   update(dt: number, aim: { x: number; z: number }): void {
     const { units, spawner } = this.d;
+    // Calibration: "find Ridgeback" means the crosshair is really on them (M8+ fix: it used to
+    // count any mouse movement). The prompt clears the flag, so only a look after it counts.
+    const team = units.teamPosition;
+    if (Math.hypot(aim.x - team.x, aim.z - team.z) < this.cfg.locateRadius) {
+      this.mission.setFlag('located');
+    }
     this.mission.update(dt);
     spawner.update(dt, units, aim);
     this.helicopter.update(dt);

@@ -2,7 +2,7 @@ import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { ORDNANCE } from '../gunship/airSupportDefs';
 import { MAP } from '../world/MapData';
-import { headlessGame } from './headlessGame';
+import { doEveryPrompt, headlessGame } from './headlessGame';
 import { largestFootprint } from './clinic';
 import { POOLS } from './lines';
 
@@ -94,13 +94,60 @@ describe('MissionHost: script actions on the real systems', () => {
     const g = headlessGame();
     g.host.start();
     step(g, 5);
-    expect(g.host.mission.objective).toMatch(/slew/i);
-    g.host.playerDid('slewed');
+    expect(g.host.mission.objective).toMatch(/find ridgeback/i);
+    const team = g.units.teamPosition;
+    g.host.update(DT, { x: team.x + 10, z: team.z }); // crosshair on the strobes
     step(g, 0.2);
     expect(g.host.mission.objective).toMatch(/25 mm/);
     g.host.playerDid('weapon25');
     step(g, 0.2);
     expect(g.host.mission.objective).toMatch(/40 mm/);
+  });
+
+  it('regression: prompts wait for the player (no timeout) and the FCO repeats the hint', () => {
+    const g = headlessGame();
+    const lines = heard(g);
+    g.host.start();
+    step(g, 90); // never looks at Ridgeback (the bot's aim is far away)
+    expect(g.host.mission.objective).toMatch(/find ridgeback/i);
+    expect(g.host.mission.timedOut).toEqual([]);
+    expect(lines.filter((l) => /Still no eyes on Ridgeback/.test(l)).length).toBeGreaterThanOrEqual(
+      3,
+    );
+  });
+
+  it('regression: mouse movement alone does not find Ridgeback; the crosshair must be on them', () => {
+    const g = headlessGame();
+    g.host.start();
+    step(g, 5);
+    const team = g.units.teamPosition;
+    for (const [dx, dz] of [
+      [300, 0],
+      [0, -200],
+      [-150, 120],
+    ]) {
+      g.host.update(DT, { x: team.x + dx, z: team.z + dz });
+    }
+    expect(g.host.mission.objective).toMatch(/find ridgeback/i);
+  });
+
+  it('regression: a key pressed before its prompt does not count', () => {
+    const g = headlessGame();
+    g.host.start();
+    g.host.playerDid('weapon40'); // pressed 2 during the opening line
+    g.host.playerDid('sensor');
+    step(g, 5);
+    const team = g.units.teamPosition;
+    g.host.update(DT, { x: team.x, z: team.z });
+    g.host.playerDid('weapon25');
+    step(g, 0.5);
+    // The 40 mm prompt is up, and the early press of 2 is forgotten.
+    expect(g.host.mission.objective).toMatch(/40 mm/);
+    step(g, 5);
+    expect(g.host.mission.objective).toMatch(/40 mm/);
+    g.host.playerDid('weapon40');
+    step(g, 0.2);
+    expect(g.host.mission.objective).toMatch(/105 mm/);
   });
 
   it('the vehicles phase sends a tagged convoy down the north road', () => {
@@ -166,10 +213,12 @@ describe('MissionHost radio between phases', () => {
     const lines: string[] = [];
     g.host.radio.onLine = (l) => lines.push(l.text);
     g.host.start();
-    for (const f of ['slewed', 'weapon25', 'weapon40', 'weapon105', 'sensor']) g.host.playerDid(f);
-    // The prompts are done at once: calibration ends and its lines (and the fields' first
-    // lines) queue up behind the one on air.
-    step(g, 4.5); // the first prompt comes 4 s in; the rest follow tick by tick
+    // The player does each prompt the moment it appears: calibration ends and its lines (and
+    // the fields' first lines) queue up behind the one on air.
+    for (let t = 0; t < 4.5; t += DT) {
+      doEveryPrompt(g);
+      g.host.update(DT, { x: 0, z: -2000 });
+    }
     expect(g.host.mission.phase!.id).toBe('fields');
     expect(g.host.radio.waiting).toBeGreaterThan(0); // the fields' opening lines wait
     lines.length = 0;

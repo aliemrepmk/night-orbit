@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headlessGame, type HeadlessGame } from './headlessGame';
+import { doEveryPrompt, headlessGame, type HeadlessGame } from './headlessGame';
 import { MISSION } from './missionDef';
 
 const DT = 1 / 30;
@@ -9,9 +9,9 @@ const DT = 1 / 30;
  * kills each enemy soldier and vehicle within `reach` m of Ridgeback, as if the player shot it.
  */
 function bot(g: HeadlessGame, reach: number) {
-  for (const f of ['slewed', 'weapon25', 'weapon40', 'weapon105', 'sensor']) g.host.playerDid(f);
   let t = 0;
   return (dt: number) => {
+    doEveryPrompt(g);
     t += dt;
     if (t < 0.5) return;
     t = 0;

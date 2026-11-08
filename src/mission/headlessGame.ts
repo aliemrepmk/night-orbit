@@ -14,3 +14,13 @@ export function headlessGame(world: StaticWorld = createWorld()) {
 
 export type HeadlessGame = ReturnType<typeof headlessGame>;
 
+/** Calibration flags a player raises by doing each prompt (looking at Ridgeback, keys 1–3, F). */
+export const PROMPT_FLAGS = ['located', 'weapon25', 'weapon40', 'weapon105', 'sensor'] as const;
+
+/**
+ * For headless bots: do every calibration prompt. Call once per tick: prompts clear their flag
+ * when they are shown (only actions after the prompt count), so a one-off call is not enough.
+ */
+export function doEveryPrompt(g: HeadlessGame): void {
+  for (const f of PROMPT_FLAGS) g.host.playerDid(f);
+}

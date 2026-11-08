@@ -74,6 +74,9 @@ export type Action =
   /** Draw the protected clinic's marker on screen for `seconds`. */
   | { readonly kind: 'markClinic'; readonly seconds: number }
   | { readonly kind: 'setFlag'; readonly name: string }
+  /** Forget a flag (a player prompt clears its flag when it is shown, so only what the player
+   * does after the prompt counts). */
+  | { readonly kind: 'clearFlag'; readonly name: string }
   | { readonly kind: 'nextPhase' }
   | { readonly kind: 'completeMission' };
 
@@ -86,6 +89,11 @@ export interface Step {
    */
   readonly timeout?: number;
   readonly onTimeout?: readonly Action[];
+  /**
+   * While the step waits, run `actions` every `every` seconds (a player prompt repeats its hint
+   * instead of timing out: the player can always do it, so it can't soft-lock).
+   */
+  readonly remind?: { readonly every: number; readonly actions: readonly Action[] };
   /** Shown in the debug line (F1) and in test failures. */
   readonly note?: string;
 }

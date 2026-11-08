@@ -74,5 +74,6 @@ export const spawnHelicopter = (from: Vec2, pad: Vec2): Action => ({
 export const boardHelicopter = (): Action => ({ kind: 'boardHelicopter' });
 export const markClinic = (seconds: number): Action => ({ kind: 'markClinic', seconds });
 export const setFlag = (name: string): Action => ({ kind: 'setFlag', name });
+export const clearFlag = (name: string): Action => ({ kind: 'clearFlag', name });
 export const nextPhase = (): Action => ({ kind: 'nextPhase' });
 export const completeMission = (): Action => ({ kind: 'completeMission' });

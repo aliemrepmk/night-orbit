@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import { MAP } from '../world/MapData';
 import type { MissionDef } from './missionTypes';
 import {
+  clearFlag,
   allOf,
   boardHelicopter,
   completeMission,
@@ -55,6 +56,12 @@ export function walkTimeout(route: string): number {
  * Site ids are the map's enemy paths or `zone:index` spawn points (`MapData.ts`); every id is
  * checked against the map by `missionDef.test.ts`. All dialogue is written for this game.
  */
+/** A calibration prompt's reminder: the FCO repeats the hint until the player does it. */
+const prompt = (hint: string) => ({
+  every: CONFIG.mission.promptRemindSeconds,
+  actions: [say('FCO', hint)],
+});
+
 export const MISSION: MissionDef = {
   id: 'varesh_valley',
   phases: [
@@ -66,32 +73,43 @@ export const MISSION: MissionDef = {
         setOrbitFocus(null),
         say('FCO', 'Lantern, FCO. Ridgeback is at the OP, four strobes. Let us run the checks.'),
       ],
+      // Each prompt waits for the player (no timeout: they can always do it) and repeats its hint
+      // every so often. A prompt clears its flag when shown, so only what the player does after
+      // it counts (M8+ fix: the captions used to run on without checking).
       steps: [
         {
-          note: 'slew',
+          note: 'find',
           when: timeInPhase(4),
           do: [
-            setObjective('Slew the sensor (mouse)'),
+            clearFlag('located'),
+            setObjective('Find Ridgeback: crosshair on the strobes'),
             say(
               'FCO',
-              'Move the sensor with the mouse. Find the blinking strobes: that is Ridgeback.',
+              'Move the sensor with the mouse. Find the blinking strobes: that is Ridgeback. Put the crosshair on them.',
             ),
           ],
         },
         {
           note: '25mm',
-          when: flag('slewed'),
-          timeout: 25,
+          when: flag('located'),
+          remind: prompt(
+            'Still no eyes on Ridgeback? Four blinking strobes at the OP. Slew onto them.',
+          ),
           do: [
+            clearFlag('weapon25'),
             setObjective('Select the 25 mm (1)'),
-            say('FCO', 'Good eyes. Select the two-five with 1. Hold the trigger for a burst.'),
+            say(
+              'FCO',
+              'Good eyes, that is them. Select the two-five with 1. Hold the trigger for a burst.',
+            ),
           ],
         },
         {
           note: '40mm',
           when: flag('weapon25'),
-          timeout: 20,
+          remind: prompt('Key 1 for the two-five.'),
           do: [
+            clearFlag('weapon40'),
             setObjective('Select the 40 mm (2)'),
             say('FCO', 'Now the forty, key 2. Five rounds a clip.'),
           ],
@@ -99,8 +117,9 @@ export const MISSION: MissionDef = {
         {
           note: '105mm',
           when: flag('weapon40'),
-          timeout: 20,
+          remind: prompt('Key 2 for the forty.'),
           do: [
+            clearFlag('weapon105'),
             setObjective('Select the 105 mm (3)'),
             say('FCO', 'And the one-oh-five, key 3. Big hit, long reload. Never near Ridgeback.'),
           ],
@@ -108,8 +127,9 @@ export const MISSION: MissionDef = {
         {
           note: 'sensor',
           when: flag('weapon105'),
-          timeout: 20,
+          remind: prompt('Key 3 for the one-oh-five.'),
           do: [
+            clearFlag('sensor'),
             setObjective('Switch the sensor mode (F)'),
             say(
               'FCO',
@@ -120,7 +140,7 @@ export const MISSION: MissionDef = {
         {
           note: 'done',
           when: flag('sensor'),
-          timeout: 20,
+          remind: prompt('Press F to switch the sensor mode.'),
           do: [
             say('FCO', 'Checks complete. Ridgeback, Lantern is on station.'),
             say('RIDGEBACK', 'Good to hear you, Lantern. Moving out.'),

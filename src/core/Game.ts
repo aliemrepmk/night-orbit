@@ -104,8 +104,6 @@ export class Game {
   private sensorFx!: SensorFX;
   /** Zone the F3 look-test tour has parked the orbit over (null = following Ridgeback). */
   private tourStop: ZoneId | null = null;
-  /** Pixels the sensor has been slewed (calibration prompt). */
-  private slewed = 0;
   /** Orbit focus the mission asked for last (null: following Ridgeback). */
   private focus: ZoneId | null = null;
   /** Who the trigger belongs to: the guns or the strike being aimed. */
@@ -185,7 +183,6 @@ export class Game {
     );
     this.units.onMuzzleFlash = (p) => this.effects.muzzleFlash(p);
     this.tourStop = null;
-    this.slewed = 0;
     this.focus = null;
     this.fireHeld = false;
     this.fireClicks = 0;
@@ -216,7 +213,9 @@ export class Game {
     );
     const t = this.units.teamPosition;
     this.gunship.reset(t.x, t.z);
-    this.sensor.reset(t.x, t.z);
+    // Calibration starts looking away from Ridgeback: finding their strobes is the first task.
+    const away = this.host.mission.phaseIndex === 0 ? CONFIG.mission.calibrationLookAway : [0, 0];
+    this.sensor.reset(t.x + away[0], t.z + away[1]);
   }
 
   /** What a screen button does. */
@@ -435,9 +434,6 @@ export class Game {
     const { dx, dy: rawDy } = this.input.consumeMouse();
     const dy = this.settings.invertY ? -rawDy : rawDy;
     this.sensor.slew(dx, dy, this.viewportHeight);
-    // Calibration prompts (mission phase 0) complete when the player does each thing.
-    this.slewed += Math.abs(dx) + Math.abs(dy);
-    if (this.slewed > CONFIG.hud.calibrationSlewPx) this.host.playerDid('slewed');
 
     const clicks = this.input.consumeFireClicks();
     const wheel = this.input.consumeWheel();
@@ -481,8 +477,10 @@ export class Game {
     if (this.input.wasPressed('Digit2')) this.sensor.selectWeapon('40');
     if (this.input.wasPressed('Digit3')) this.sensor.selectWeapon('105');
     if (this.input.wasPressed('KeyQ')) this.sensor.cycleWeapon(1);
+    // Calibration: "select the 40 mm" completes while the 40 mm is selected (the prompt clears
+    // the flag, and the previous prompt left a different gun selected, so a key press is needed).
+    this.host.playerDid(`weapon${this.sensor.weapon}`);
     if (this.sensor.weapon !== weaponBefore) {
-      this.host.playerDid(`weapon${this.sensor.weapon}`);
       this.sensorFx.triggerSwitch();
       if (this.air.mode !== null) {
         this.air.mode = null; // picking a gun takes the trigger back from air support…

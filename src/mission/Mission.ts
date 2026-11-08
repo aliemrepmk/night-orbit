@@ -42,6 +42,8 @@ export class Mission {
   stepIndex = 0;
   phaseTime = 0;
   stepTime = 0;
+  /** Seconds until the current step's next reminder. */
+  private remindLeft = Infinity;
   /** Steps that fired through their timeout instead of their condition, as `phase/note` (debug, tests). */
   readonly timedOut: string[] = [];
   readonly flags = new Set<string>();
@@ -101,8 +103,18 @@ export class Mission {
 
     const step = this.step;
     if (!step) return; // a phase whose steps are all done waits for nextPhase (should not happen)
+    if (this.remindLeft === Infinity && step.remind) this.remindLeft = step.remind.every;
     const timedOut = step.timeout !== undefined && this.stepTime >= step.timeout;
-    if (!this.check(step.when) && !timedOut) return;
+    if (!this.check(step.when) && !timedOut) {
+      if (step.remind) {
+        this.remindLeft -= dt;
+        if (this.remindLeft <= 0) {
+          this.remindLeft = step.remind.every;
+          this.run(step.remind.actions);
+        }
+      }
+      return;
+    }
 
     if (timedOut && !this.check(step.when)) {
       this.timedOut.push(`${this.phase!.id}/${step.note ?? this.stepIndex}`);
@@ -110,6 +122,7 @@ export class Mission {
     }
     this.stepIndex++;
     this.stepTime = 0;
+    this.remindLeft = Infinity;
     this.run(step.do);
     this.applyPendingPhase();
   }
@@ -161,6 +174,7 @@ export class Mission {
     this.stepIndex = 0;
     this.phaseTime = 0;
     this.stepTime = 0;
+    this.remindLeft = Infinity;
     this.pendingPhase = null;
     const p = this.def.phases[i];
     this.objective = p.objective;
@@ -186,6 +200,9 @@ export class Mission {
           break;
         case 'setFlag':
           this.flags.add(a.name);
+          break;
+        case 'clearFlag':
+          this.flags.delete(a.name);
           break;
         case 'startTimer': {
           const t = this.timer(a.id);

@@ -5,6 +5,7 @@ import type { Action, MissionDef } from './missionTypes';
 import {
   allOf,
   anyOf,
+  clearFlag,
   completeMission,
   flag,
   helicopter,
@@ -274,5 +275,69 @@ describe('Mission conditions', () => {
     const m = new Mission(one(flag('x')), world);
     m.start();
     expect(m.debugLine).toMatch(/^P 1\/1/);
+  });
+});
+
+describe('Mission prompts (M8+ fix: calibration checks what the player really did)', () => {
+  it('clearFlag forgets a flag set earlier', () => {
+    const { world } = fakeWorld();
+    const m = new Mission(
+      {
+        id: 't',
+        phases: [
+          {
+            id: 'p',
+            objective: '',
+            teamStart: [0, 0],
+            onEnter: [],
+            steps: [
+              { when: timeInPhase(1), do: [clearFlag('k'), setObjective('press k')] },
+              { when: flag('k'), do: [setObjective('done')] },
+            ],
+          },
+        ],
+      },
+      world,
+    );
+    m.start();
+    m.setFlag('k'); // too early
+    for (let i = 0; i < 40; i++) m.update(0.05);
+    expect(m.objective).toBe('press k');
+    m.setFlag('k');
+    m.update(0.05);
+    expect(m.objective).toBe('done');
+  });
+
+  it('remind repeats its actions while the step waits, and stops once it fires', () => {
+    const { w, world } = fakeWorld();
+    const hints = () => w.done.filter((a) => a.kind === 'say' && a.text === 'hint').length;
+    const m = new Mission(
+      {
+        id: 't',
+        phases: [
+          {
+            id: 'p',
+            objective: '',
+            teamStart: [0, 0],
+            onEnter: [],
+            steps: [
+              {
+                when: flag('go'),
+                remind: { every: 10, actions: [say('FCO', 'hint')] },
+                do: [setObjective('done')],
+              },
+            ],
+          },
+        ],
+      },
+      world,
+    );
+    m.start();
+    for (let i = 0; i < 35 * 20; i++) m.update(0.05);
+    expect(hints()).toBe(3);
+    m.setFlag('go');
+    for (let i = 0; i < 30 * 20; i++) m.update(0.05);
+    expect(hints()).toBe(3);
+    expect(m.objective).toBe('done');
   });
 });

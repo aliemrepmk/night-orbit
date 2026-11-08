@@ -361,6 +361,12 @@ export const CONFIG = {
     boardOffset: 6,
     /** The crosshair within this distance of the clinic counts as "on the clinic" (m). */
     clinicHoverRadius: 12,
+    /** Calibration (M8+ fix): the crosshair within this distance of Ridgeback counts as "found them" (m). */
+    locateRadius: 45,
+    /** Calibration starts with the sensor looking this far from Ridgeback ([x, z] m), so you have to find them. */
+    calibrationLookAway: [240, -170] as readonly [number, number],
+    /** A calibration prompt repeats its hint every this many seconds until the player does it. */
+    promptRemindSeconds: 18,
     /** "Off target": a 40/105 round that hits nobody with an enemy within this distance (m). */
     missNear: 40,
     /** Ridgeback calls for help once team health is below this fraction while under fire. */
@@ -422,8 +428,6 @@ export const CONFIG = {
   hud: {
     /** How long "DANGER CLOSE" stays up after a close impact (seconds). */
     dangerCloseSeconds: 2.5,
-    /** Calibration: the "slew the sensor" prompt completes after this much mouse movement (px). */
-    calibrationSlewPx: 400,
     /** Off-screen friendly arrows (M8): distance from the screen edge (CSS px). */
     arrowMargin: 36,
   },

@@ -1,3 +1,4 @@
+import { PROMPT_FLAGS } from './headlessGame';
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../core/rng';
 import { WaveSpawner } from '../units/spawning';
@@ -74,6 +75,10 @@ describe('the Varesh Valley mission (PLAN.md §8)', () => {
   });
 
   it('every step that waits on the world has a safety-valve timeout (no soft-locks)', () => {
+    const prompt = (c: Condition) =>
+      conditions(c).some(
+        (x) => x.kind === 'flag' && (PROMPT_FLAGS as readonly string[]).includes(x.name),
+      );
     const waits = (c: Condition) =>
       conditions(c).some((x) =>
         ['teamReached', 'zoneEnemiesBelow', 'vehiclesDestroyed', 'helicopter', 'flag'].includes(
@@ -82,7 +87,14 @@ describe('the Varesh Valley mission (PLAN.md §8)', () => {
       );
     for (const p of phases) {
       for (const s of p.steps) {
-        if (waits(s.when)) expect(s.timeout, `${p.id}/${s.note}`).toBeGreaterThan(0);
+        if (prompt(s.when)) {
+          // A player prompt waits for the player (they can always do it) and repeats its hint
+          // instead (M8+ fix: the calibration captions used to move on by themselves).
+          expect(s.timeout, `${p.id}/${s.note}`).toBeUndefined();
+          expect(s.remind?.every, `${p.id}/${s.note}`).toBeGreaterThan(0);
+        } else if (waits(s.when)) {
+          expect(s.timeout, `${p.id}/${s.note}`).toBeGreaterThan(0);
+        }
       }
     }
   });

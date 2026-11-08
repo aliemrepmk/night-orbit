@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld } from './battle';
-import { headlessGame, type HeadlessGame } from './headlessGame';
+import { doEveryPrompt, headlessGame, type HeadlessGame } from './headlessGame';
 
 const DT = 1 / 30;
 
 /** Plays `seconds` of the mission with nobody shooting (the sensor looks somewhere harmless). */
 function play(g: HeadlessGame, seconds: number) {
-  for (const f of ['slewed', 'weapon25', 'weapon40', 'weapon105', 'sensor']) g.host.playerDid(f);
   for (let t = 0; t < seconds; t += DT) {
+    doEveryPrompt(g);
     g.host.update(DT, { x: 0, z: -2000 });
     g.units.update(DT);
     g.vehicles.update(DT);
