@@ -76,28 +76,57 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
     thumpEnd: 18,
   },
   // Air support (M5+): a gun-run hit is a short crack (40 of them make the ripping sound);
-  // the bomb is the longest, deepest rumble in the game.
+  // the bomb is the longest, deepest rumble in the game. Made much louder after the M8+ A + B
+  // play test ("can we make gun run and bomb louder?"): they are the biggest things you call in.
   impactgunrun: {
-    duration: 0.12,
-    noiseGain: 0.05,
-    cutoffStart: 900,
-    cutoffEnd: 250,
-    thumpGain: 0.03,
-    thumpStart: 90,
-    thumpEnd: 50,
+    duration: 0.3,
+    noiseGain: 0.3,
+    cutoffStart: 1800,
+    cutoffEnd: 260,
+    thumpGain: 0.2,
+    thumpStart: 120,
+    thumpEnd: 40,
   },
+  // The bomb is the 105 mm blast (the user's favorite) made bigger: louder, brighter at the
+  // start so it carries on small speakers (most of the 105 mm's energy is below 150 Hz), and a
+  // long ring (~4 s audible), then ~2 dB down ("just a little"). M8+ play tests.
   impactbomb: {
-    duration: 2.6,
-    noiseGain: 0.4,
-    cutoffStart: 350,
-    cutoffEnd: 40,
-    thumpGain: 0.7,
-    thumpStart: 38,
-    thumpEnd: 12,
+    duration: 12,
+    noiseGain: 0.82,
+    cutoffStart: 1200,
+    cutoffEnd: 180,
+    thumpGain: 0.85,
+    thumpStart: 60,
+    thumpEnd: 19,
   },
 };
 
-/** Impacts far from where the sensor is looking sound quieter (0.25 at 500 m and beyond). */
-export function impactVolume(distanceToAim: number): number {
-  return Math.max(0.25, 1 - distanceToAim / 667);
+/**
+ * The falling bomb's whistle (M8+ play test: "a dropping whistle on bomb like real life"): a
+ * tone sliding down in pitch as the bomb falls, with a breathy air-rush layer that follows it,
+ * getting louder until the blast cuts it off. Its length is the strike's `whistleSeconds`.
+ */
+export const WHISTLE = {
+  /** Pitch at the start and at impact (Hz): a fast sweep down. */
+  startHz: 2600,
+  endHz: 650,
+  /** Level at the start and just before impact. */
+  startGain: 0.012,
+  endGain: 0.11,
+  /** Mostly air: the band-passed rush is the sound, a faint tone sits inside it (no wobble). */
+  rushQ: 3.5,
+  rushGain: 1,
+  toneGain: 0.18,
+} as const;
+
+/** Air strikes are loud wherever they land: they never drop below this (M8+ play test). */
+export const STRIKE_MIN_VOLUME = 0.8;
+
+/**
+ * Impacts far from where the sensor is looking sound quieter (0.25 at 500 m and beyond). Air
+ * strikes (`gunrun`, `bomb`) shake the whole valley, so they stay at `STRIKE_MIN_VOLUME` or more.
+ */
+export function impactVolume(distanceToAim: number, weapon?: OrdnanceId): number {
+  const v = Math.max(0.25, 1 - distanceToAim / 667);
+  return weapon === 'gunrun' || weapon === 'bomb' ? Math.max(STRIKE_MIN_VOLUME, v) : v;
 }

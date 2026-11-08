@@ -9,6 +9,9 @@ interface PendingImpact {
   x: number;
   z: number;
   ordnance: Ordnance;
+  /** When its falling whistle starts (Infinity = none), and whether it has started. */
+  whistleAt: number;
+  whistled: boolean;
 }
 
 /** An aircraft crossing the area: over (x, z) at time `t0`, flying along `heading`. */
@@ -94,6 +97,9 @@ export class AirSupport {
         x: x + fx * along - fz * side,
         z: z + fz * along + fx * side,
         ordnance: def.ordnance,
+        whistleAt:
+          def.whistleSeconds > 0 ? start + u * def.walkTime - def.whistleSeconds : Infinity,
+        whistled: false,
       });
     }
     this.pending.sort((a, b) => a.t - b.t);
@@ -103,9 +109,21 @@ export class AirSupport {
     return def;
   }
 
-  /** Advances time and lands every impact that is due, in order. */
-  update(dt: number, land: (x: number, z: number, ordnance: Ordnance) => void): void {
+  /**
+   * Advances time and lands every impact that is due, in order. `whistle` is called once per
+   * falling bomb when its whistle should start, with the seconds until it lands.
+   */
+  update(
+    dt: number,
+    land: (x: number, z: number, ordnance: Ordnance) => void,
+    whistle?: (x: number, z: number, secondsToImpact: number) => void,
+  ): void {
     this.time += dt;
+    for (const p of this.pending) {
+      if (p.whistled || this.time < p.whistleAt) continue;
+      p.whistled = true;
+      whistle?.(p.x, p.z, Math.max(0, p.t - this.time));
+    }
     let n = 0;
     while (n < this.pending.length && this.pending[n].t <= this.time) {
       const p = this.pending[n++];

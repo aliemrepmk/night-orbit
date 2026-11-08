@@ -200,7 +200,7 @@ export class Game {
     // Placeholder sounds react to events; nobody else needs to know about audio.
     this.bus.on('shotFired', (e) => this.audio.play(`fire${e.weapon}`));
     this.bus.on('impact', (e) =>
-      this.audio.play(`impact${e.weapon}`, impactVolume(e.distanceToAim)),
+      this.audio.play(`impact${e.weapon}`, impactVolume(e.distanceToAim, e.weapon)),
     );
     this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
 
@@ -312,8 +312,16 @@ export class Game {
     );
     // Air strikes land on the ground under their marked point (PLAN.md §7.19).
     if (playing) {
-      this.air.update(dt, (x, z, o) =>
-        this.explosions.detonate(new Vector3(x, this.terrain.heightAt(x, z), z), o, true),
+      this.air.update(
+        dt,
+        (x, z, o) =>
+          this.explosions.detonate(new Vector3(x, this.terrain.heightAt(x, z), z), o, true),
+        // A falling bomb whistles down (heard wherever it lands, like the blast itself).
+        (x, z, seconds) =>
+          this.audio.playWhistle(
+            seconds / this.timeScale,
+            impactVolume(Math.hypot(x - this.sensor.aim.x, z - this.sensor.aim.z), 'bomb'),
+          ),
       );
     }
     if (playing) {

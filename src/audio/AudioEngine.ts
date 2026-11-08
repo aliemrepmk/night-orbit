@@ -1,6 +1,6 @@
 import { CONFIG } from '../config';
 import { engineFrequencies, engineMix, type EngineMode, type EngineTune } from './engineDrone';
-import { SOUNDS, type SoundId } from './sounds';
+import { SOUNDS, WHISTLE, type SoundId } from './sounds';
 
 /** The live nodes of the engine drone (M8+ Phase B). */
 interface EngineNodes {
@@ -84,7 +84,14 @@ export class AudioEngine {
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
     this.master.gain.value = MASTER * this.volume;
-    this.master.connect(this.ctx.destination);
+    // A limiter, so a bomb on top of a gun run (40 cracks) can't clip.
+    const limiter = this.ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
+    this.master.connect(limiter).connect(this.ctx.destination);
 
     // One second of white noise, reused by every sound.
     const n = this.ctx.sampleRate;
@@ -169,6 +176,47 @@ export class AudioEngine {
 
   get enabled(): boolean {
     return this.ctx !== null;
+  }
+
+  /**
+   * A falling bomb: a fast shriek of air (band-passed noise with a faint tone inside) sweeping
+   * from `WHISTLE.startHz` down to `endHz` over `seconds`, getting louder; the boom cuts it off.
+   */
+  playWhistle(seconds: number, volume = 1): void {
+    const { ctx, master, noise } = this;
+    if (!ctx || !master || !noise || ctx.state !== 'running' || seconds <= 0) return;
+    const W = WHISTLE;
+    const t0 = ctx.currentTime;
+    const t1 = t0 + seconds;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(W.startGain * volume, t0);
+    out.gain.exponentialRampToValueAtTime(W.endGain * volume, t1);
+    out.gain.setValueAtTime(0, t1);
+    out.connect(master);
+
+    const tone = ctx.createOscillator();
+    tone.frequency.setValueAtTime(W.startHz, t0);
+    tone.frequency.exponentialRampToValueAtTime(W.endHz, t1);
+    const toneGain = ctx.createGain();
+    toneGain.gain.value = W.toneGain;
+    tone.connect(toneGain).connect(out);
+
+    const rush = ctx.createBufferSource();
+    rush.buffer = noise;
+    rush.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = W.rushQ;
+    band.frequency.setValueAtTime(W.startHz, t0);
+    band.frequency.exponentialRampToValueAtTime(W.endHz, t1);
+    const rushGain = ctx.createGain();
+    rushGain.gain.value = W.rushGain;
+    rush.connect(band).connect(rushGain).connect(out);
+
+    for (const n of [tone, rush]) {
+      n.start(t0);
+      n.stop(t1);
+    }
   }
 
   play(id: SoundId, volume = 1): void {

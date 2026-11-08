@@ -166,3 +166,43 @@ describe('strike data', () => {
     expect(STRIKES.bomb.ordnance.blastRadius).toBeGreaterThan(ORDNANCE['105'].blastRadius);
   });
 });
+
+describe('AirSupport bomb whistle (M8+ play test)', () => {
+  it('cues the whistle once, whistleSeconds before the bomb lands, and never for a gun run', () => {
+    const air = new AirSupport(createRng(3));
+    air.mode = 'bomb';
+    air.call(100, 200);
+    const whistles: { t: number; left: number; x: number; z: number }[] = [];
+    let landedAt = -1;
+    for (let i = 0; i < 60 * 30; i++) {
+      air.update(
+        1 / 60,
+        (_x, _z, o) => {
+          if (o.id === 'bomb') landedAt = air.time;
+        },
+        (x, z, left) => whistles.push({ t: air.time, left, x, z }),
+      );
+    }
+    expect(whistles).toHaveLength(1);
+    const w = whistles[0];
+    expect(w.x).toBeCloseTo(100);
+    expect(w.z).toBeCloseTo(200);
+    expect(landedAt - w.t).toBeCloseTo(STRIKES.bomb.whistleSeconds, 1);
+    expect(w.left).toBeCloseTo(STRIKES.bomb.whistleSeconds, 1);
+  });
+
+  it('gun runs have no whistle', () => {
+    expect(STRIKES.gunrun.whistleSeconds).toBe(0);
+    const air = new AirSupport(createRng(4));
+    air.mode = 'gunrun';
+    air.call(0, 0);
+    let whistles = 0;
+    for (let i = 0; i < 60 * 20; i++)
+      air.update(
+        1 / 60,
+        () => {},
+        () => whistles++,
+      );
+    expect(whistles).toBe(0);
+  });
+});

@@ -27,6 +27,8 @@ export interface StrikeDef {
   readonly passOffset: number;
   /** What each impact does. */
   readonly ordnance: Ordnance;
+  /** A falling bomb's whistle starts this many seconds before it lands (0 = none). */
+  readonly whistleSeconds: number;
 }
 
 export const STRIKES: Readonly<Record<StrikeId, StrikeDef>> = {
@@ -46,6 +48,7 @@ export const STRIKES: Readonly<Record<StrikeId, StrikeDef>> = {
     jetSpeed: 190,
     jetAltitude: 260,
     passOffset: 2.6, // the jet fires from behind and pulls up past the far end
+    whistleSeconds: 0,
     ordnance: {
       id: 'gunrun',
       damage: 200,
@@ -84,6 +87,7 @@ export const STRIKES: Readonly<Record<StrikeId, StrikeDef>> = {
     jetSpeed: 260,
     jetAltitude: 650,
     passOffset: -3, // released before the target: it passes overhead before the bomb lands
+    whistleSeconds: 0.5, // a short, quiet falling sweep just before impact (M8+ play tests)
     ordnance: {
       id: 'bomb',
       damage: 4000,

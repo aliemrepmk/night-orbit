@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AudioEngine } from './AudioEngine';
-import { SOUNDS, impactVolume } from './sounds';
+import { STRIKES } from '../gunship/airSupportDefs';
+import { SOUNDS, STRIKE_MIN_VOLUME, WHISTLE, impactVolume } from './sounds';
 
 describe('placeholder sounds', () => {
   it('defines valid envelopes and sweeps for every sound', () => {
@@ -18,6 +19,55 @@ describe('placeholder sounds', () => {
     expect(SOUNDS.fire105.duration).toBeGreaterThan(SOUNDS.fire40.duration);
     expect(SOUNDS.fire40.duration).toBeGreaterThan(SOUNDS.fire25.duration);
     expect(SOUNDS.fire105.thumpGain).toBeGreaterThan(SOUNDS.fire25.thumpGain);
+  });
+
+  it('makes air strikes louder than the guns: a gun-run hit above a 25 mm hit, the bomb the loudest', () => {
+    const loud = (d: (typeof SOUNDS)[keyof typeof SOUNDS]) => d.noiseGain + d.thumpGain;
+    expect(loud(SOUNDS.impactgunrun)).toBeGreaterThan(loud(SOUNDS.impact25) * 3);
+    expect(loud(SOUNDS.impactbomb)).toBeGreaterThan(loud(SOUNDS.impact105));
+    expect(SOUNDS.impactbomb.duration).toBeGreaterThan(SOUNDS.impact105.duration);
+  });
+
+  it('the bomb whistle slides down in pitch and gets louder toward impact', () => {
+    expect(WHISTLE.startHz).toBeGreaterThan(WHISTLE.endHz);
+    expect(WHISTLE.endHz).toBeGreaterThan(0); // exponential ramps need > 0
+    expect(WHISTLE.endGain).toBeGreaterThan(WHISTLE.startGain);
+    expect(WHISTLE.startGain).toBeGreaterThan(0);
+    const a = new AudioEngine();
+    expect(() => a.playWhistle(3)).not.toThrow(); // silent no-op without WebAudio
+  });
+
+  it('the whistle is a quick sweep (0.5 s, M8+ play tests) and mostly air, not a pure tone', () => {
+    expect(STRIKES.bomb.whistleSeconds).toBeCloseTo(0.5);
+    expect(WHISTLE.endGain).toBeLessThan(SOUNDS.impactbomb.noiseGain / 4); // quiet next to the blast
+    expect(WHISTLE.rushGain).toBeGreaterThan(WHISTLE.toneGain * 3);
+    expect(WHISTLE.startHz / WHISTLE.endHz).toBeGreaterThanOrEqual(3); // a real sweep
+  });
+
+  it('the bomb is a bigger 105 mm blast: louder, brighter at the start, far longer (M8+ play tests)', () => {
+    const b = SOUNDS.impactbomb;
+    const g = SOUNDS.impact105;
+    expect(b.noiseGain).toBeGreaterThan(g.noiseGain);
+    expect(b.thumpGain).toBeGreaterThan(g.thumpGain);
+    expect(b.duration).toBeGreaterThanOrEqual(g.duration * 5);
+    // The same falling sweeps as the 105 mm, starting brighter so it carries on small speakers.
+    expect(b.cutoffStart).toBeGreaterThan(g.cutoffStart);
+    expect(b.cutoffStart).toBeGreaterThan(b.cutoffEnd);
+    expect(b.thumpStart).toBeGreaterThan(b.thumpEnd);
+  });
+
+  it('the bomb rumbles far longer than anything else', () => {
+    for (const [id, d] of Object.entries(SOUNDS)) {
+      if (id !== 'impactbomb')
+        expect(SOUNDS.impactbomb.duration, id).toBeGreaterThan(d.duration * 2);
+    }
+  });
+
+  it('keeps air strikes loud wherever they land (regression: they faded with distance)', () => {
+    expect(impactVolume(2000, 'bomb')).toBe(STRIKE_MIN_VOLUME);
+    expect(impactVolume(2000, 'gunrun')).toBe(STRIKE_MIN_VOLUME);
+    expect(impactVolume(0, 'bomb')).toBe(1);
+    expect(impactVolume(2000, '105')).toBe(0.25); // the guns still fade
   });
 
   it('quiets impacts far from the aim point, but never silences them', () => {
