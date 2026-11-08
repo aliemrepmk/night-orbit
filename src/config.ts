@@ -306,8 +306,8 @@ export const CONFIG = {
     /** One wheel notch turns the gun-run direction by this much (15°). */
     axisStepRad: Math.PI / 12,
     /** The jet drawn as a long hot streak: length (m) and sprite size. */
-    jetStreakLength: 40,
-    jetStreakSize: 3.5,
+    jetStreakLength: 22, // the exhaust trail behind the jet model (M8+ Phase E; was the whole jet)
+    jetStreakSize: 2.2,
   },
 
   /** Enemy and friendly tracers on the ground (short, purely visual). */

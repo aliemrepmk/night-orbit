@@ -14,6 +14,8 @@ import {
   strikeLine,
   teamLine,
   type GunReadout,
+  flareLine,
+  hullLine,
 } from './hudFormat';
 
 function readout(w: WeaponState): GunReadout {
@@ -124,5 +126,17 @@ describe('HUD Kestrel 6 line (M7)', () => {
   it('shows its health and when it is under fire', () => {
     expect(kestrelLine(400, 400, false)).toBe('KESTREL 6 ▮▮▮▮▮▮▮▮▮▮ 100%');
     expect(kestrelLine(200, 400, true)).toBe('KESTREL 6 ▮▮▮▮▮▯▯▯▯▯  50%  UNDER FIRE');
+  });
+});
+
+describe('air-defense HUD lines (M8+ Phase E)', () => {
+  it('shows the hull with a bar and percent, and ENGINE OUT once an engine is lost', () => {
+    expect(hullLine(100, 100, false)).toBe(`HULL      ${bar(1, 10)} 100%`);
+    expect(hullLine(29, 100, true)).toMatch(/ 29% {2}ENGINE OUT$/);
+  });
+
+  it('shows flares left as boxes and the key', () => {
+    expect(flareLine(4, 6)).toBe('FLR ■■■■□□  X');
+    expect(flareLine(0, 6)).toBe('FLR □□□□□□  X');
   });
 });

@@ -110,3 +110,14 @@ export function kestrelLine(hp: number, max: number, underFire: boolean): string
   return `KESTREL 6 ${bar(f, 10)} ${pct}%${underFire ? '  UNDER FIRE' : ''}`;
 }
 
+/** The gunship's hull (M8+ Phase E), e.g. `HULL ▮▮▮▮▮▮▮▯▯▯  70%  ENGINE OUT`. */
+export function hullLine(hull: number, max: number, engineOut: boolean): string {
+  const f = Math.min(1, Math.max(0, hull / max));
+  const pct = String(Math.ceil(f * 100 - 1e-9)).padStart(3);
+  return `HULL      ${bar(f, 10)} ${pct}%${engineOut ? '  ENGINE OUT' : ''}`;
+}
+
+/** Flares left, e.g. `FLR ■■■■□□  X`. */
+export function flareLine(left: number, max: number): string {
+  return `FLR ${'■'.repeat(left)}${'□'.repeat(Math.max(0, max - left))}  X`;
+}

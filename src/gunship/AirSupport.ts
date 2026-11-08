@@ -110,6 +110,18 @@ export class AirSupport {
   }
 
   /**
+   * The selected strike is aborted before it gets there (too much AA, M8+ Phase E): it goes
+   * back on its cooldown, nothing lands. Returns the strike, or null if none was selected/ready.
+   */
+  abort(): StrikeDef | null {
+    if (this.mode === null || !this.ready(this.mode)) return null;
+    const def = this.defs[this.mode];
+    this.readyAt[def.id] = this.time + def.cooldown;
+    this.mode = null;
+    return def;
+  }
+
+  /**
    * Advances time and lands every impact that is due, in order. `whistle` is called once per
    * falling bomb when its whistle should start, with the seconds until it lands.
    */
@@ -133,6 +145,15 @@ export class AirSupport {
     for (let i = this.jets.length - 1; i >= 0; i--) {
       if (this.time > this.jets[i].t0 + JET_TAIL) this.jets.splice(i, 1);
     }
+  }
+
+  /**
+   * Jet `j`'s nose pitch now (radians, positive = nose down): it dives in at 15 m/s and pulls up
+   * at 40 m/s after passing the target, as in `jetPosition` (M8+ Phase E, for the jet model).
+   */
+  jetPitch(j: JetPass): number {
+    const dt = this.time - j.t0;
+    return dt > 0 ? -Math.atan2(40, j.strike.jetSpeed) : Math.atan2(15, j.strike.jetSpeed);
   }
 
   /** Where jet `j` is now (null while it is still far away or long gone). */

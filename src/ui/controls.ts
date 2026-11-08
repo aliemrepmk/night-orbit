@@ -7,6 +7,7 @@ export const CONTROLS: readonly (readonly [key: string, action: string])[] = [
   ['T', 'Air support: gun run → bomb → off'],
   ['WHEEL (T)', 'Turn the gun run; click calls it'],
   ['F', 'Sensor: white-hot / black-hot / NV'],
+  ['X', 'Flares: decoy a missile (when you hear the warning)'],
   ['H', 'Show / hide these controls'],
   ['ESC', 'Pause'],
   ['F1', 'Performance stats'],

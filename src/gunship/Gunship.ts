@@ -15,6 +15,8 @@ export class Gunship {
   /** Orbit angle in radians; 0 = due east of the center. */
   angle = 0;
   time = 0;
+  /** Orbit speed factor: below 1 after an engine is lost (M8+ Phase E). */
+  speedScale = 1;
 
   constructor(private readonly cfg: OrbitConfig = CONFIG.orbit) {
     this.updatePosition();
@@ -29,6 +31,7 @@ export class Gunship {
   reset(x: number, z: number): void {
     this.angle = 0;
     this.time = 0;
+    this.speedScale = 1;
     this.snapTo(x, z);
   }
 
@@ -41,7 +44,8 @@ export class Gunship {
 
   update(dt: number): void {
     this.time += dt;
-    this.angle = (this.angle + ((2 * Math.PI) / this.cfg.period) * dt) % (2 * Math.PI);
+    this.angle =
+      (this.angle + ((2 * Math.PI) / this.cfg.period) * this.speedScale * dt) % (2 * Math.PI);
     const k = 1 - Math.exp(-dt / this.cfg.centerGlideTau);
     this.center.x += (this.targetCenter.x - this.center.x) * k;
     this.center.z += (this.targetCenter.z - this.center.z) * k;

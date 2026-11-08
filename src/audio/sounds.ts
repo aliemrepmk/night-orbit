@@ -17,7 +17,8 @@ export interface SoundDef {
   readonly thumpEnd: number;
 }
 
-export type SoundId = `fire${WeaponId}` | `impact${OrdnanceId}`;
+/** Plus the air-defense sounds (M8+ Phase E): AA bursts, hits on the hull, flare pops. */
+export type SoundId = `fire${WeaponId}` | `impact${OrdnanceId}` | 'aaBurst' | 'hullHit' | 'flare';
 
 export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
   fire25: {
@@ -98,6 +99,34 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
     thumpGain: 0.85,
     thumpStart: 60,
     thumpEnd: 19,
+  },
+  // Air defense (M8+ Phase E): distant AA thumps, a metallic bang in the airframe, flares popping.
+  aaBurst: {
+    duration: 0.5,
+    noiseGain: 0.12,
+    cutoffStart: 700,
+    cutoffEnd: 150,
+    thumpGain: 0.18,
+    thumpStart: 90,
+    thumpEnd: 45,
+  },
+  hullHit: {
+    duration: 0.45,
+    noiseGain: 0.7,
+    cutoffStart: 4000,
+    cutoffEnd: 400,
+    thumpGain: 0.5,
+    thumpStart: 140,
+    thumpEnd: 60,
+  },
+  flare: {
+    duration: 0.25,
+    noiseGain: 0.35,
+    cutoffStart: 6000,
+    cutoffEnd: 1500,
+    thumpGain: 0.1,
+    thumpStart: 300,
+    thumpEnd: 120,
   },
 };
 

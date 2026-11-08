@@ -30,6 +30,8 @@ export class Sensor {
   /** Player settings (M8): mouse sensitivity multiplier, and 0 turns camera shake off. */
   sensitivityScale = 1;
   shakeScale = 1;
+  /** Camera jitter factor: up after an engine is lost (a rougher ride, M8+ Phase E). */
+  jitterScale = 1;
 
   constructor(
     private readonly gunship: Gunship,
@@ -126,7 +128,7 @@ export class Sensor {
 
     if (this.cfg.jitterDeg > 0) {
       const t = this.time;
-      const j = this.cfg.jitterDeg * DEG;
+      const j = this.cfg.jitterDeg * this.jitterScale * DEG;
       cam.rotateY(j * (Math.sin(t * 1.7) + 0.5 * Math.sin(t * 4.3 + 1.1)));
       cam.rotateX(j * (Math.sin(t * 1.3 + 2.0) + 0.5 * Math.sin(t * 3.7)));
     }
@@ -156,6 +158,7 @@ export class Sensor {
     this.fovDeg = this.targetFovDeg;
     this.shakeDeg = 0;
     this.shakeTauNow = 0;
+    this.jitterScale = 1;
     this.aim.set(x, 0, z);
     this.constrainAim();
     this.syncCamera();

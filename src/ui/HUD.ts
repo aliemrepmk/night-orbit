@@ -9,7 +9,7 @@ export interface FriendlyArrow extends EdgeArrow {
 }
 
 /** Off-screen friendlies drawn at once: Ridgeback and Kestrel 6. */
-const MAX_ARROWS = 2;
+const MAX_ARROWS = 4; // Ridgeback, Kestrel 6, and up to two inbound missiles
 
 export interface HudData {
   altitude: number;
@@ -50,6 +50,10 @@ export interface HudData {
   arrows: readonly FriendlyArrow[];
   /** The controls overlay (`H`, M8). */
   help: boolean;
+  /** Air defense (M8+ Phase E): the hull and flares lines, and the most urgent warning ('' = none). */
+  hull: string;
+  flares: string;
+  airAlert: string;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
@@ -114,10 +118,12 @@ export class HUD {
       <div class="hud-alert" data-k="alert"></div>
       <div class="hud-row bottom">
         <div class="hud-block">
+          <div class="hud-team" data-k="hull"></div>
           <div class="hud-team" data-k="kestrel"></div>
           <div class="hud-team" data-k="team"></div>
           <div data-k="weapons"></div>
           <div class="hud-air" data-k="air"></div>
+          <div data-k="flares"></div>
         </div>
         <div class="hud-block center" data-k="coords"></div>
         <div class="hud-block right">
@@ -156,8 +162,11 @@ export class HUD {
     const preview = d.air.preview;
     this.set(
       'alert',
-      d.dangerClose ? 'DANGER CLOSE' : preview?.danger ? 'FRIENDLIES DANGER CLOSE' : '',
+      d.airAlert ||
+        (d.dangerClose ? 'DANGER CLOSE' : preview?.danger ? 'FRIENDLIES DANGER CLOSE' : ''),
     );
+    this.set('hull', d.hull);
+    this.set('flares', d.flares);
     this.set(
       'air',
       d.air.strikes.map((s) => strikeLine(s.label, s.cooldownLeft, s.selected)).join('\n'),

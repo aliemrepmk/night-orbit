@@ -5,6 +5,8 @@ import { SOUNDS, WHISTLE, type SoundId } from './sounds';
 /** The live nodes of the engine drone (M8+ Phase B). */
 interface EngineNodes {
   readonly saws: OscillatorNode[];
+  /** Each engine's own level (an engine lost to AA falls silent, M8+ Phase E). */
+  readonly sawGains: GainNode[];
   readonly whine: OscillatorNode;
   readonly muffle: BiquadFilterNode;
   readonly level: GainNode;
@@ -121,12 +123,14 @@ export class AudioEngine {
     sawLp.type = 'lowpass';
     sawLp.frequency.value = E.cutoffHz;
     sawLp.connect(beat);
+    const sawGains: GainNode[] = [];
     const saws = engineFrequencies(1).map((f) => {
       const o = ctx.createOscillator();
       o.type = 'sawtooth';
       o.frequency.value = f;
       const g = ctx.createGain();
       g.gain.value = 0.25;
+      sawGains.push(g);
       o.connect(g).connect(sawLp);
       o.start();
       return o;
@@ -161,7 +165,7 @@ export class AudioEngine {
     beat.connect(muffle).connect(level).connect(bus);
     if (pan) bus.connect(pan).connect(master);
     else bus.connect(master);
-    return { saws, whine, muffle, level, bus, pan };
+    return { saws, sawGains, whine, muffle, level, bus, pan };
   }
 
   private applyEngineMode(): void {
@@ -218,6 +222,35 @@ export class AudioEngine {
       n.stop(t1);
     }
   }
+
+  /** A short square-wave beep (the missile warning tone, M8+ Phase E). */
+  beep(hz: number, seconds: number, volume = 0.12): void {
+    const { ctx, master } = this;
+    if (!ctx || !master || ctx.state !== 'running') return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = hz;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(volume, t0);
+    g.gain.setValueAtTime(0, t0 + seconds);
+    osc.connect(g).connect(master);
+    osc.start(t0);
+    osc.stop(t0 + seconds + 0.01);
+  }
+
+  /** Engines still running (M8+ Phase E): after one is lost to AA, its part of the drone stops. */
+  setEnginesRunning(n: number): void {
+    const { ctx, engine } = this;
+    this.enginesRunning = n;
+    if (!ctx || !engine) return;
+    engine.sawGains.forEach((g, i) =>
+      g.gain.setTargetAtTime(i < n ? 0.25 : 0, ctx.currentTime, 0.6),
+    );
+  }
+
+  /** Engines running (4, or 3 once one is lost). */
+  enginesRunning = 4;
 
   play(id: SoundId, volume = 1): void {
     const { ctx, master, noise } = this;

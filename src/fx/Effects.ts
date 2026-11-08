@@ -261,6 +261,80 @@ export class Effects {
     this.smokePuff(p, dt, intensity * 0.6);
   }
 
+  /** A missile in flight (M8+ Phase E): a white-hot motor and a thin smoke trail. Every tick. */
+  missileTrail(p: Vector3, dt: number): void {
+    const rng = this.rng;
+    this.hot.spawn({
+      ...still(p.x, p.y, p.z),
+      life: 0.12,
+      size0: 3.2,
+      size1: 1.2,
+      heat0: FIRE.max,
+      heat1: FIRE.max,
+      glow0: GLOW.fire,
+      glow1: GLOW.fire * 0.5,
+      albedo: 0,
+      gravity: 0,
+      drag: 0,
+      alpha: 1,
+    });
+    if (rng() < 40 * dt) {
+      this.smoke.spawn({
+        x: p.x + range(rng, -0.5, 0.5),
+        y: p.y,
+        z: p.z + range(rng, -0.5, 0.5),
+        vx: 0,
+        vy: 0.3,
+        vz: 0,
+        life: range(rng, 3, 5),
+        size0: 2,
+        size1: 7,
+        heat0: 0.6,
+        heat1: 0.2,
+        glow0: 0,
+        glow1: 0,
+        albedo: 0.3,
+        gravity: -0.05,
+        drag: 0.3,
+        alpha: 0.6,
+      });
+    }
+  }
+
+  /**
+   * Flares (M8+ Phase E): a spray of blinding-hot pellets falling away below the aircraft, seen
+   * along the sensor's view (from `eye` toward `toward`), so the feed shows the decoy cloud.
+   */
+  flares(eye: Vector3, toward: Vector3): void {
+    const rng = this.rng;
+    const dx = toward.x - eye.x;
+    const dy = toward.y - eye.y;
+    const dz = toward.z - eye.z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    for (let i = 0; i < 16; i++) {
+      const along = range(rng, 140, 260);
+      this.hot.spawn({
+        x: eye.x + (dx / len) * along + range(rng, -25, 25),
+        y: eye.y + (dy / len) * along + range(rng, -10, 10),
+        z: eye.z + (dz / len) * along + range(rng, -25, 25),
+        vx: range(rng, -8, 8),
+        vy: range(rng, -14, -4),
+        vz: range(rng, -8, 8),
+        life: range(rng, 2.5, 4),
+        size0: range(rng, 3, 5),
+        size1: 1.5,
+        heat0: FIRE.max,
+        heat1: FIRE.max * 0.8,
+        glow0: GLOW.fire * 1.5,
+        glow1: GLOW.fire,
+        albedo: 0,
+        gravity: 9.8,
+        drag: 0.6,
+        alpha: 1,
+      });
+    }
+  }
+
   /** Dark smoke from a damaged vehicle: call every tick. */
   smokePuff(p: Vector3, dt: number, intensity = 1): void {
     const rng = this.rng;

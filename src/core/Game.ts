@@ -25,6 +25,8 @@ import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import {
   failReasonText,
+  flareLine,
+  hullLine,
   kestrelLine,
   objectiveLine,
   subtitleLine,
@@ -33,6 +35,7 @@ import {
 } from '../ui/hudFormat';
 import { InfantryRenderer } from '../units/InfantryRenderer';
 import { TANK_BLAST, type Explosives } from '../world/explosives';
+import type { AirDefense } from '../combat/AirDefense';
 import { createBattle, createWorld, type StaticWorld } from '../mission/battle';
 import { rateMission, summaryRows, type MissionStats } from '../mission/stats';
 import { edgeArrow } from '../ui/edgeArrow';
@@ -43,6 +46,7 @@ import { browserStorage, loadSettings, saveSettings, type Settings } from '../ui
 import { DebugOverlay } from '../debug/DebugOverlay';
 import { formatPlacement, mapOverlay, nextTourStop } from '../debug/mapOverlay';
 import { HelicopterRenderer } from '../units/HelicopterRenderer';
+import { AirRenderer } from '../render/AirRenderer';
 import { CHEAT_KEYS, nextTimeScale, phaseFromUrl } from '../debug/cheats';
 import { MISSION } from '../mission/missionDef';
 import { largestFootprint } from '../mission/clinic';
@@ -87,6 +91,8 @@ export class Game {
   private readonly overlay: DebugOverlay | null = null;
   private readonly effects: Effects;
   private readonly heliView = new HelicopterRenderer();
+  /** Strike jets and AA emplacements (M8+ Phase E). */
+  private readonly airView = new AirRenderer();
   private readonly infantryView = new InfantryRenderer();
   private readonly vehicleView = new VehicleRenderer();
   private readonly audio = new AudioEngine();
@@ -107,6 +113,10 @@ export class Game {
   private stats!: MissionStats;
   /** The fuel depot's tanks (M8+ Phase D). */
   private depot!: Explosives;
+  /** Enemy air defense (M8+ Phase E): AA, hull, missiles, flares. */
+  private airDefense!: AirDefense;
+  /** Seconds to the next missile-warning beep. */
+  private beepLeft = 0;
   private weapons!: Weapons;
   private projectiles!: Projectiles;
   private explosions!: Explosions;
@@ -149,6 +159,7 @@ export class Game {
     this.renderer = new Renderer(canvas, this.sensor.camera);
     this.renderer.scene.add(this.world.root);
     this.renderer.scene.add(this.infantryView.root, this.vehicleView.mesh, this.heliView.mesh);
+    this.renderer.scene.add(this.airView.root);
     this.effects = new Effects(ground, createRng(77));
     this.renderer.scene.add(this.effects.root);
 
@@ -185,6 +196,9 @@ export class Game {
     this.host = b.host;
     this.stats = b.stats;
     this.depot = b.depot;
+    this.airDefense = b.airDefense;
+    this.units.plane = this.gunship; // MANPADS teams launch at the gunship
+    this.audio.setEnginesRunning(4);
     this.weapons = new Weapons();
     this.projectiles = new Projectiles();
     this.air = new AirSupport(createRng(8080));
@@ -212,6 +226,22 @@ export class Game {
       this.audio.play(`impact${e.weapon}`, impactVolume(e.distanceToAim, e.weapon)),
     );
     this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
+    // Air defense (M8+ Phase E): hits shake the feed and break it up with static.
+    this.bus.on('hullHit', (e) => {
+      this.sensor.addShake(e.by === 'missile' ? 0.9 : 0.3, e.by === 'missile' ? 0.6 : undefined);
+      this.sensorFx.triggerSwitch();
+      this.audio.play('hullHit', e.by === 'missile' ? 1 : 0.6);
+    });
+    this.bus.on('engineLost', () => {
+      this.gunship.speedScale = CONFIG.airDefense.engineOutSpeed;
+      this.sensor.jitterScale = CONFIG.airDefense.engineOutJitter;
+      this.audio.setEnginesRunning(3);
+    });
+    this.bus.on('flares', (e) => {
+      if (e.result === 'empty') return;
+      this.audio.play('flare');
+      this.effects.flares(this.gunship.position, this.sensor.aim);
+    });
 
     // `?phase=village` starts at a phase (dev builds or ?debug=1).
     const cheats = import.meta.env.DEV || this.debug;
@@ -295,6 +325,12 @@ export class Game {
     this.renderer.render(this.thermalFrame(now / 1000));
     this.updateHud();
     this.audio.tuneEngine(engineTune(this.gunship.angle, now / 1000));
+    // Missile warning: a fast beep while a missile is climbing at us.
+    this.beepLeft -= elapsed;
+    if (this.flow.playing && this.airDefense.inbound.length > 0 && this.beepLeft <= 0) {
+      this.audio.beep(1250, 0.09);
+      this.beepLeft = 0.3;
+    }
     this.overlay?.render(this.sensor.camera, window.innerWidth, window.innerHeight);
     this.input.endFrame();
   }
@@ -339,6 +375,11 @@ export class Game {
       this.host.update(dt, this.sensor.aim);
       this.units.update(dt);
       this.vehicles.update(dt);
+      this.airDefense.update(dt, this.gunship, (from, to, n) => {
+        this.units.burstFrom(from, { position: to }, n, 'enemy', true);
+        const d = Math.hypot(from.x - this.sensor.aim.x, from.z - this.sensor.aim.z);
+        this.audio.play('aaBurst', impactVolume(d));
+      });
       this.followTeam();
       if (this.host.mission.status === 'complete') this.complete();
     }
@@ -350,6 +391,12 @@ export class Game {
         this.burnAt.set(def.x + ox * def.radius, def.y + 3.5, def.z + oz * def.radius);
         this.effects.fire(this.burnAt, dt, 1.6 * intensity);
       }
+    }
+    // Missiles in flight leave a smoke trail; destroyed AA guns burn for a while.
+    for (const m of this.airDefense.missiles)
+      if (!m.done) this.effects.missileTrail(m.position, dt);
+    for (const g of this.airDefense.guns) {
+      if (!g.alive && g.deadFor < 40) this.effects.fire(g.position, dt, 1.5);
     }
     this.vehicleView.emitEffects(this.vehicles.vehicles, this.effects, dt);
     if (this.host.helicopter.state === 'destroyed')
@@ -421,6 +468,12 @@ export class Game {
     this.infantryView.sync(this.units, heightPx, this.sensor.fovDeg);
     this.vehicleView.sync(this.vehicles.vehicles);
     this.heliView.sync(this.host.helicopter);
+    this.airView.sync(
+      this.air,
+      (x, z) => this.terrain.heightAt(x, z),
+      this.airDefense,
+      this.gunship.position,
+    );
     const g = CONFIG.groundFire;
     this.effects.sync(heightPx, this.sensor.fovDeg, this.gunship.position, (emit) => {
       this.projectiles.forEachActive((s) => {
@@ -480,7 +533,14 @@ export class Game {
       if (trigger.strikeClicks > 0) {
         const { x, z } = this.sensor.aim;
         const axis = this.air.axis;
-        const def = this.air.call(x, z);
+        // AA near the target (M8+ Phase E): enough of it and the pilot aborts; one gun may hit the jet.
+        const threat = this.airDefense.strikeThreat(x, z);
+        const aborted = threat >= CONFIG.airDefense.abortAt ? this.air.abort() : null;
+        if (aborted) this.bus.emit('strikeAborted', { strike: aborted.id });
+        const def = aborted ? null : this.air.call(x, z);
+        if (def && threat > 0 && this.spreadRng() < CONFIG.airDefense.jetHitChance) {
+          this.bus.emit('jetHit', { strike: def.id });
+        }
         if (def) {
           const danger = this.units.friendlies.some(
             (f) =>
@@ -517,6 +577,8 @@ export class Game {
       this.sensorFx.triggerSwitch();
       this.host.playerDid('sensor');
     }
+    // X: flares (M8+ Phase E) — decoy a missile in flight; wasted if nothing is inbound.
+    if (this.input.wasPressed('KeyX')) this.airDefense.dropFlares(this.gunship);
     if (this.input.wasPressed('F1')) this.debug = !this.debug;
     if (this.input.wasPressed('KeyH')) this.help = !this.help;
     if (this.overlay) {
@@ -604,6 +666,14 @@ export class Game {
       sensorMode: sensorModeLabel(this.sensorMode),
       clock: this.missionClock,
       arrows: this.friendlyArrows(),
+      hull: hullLine(this.airDefense.hull, CONFIG.airDefense.hull, this.airDefense.engineLost),
+      flares: flareLine(this.airDefense.flares, CONFIG.airDefense.flares),
+      airAlert:
+        this.airDefense.inbound.length > 0
+          ? 'MISSILE LAUNCH · FLARES (X)'
+          : this.airDefense.hull < CONFIG.airDefense.engineOutAt
+            ? 'HULL CRITICAL'
+            : '',
       help: this.help && this.flow.playing,
       kestrel: this.host.helicopter.alive
         ? kestrelLine(
@@ -670,6 +740,7 @@ export class Game {
     this.teamPoint.y = this.terrain.heightAt(this.teamPoint.x, this.teamPoint.z) + 1;
     add(this.teamPoint, 'RIDGEBACK');
     if (this.host.helicopter.alive) add(this.host.helicopter.position, 'KESTREL 6');
+    for (const m of this.airDefense.inbound.slice(0, 2)) add(m.position, 'MISSILE');
     return out;
   }
 
