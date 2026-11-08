@@ -30,7 +30,7 @@ describe('air defense in the mission (M8+ Phase E)', { timeout: 60_000 }, () => 
     expect(g.airDefense.gun('aa_forest')!.active).toBe(false);
     const ship = new Gunship();
     ship.snapTo(MAP.zones.fields.center[0], MAP.zones.fields.center[1]);
-    const tracers = fly(g, ship, 20);
+    const tracers = fly(g, ship, 45);
     expect(tracers).toBeGreaterThan(30);
     expect(g.airDefense.hull).toBeLessThan(100);
   });

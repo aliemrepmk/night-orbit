@@ -523,25 +523,25 @@ export const CONFIG = {
      * sensor can reach, so every gun that shoots at you can be shot back. */
     engageRadius: 470,
     /** Seconds between bursts (random in range) and tracers per burst. */
-    burstMin: 1.1,
-    burstMax: 2.0,
+    burstMin: 1.4,
+    burstMax: 2.4,
     burstTracers: 6,
-    /** Chance a burst hits: best at `nearSlant` m, worst at `farSlant`, ramping up over
+    /** Chance a burst hits (tuned in the Phase F check: ~15 % hull a minute per ignored gun): best at `nearSlant` m, worst at `farSlant`, ramping up over
      * `trackSeconds` of continuous firing (the gunner walks the rounds onto you). */
-    hitNear: 0.5,
-    hitFar: 0.12,
+    hitNear: 0.3,
+    hitFar: 0.08,
     nearSlant: 750,
     farSlant: 1500,
-    trackSeconds: 8,
-    hitDamage: 3,
+    trackSeconds: 12,
+    hitDamage: 2,
     /** AA gun hit points (one 105 mm, two 40 mm, a long 25 mm burst). */
     gunHp: 300,
     /** MANPADS: aim time, missile speed (m/s), damage on a hit, and launch reach (slant m). */
     manpadsAim: 2,
-    manpadsReload: 25,
+    manpadsReload: 35,
     manpadsRange: 1700,
     missileSpeed: 300,
-    missileDamage: 30,
+    missileDamage: 22,
     /** Flares decoy a missile dropped at least this many seconds before it would hit. */
     flareLead: 0.8,
     flares: 6,
