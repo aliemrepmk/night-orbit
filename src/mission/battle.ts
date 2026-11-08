@@ -13,6 +13,7 @@ import { Terrain } from '../world/Terrain';
 import { mapHeightField } from '../world/terrainShape';
 import { WorldBuilder } from '../world/WorldBuilder';
 import { Explosives } from '../world/explosives';
+import { inForest } from '../world/forest';
 import { ORDNANCE } from '../gunship/airSupportDefs';
 import type { Footprint } from './clinic';
 import { MISSION } from './missionDef';
@@ -63,6 +64,7 @@ export function createBattle(w: StaticWorld) {
         lineOfSight: (a, b) => w.collision.lineOfSight(a, b),
         pushOut: (x, z, r, out) => w.collision.pushOut(x, z, r, out),
         detour: (fx, fz, tx, tz, out) => w.crossings.detour(fx, fz, tx, tz, out),
+        concealment: (x, z) => (inForest(MAP, x, z) ? CONFIG.forest.concealment : 1),
       },
       cover: w.world.cover,
     },

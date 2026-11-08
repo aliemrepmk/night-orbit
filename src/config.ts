@@ -512,6 +512,11 @@ export const CONFIG = {
     burnSeconds: 90,
   },
 
+  /** Black Pine Forest (M8+ Phase D): enemy fire at Ridgeback under the trees hits this much as often. */
+  forest: {
+    concealment: 0.55,
+  },
+
   fx: {
     /** Constant wind for the mission: smoke drifts with it (m/s). */
     wind: [1.6, 0, -0.9] as readonly [number, number, number],

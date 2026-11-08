@@ -61,6 +61,8 @@ export interface UnitWorld {
    * be walked through (the stream: go via the bridge). Writes `out`; false = walk straight.
    */
   detour?(fx: number, fz: number, tx: number, tz: number, out: { x: number; z: number }): boolean;
+  /** How exposed a target at (x, z) is to enemy fire (1 = open; less under the forest's trees). */
+  concealment?(x: number, z: number): number;
 }
 
 /** Open ground: nothing blocks anything (tests, and before a map exists). */
@@ -253,7 +255,14 @@ export class UnitManager {
   /** Enemy fire from `from` at Ridgeback for `dt` seconds: dps × accuracy at that distance. */
   damageTeam(from: Vector3, target: Infantry, dps: number, maxRange: number, dt: number): void {
     const d = Math.hypot(target.position.x - from.x, target.position.z - from.z);
-    this.team.damage(dps * enemyAccuracy(d, maxRange, this.cfg.enemyFire) * dt);
+    this.team.damage(
+      dps * enemyAccuracy(d, maxRange, this.cfg.enemyFire) * this.exposure(target) * dt,
+    );
+  }
+
+  /** Concealment of a target under the trees (M8+ Phase D): 1 = in the open. */
+  private exposure(target: Infantry): number {
+    return this.world.concealment?.(target.position.x, target.position.z) ?? 1;
   }
 
   /** A visible burst from any shooter (soldier or mounted gun). */
@@ -530,7 +539,9 @@ export class UnitManager {
           return;
         }
         e.turnToward(Math.atan2(dx, dz), dt);
-        this.team.damage(e.def.dps * enemyAccuracy(dist, e.def.range, this.cfg.enemyFire) * dt);
+        this.team.damage(
+          e.def.dps * enemyAccuracy(dist, e.def.range, this.cfg.enemyFire) * this.exposure(t) * dt,
+        );
         e.fireTimer -= dt;
         if (e.fireTimer <= 0) {
           const ef = this.cfg.enemyFire;

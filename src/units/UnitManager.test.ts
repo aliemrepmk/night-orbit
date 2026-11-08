@@ -86,6 +86,24 @@ describe('UnitManager', () => {
     expect(tracer).toBe(true);
   });
 
+  it('enemy fire at a concealed team (under the forest) drains less (M8+ Phase D)', () => {
+    const lost = (concealment: number) => {
+      const bus = new EventBus<GameEvents>();
+      const units = new UnitManager(flat, bus, createRng(1), ROUTE, {
+        world: { lineOfSight: () => true, pushOut: () => false, concealment: () => concealment },
+      });
+      const lead = units.friendlies[0].position;
+      const e = units.spawnEnemy(INFANTRY.machineGunner, lead.x + 100, lead.z)!;
+      e.standoff = 0.95;
+      const before = units.team.value;
+      step(units, 2);
+      return before - units.team.value;
+    };
+    const open = lost(1);
+    expect(open).toBeGreaterThan(0);
+    expect(lost(0.5)).toBeCloseTo(open * 0.5, 0);
+  });
+
   it('drains team health by dps × accuracy × time while enemies fire', () => {
     const { units } = rig();
     const lead = units.friendlies[0].position;
