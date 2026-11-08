@@ -44,7 +44,7 @@
 11. [Performance Budget](#11-performance-budget)
 12. [Testing Strategy](#12-testing-strategy)
 13. [Risks & Mitigations](#13-risks--mitigations)
-14. [Future: Endless Survival Mode](#14-future-endless-survival-mode)
+14. [Future: Endless Survival Mode](#14-future-endless-survival-mode) (and the backlog)
 
 ---
 
@@ -217,6 +217,10 @@ night-orbit/
     │   ├── HUD.ts              ← telemetry, reticles, ammo, reload, team status, objective
     │   ├── reticles.ts         ← SVG reticle shapes per weapon
     │   ├── Screens.ts          ← title, briefing, pause, settings, fail, complete
+    │   ├── screenFlow.ts       ← (as built) the screen state machine
+    │   ├── settings.ts         ← (as built) settings + safe localStorage save/load
+    │   ├── edgeArrow.ts        ← (as built) off-screen friendly arrows
+    │   ├── briefingMap.ts      ← (as built) the briefing's map sketch from MapData
     │   └── hud.css
     │
     └── debug/
@@ -766,7 +770,7 @@ Target total duration: **12–15 minutes**. Enemy counts below are starting valu
 ### Phase 0 — Briefing & Calibration (~1 min)
 
 - Briefing screen: Ridgeback's observation post was compromised; they must cross the Varesh Valley on foot to LZ QUARRY. LANTERN 2-1 provides overwatch.
-- In-game: the orbit starts over the OP. The FCO walks through controls as **prompted steps**: slew the sensor, switch to each weapon, toggle polarity. Each prompt completes when the player does it.
+- In-game: the orbit starts over the OP, with the sensor looking away from Ridgeback. The FCO walks through controls as **prompted steps**: find Ridgeback (crosshair on their strobes), switch to each weapon, toggle polarity. Each prompt completes only when the player does it after the prompt (no timeout; the FCO repeats the hint).
 - **Teaches:** controls, how to spot strobes.
 
 ### Phase 1 — Fields (~3 min)
@@ -937,13 +941,158 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Waves are about 1.6× bigger, with extra groups in every phase. The crossroads now has foot soldiers with the convoy, and LZ background waves come every 18 s, then every 9 s.
   - The village has 143 houses: 100 more along every street and two new outer lanes (`north_row`, `south_row`).
   - Collision boxes are filed in a 32 m grid, so line-of-sight and wall checks scale with the bigger village.
-- **As built:** `src/mission/` (types, `script.ts` builders, `missionDef.ts`, `Mission` runner, `MissionHost` on the real systems, `Radio`, `Chatter`, `lines.ts`, `clinic.ts`); `units/Helicopter.ts`; `debug/cheats.ts`. The test scene became `units/spawning.ts` (scripted groups at named sites + per-zone background waves). A minimal mission-complete screen (kills, time, health) until M8.
+- **As built:** `src/mission/` (types, `script.ts` builders, `missionDef.ts`, `Mission` runner, `MissionHost` on the real systems, `Radio`, `Chatter`, `lines.ts`, `clinic.ts`); `units/Helicopter.ts`; `debug/cheats.ts`. The test scene became `units/spawning.ts` (scripted groups at named sites + per-zone background waves). A minimal mission-complete screen (kills, time, health), replaced by M8's screens.
 
-### M8 — UI Screens & Settings (1–2 days)
+### M8 — UI Screens & Settings (1–2 days) — ✅ signed off (2026-11-09)
 
 - Title, briefing, pause, settings, fail, complete with stats and rating. Off-screen friendly arrows. Help overlay.
 - 🧪 **Tests:** stats/rating calculation; settings save/load with storage unavailable.
 - ✅ **Done when:** a new player can start, understand the controls and finish without outside help.
+- **As built (code-complete 2026-11-08, awaiting the new-player test):**
+  - Screens: title (click to begin; SETTINGS), briefing (a map sketch drawn from `MapData`: route OP → LZ, zones, roads, stream, clinic; situation and rules text; DEPLOY), pause (RESUME, RESTART MISSION, SETTINGS, controls list), settings, failed (reason + stats + RETRY), complete (grade, label, score + stats + PLAY AGAIN). A pure state machine (`ui/screenFlow.ts`) drives them; aiming (pointer lock) is what starts play.
+  - Stats: kills, gun accuracy (impacts that hurt at least one enemy; air strikes don't count), damage taken, danger-close count, time. Rating 0–100 → S/A/B/C/D, all in `CONFIG.rating`.
+  - Settings: mouse sensitivity, invert Y, volume, screen shake, radio subtitles; saved in localStorage and safe when storage is blocked.
+  - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
+  - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
+
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–B done and play-tested
+
+The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
+grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
+The user play-tests after A+B, after C+D, after E, and fully after F. Each phase ends with
+`npm run check` green, a Chrome check, and STATUS/PLAN updated. M8 is signed off together with
+Phase A (its two screen fixes).
+
+**Phase A — Quick fixes (0.5 day; play-test items 3, 7, 8)** — ✅ code-complete 2026-11-09
+
+- The guns never fire while a strike is being aimed. After a strike is called, the trigger stays
+  locked until the button is released, and a click while the strike is still rearming does
+  nothing. (Cause: calling a strike leaves aiming mode on the same click, so the still-held
+  button became a 25 mm trigger.) The trigger gating moves into a pure module, with a regression test.
+- Title: "CLICK TO BEGIN" in phosphor green (still blinking); SETTINGS moved further down.
+- Briefing: the map and the text are columns of equal height; the sketch is bigger, with a tighter
+  frame, and shows the new map features from Phase D. It still stacks on narrow screens.
+
+**Phase B — Engine sound (0.5 day; item 1; pulls a piece of M9 forward)** — ✅ code-complete 2026-11-09
+
+- Play test (2026-11-09): air strikes made louder (gun-run and bomb impacts, a ≥ 0.8 volume floor wherever they land, a master limiter). Then (five rounds of tuning): the gun run at about half its loudest, the bomb as a bigger 105 mm blast (louder, brighter, ~4 s audible), and a quiet 0.5 s falling air sweep before it lands. Bug fixed on the way: long sounds lost their noise after ~1 s (the noise buffer didn't loop). Last: the bomb ~2 dB quieter, a bigger and longer shake (felt ~560 m away, ~2.5 s), a bigger smoke cloud with a low dust ring that rolls out and hangs, and a crater twice as wide (18 m).
+- Bug fix (2026-11-09): the calibration prompts now check what the player really did (crosshair on Ridgeback, the requested gun selected, F pressed after the prompt) instead of moving on by themselves; the FCO repeats the hint every 18 s.
+
+- A constant synthesized four-engine turboprop drone: detuned low oscillators, a propeller beat
+  (amplitude wobble) and low-passed airflow noise. Pitch and pan shift a little with the orbit.
+  It is muffled while paused and fades in on DEPLOY. A new ENGINE volume slider in settings.
+- 🧪 Pure tests for the pitch and pan curves.
+
+**Phase C — Soldiers that look like soldiers (1.5 days; item 10)**
+
+- Low-poly humans made of instanced parts: head or helmet, torso with plate carrier, arms, legs,
+  rifle. Poses: walk and run cycles, crouch, prone, firing, falling, lying dead.
+- Ridgeback: helmets with NVGs and different kit. Militia: soft caps, mixed clothing.
+- Thermal: faces and hands hottest, clothing cooler, barrels warming up after firing.
+- Budget: about 7 draw calls for up to 120 soldiers.
+- 🧪 A pure pose → joint-angle test.
+
+**Phase D — A fuller map (1.5 days; item 6)**
+
+- **Black Pine Forest** (north-east): dense instanced trees, a logging road, a sawmill clearing
+  (alternate **LZ SAWMILL**) and a forester's lodge. The canopy partly hides soldiers, so you
+  watch the trails and the gaps.
+- A hilltop radio relay (mast and compound, an AA site); a farm hamlet, orchards, a cemetery wall
+  by the village, a power line along the main road, burnt-out wrecks.
+- A **fuel depot** at the crossroads that explodes when shot, killing whatever is next to it.
+- Budgets: PLAN §11 (60 FPS, ≤ 100 draw calls).
+- 🧪 `validateMap` for the new data, the forest blocks line of sight, the depot blast.
+
+**Phase E — Anti-aircraft, strike jets and gunship damage (3 days; items 2, 5)**
+
+- **Strike jets:** a low-poly instanced ground-attack jet (A-10-style) for the gun run and a
+  fighter (F-16-style) for the bomb. They fly real attack runs (dive, fire or release, pull off);
+  their exhausts are hot in thermal. They replace today's hot streak.
+- **AA:** stationary twin-barrel AA guns at authored sites, and AA trucks that come with convoys.
+  They fire climbing tracer streams at the gunship and at jets in range. Each is a hot,
+  high-value target for the 105 mm.
+- **Gunship hull:**
+  - AA hits cost hull integrity. The chance of a hit falls off with range and grows with how
+    long the gunner has been tracking.
+  - Each hit shakes the feed, adds static and plays a hit sound; the pilot calls "We're hit!";
+    the HUD shows `HULL 64%`.
+  - Below 30 %: `HULL CRITICAL` warnings and an engine lost (a slower, wobblier orbit and a
+    different engine sound).
+  - At 0 the mission fails: `LANTERN 2-1 SHOT DOWN` (new fail reason). The hull doesn't repair
+    during the mission.
+- **MANPADS and flares:**
+  - A militia soldier type with a shoulder-fired missile kneels, aims for ~2 s and launches.
+  - The HUD shows a `MISSILE LAUNCH` warning with a tone and an arrow toward the launch; the
+    missile's hot plume climbs at you.
+  - **X** drops flares. Within ~2.5 s of the launch the missile is decoyed (bright flares fall
+    through the feed); too late or with none left, it is a big hull hit.
+  - 6 flare loads (HUD `FLR 6`); dropping flares with no launch wastes one.
+  - MANPADS teams can be killed before they fire (their tubes are hot).
+- **Jets under fire:** a live AA site near a strike's target can damage the jet. Two or more make
+  the pilot abort ("Hammer aborting, too hot!") and the strike goes back on cooldown, so you
+  clear AA before calling the jets.
+- 🧪 AA targeting, range and hit chance; hull, engine loss and the shoot-down fail; the flare
+  window (in time, late, wasted, empty); the jet abort rule.
+
+**Phase F — Mission rewrite with random twists (3–4 days; items 4, 9; the most important)**
+
+_F1. Backbone, the same every run (about 14–17 min):_
+
+| Phase                  | What happens                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| 0. Calibration         | As now, plus the first AA lesson: "Triple-A on the ridge. Kill it before we bring the jets."            |
+| 1. Fields              | Tree-line contact → farmhouse and barn fight → ambush on the walk from the hamlet → bridge.             |
+| 2. Village             | Clinic briefing → west streets → pinned in the square with waves from three sides → technicals.         |
+| 3. Crossroads          | A bigger convoy (trucks, two technicals, an APC, an AA truck); foot assaults alongside; the fuel depot. |
+| 4. Extraction          | Walk to LZ QUARRY under fire; one extraction twist decides the ending.                                  |
+| 5. Forest / last stand | Depends on the twist: the push through Black Pine Forest to LZ SAWMILL, or holding QUARRY.              |
+
+Pacing rules: about 2–3× more soldiers on foot and more, varied vehicles; every walking leg has
+patrols, snipers or an ambush; Ridgeback walks ~20 % faster; the longest quiet stretch is about
+25 s (enforced by the auto-play test).
+
+_F2. Random twists:_ every run rolls its events from a seeded pool: **exactly one extraction
+twist**, plus **2–4 side events**, each with its own chance. Events are never incompatible with
+each other, and the radio foreshadows them.
+
+| Event                   | Chance            | Where                 | What happens                                                                                                                                           |
+| ----------------------- | ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Kestrel shot at, aborts | 45 % (extraction) | Phase 4               | Hidden forest AA opens up on Kestrel 6, which breaks off. Ridgeback pushes through the forest to LZ SAWMILL; kill the forest AA so Kestrel can return. |
+| LZ QUARRY overrun       | 35 % (extraction) | Phase 4               | Militia take the quarry before Ridgeback arrives. Reroute to SAWMILL, chased by a vehicle column on the logging road.                                  |
+| Hold the line           | 20 % (extraction) | Phase 4               | Kestrel 6 is delayed 2 min: a last stand at QUARRY with doubled waves, an APC and MANPADS teams.                                                       |
+| Clinic assault          | 60 %              | Village               | Militia storm the clinic: defend a building you can't hit, with precise 25 mm at its doors.                                                            |
+| Mortar team             | 50 %              | Fields or village     | Rounds start falling near Ridgeback and the team health drains until you find the muzzle flashes and kill it.                                          |
+| Downed jet pilot        | 25 %              | After a strike        | A strike jet is hit by AA and its pilot ejects. Ridgeback detours to recover them while militia race for them too. Bonus if the pilot is saved.        |
+| High-value target       | 35 %              | Crossroads            | A commander's SUV flees with an escort; destroying it before it leaves the map is an optional bonus.                                                   |
+| Civilian bus            | 40 %              | Village or crossroads | A protected bus drives the main road during a fight. Hitting it fails the mission like the clinic.                                                     |
+| Wounded operator        | 30 %              | Village or later      | A Ridgeback member is hit: half speed and more damage taken for the rest of the mission.                                                               |
+| Fog bank                | 20 %              | Any                   | Ground fog for about 2 min: lower thermal contrast and range.                                                                                          |
+| 105 mm jam              | 20 %              | Any                   | The 105 mm jams for about 30 s (a crew line); fight with 25 and 40 mm.                                                                                 |
+| MANPADS ambush          | 40 %              | Crossroads or later   | A surprise missile team during a vehicle fight.                                                                                                        |
+
+- A pure `twists.ts` rolls the events from the run's seed and enforces compatibility and count
+  limits; each event is a set of data-driven mission steps, like the existing script.
+- Every new run gets a new seed; RESTART keeps the same seed. The end screen lists the events
+  (`EVENTS: Clinic assault · Mortar · Kestrel abort`) and the seed. Dev flags: `?seed=1234`,
+  `?twist=mortar,kestrelAbort`.
+- Bonus objectives (pilot, high-value target) add to the rating; hitting the bus fails the
+  mission like the clinic.
+- 🧪 The roll is deterministic per seed, chances hold over many seeds, and conflicting events
+  never roll together; every event forced on, plus 20 random seeds, play to MISSION COMPLETE with
+  the auto-play bot; the new fail paths (shot down, bus hit).
+
+_F3. Radio (more varied lines; commands are in the backlog, §14):_
+
+- About 3× more lines; a pool is used up before any line repeats.
+- Location callouts built from map names: "Two squirters running north from the barn",
+  "Technical eastbound on the main road".
+- Pilot and navigator banter in quiet moments; Ridgeback lines more stressed as health drops.
+- New lines for AA, missiles, flares, hull damage, every twist and the bonus objectives.
+- 🧪 Pool rotation; callouts name the right direction and landmark.
+
+✅ **Done when:** no stretch of the mission feels empty; two runs with different seeds feel
+different; AA and missiles are a threat you manage (and can lose to); the soldiers, jets and
+the forest read clearly in every sensor at 60 FPS.
 
 ### M9 — Audio (1–2 days)
 
@@ -1044,7 +1193,14 @@ The architecture already supports it with little new code:
 - New scoring: survival time, kill-streak multipliers, a local high-score table (localStorage).
 - Optional rotating zones: the team relocates every N waves, moving the orbit focus.
 
-**Stretch ideas after that:** civilians (non-targets) in the village, enemy anti-aircraft fire with flares, checkpoints, recorded voice-over, gamepad support, a replay ("kill cam" from the feed).
+**Stretch ideas after that:** civilians (non-targets) in the village, checkpoints, recorded voice-over, gamepad support, a replay ("kill cam" from the feed).
+
+### Backlog (agreed for later, not scheduled)
+
+- **Radio commands to Ridgeback:** keys to tell the team "hold" or "move" (M8 play test).
+- **Ask the FCO for a target callout:** e.g. "nearest threat to Ridgeback", answered on the
+  radio with a direction and landmark (M8 play test).
+- (Enemy anti-aircraft fire and flares moved into M8+ Phase E.)
 
 ---
 
