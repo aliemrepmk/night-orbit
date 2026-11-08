@@ -26,8 +26,8 @@ const FORMATION: readonly (readonly [number, number])[] = [
 /**
  * Where Ridgeback is going (PLAN.md §7.9): a squad anchor walks a route at a steady pace,
  * holds at every waypoint, and gives each member a formation slot around it. Pure: members
- * steer toward their slots in `UnitManager`. Walks the route back and forth (test scene;
- * M7 drives it with `moveTeam` instead).
+ * steer toward their slots in `UnitManager`. The mission (M7) drives it with `walk` (one route,
+ * once, then hold at its end) and `halt`; a squad built with `loop` walks its route back and forth.
  */
 export class Squad {
   readonly anchor = new Vector3();
@@ -37,19 +37,63 @@ export class Squad {
   /** Index of the waypoint being walked to. */
   private next = 1;
   private dir = 1;
+  /** Holding in place (after `halt`, or at the end of a one-way route) until the next `walk`. */
+  private stopped = false;
+  private route: readonly RoutePoint[];
 
   constructor(
-    readonly route: readonly RoutePoint[],
+    route: readonly RoutePoint[],
     private readonly cfg: SquadConfig = CONFIG.ridgeback,
+    /** Walk the route back and forth forever (tests); otherwise walk it once and stop. */
+    private loop = true,
   ) {
     if (route.length < 2) throw new Error('A squad route needs at least two points');
+    this.route = route;
     this.anchor.set(route[0].x, 0, route[0].z);
     this.heading = Math.atan2(route[1].x - route[0].x, route[1].z - route[0].z);
   }
 
-  /** True while walking between waypoints (false while holding at one). */
+  /** True while walking between waypoints (false while holding at one, or stopped). */
   get moving(): boolean {
-    return this.holdLeft <= 0;
+    return !this.stopped && this.holdLeft <= 0;
+  }
+
+  /** Stopped at the end of a one-way route (or by `halt`). */
+  get arrived(): boolean {
+    return this.stopped;
+  }
+
+  /**
+   * Walks `route` once, from wherever the squad is now (it heads for the route's first point
+   * that is ahead of it), and stops at its last point. Ends any back-and-forth looping.
+   */
+  walk(route: readonly RoutePoint[]): void {
+    if (route.length === 0) return;
+    this.loop = false;
+    this.stopped = false;
+    this.holdLeft = 0;
+    this.route = route;
+    // Skip points the squad is already standing on (a route usually starts where the last ended).
+    let i = 0;
+    while (
+      i < route.length - 1 &&
+      Math.hypot(route[i].x - this.anchor.x, route[i].z - this.anchor.z) < 1
+    )
+      i++;
+    this.next = i;
+    this.dir = 1;
+  }
+
+  /** Stops where it stands and holds (the team fights back while holding). */
+  halt(): void {
+    this.stopped = true;
+    this.holdLeft = 0;
+  }
+
+  /** Puts the squad at (x, z), stopped (phase skips, `?phase=`). */
+  placeAt(x: number, z: number): void {
+    this.anchor.set(x, 0, z);
+    this.halt();
   }
 
   /** The waypoint the squad is heading to (or holding before). */
@@ -58,6 +102,7 @@ export class Squad {
   }
 
   update(dt: number): void {
+    if (this.stopped) return;
     if (this.holdLeft > 0) {
       this.holdLeft = Math.max(0, this.holdLeft - dt);
       return;
@@ -71,6 +116,12 @@ export class Squad {
     if (dist <= stepLen) {
       this.anchor.x = target.x;
       this.anchor.z = target.z;
+      if (!this.loop) {
+        // One-way: walk straight through waypoints; stop at the last one.
+        if (this.next >= this.route.length - 1) this.stopped = true;
+        else this.next++;
+        return;
+      }
       this.holdLeft = this.cfg.holdTime;
       this.advance();
       return;

@@ -7,13 +7,14 @@ import { INFANTRY } from './unitDefs';
 import type { VehicleManager } from './VehicleManager';
 import { VEHICLES, type VehicleDef } from './vehicleDefs';
 import { MAP } from '../world/MapData';
-import { toPathPoints, type MapData, type Vec2 } from '../world/mapTypes';
+import { toPathPoints, type MapData, type Vec2, type ZoneId } from '../world/mapTypes';
 
 /**
- * TEMPORARY test scene on the real map (M7's mission script replaces it): Ridgeback walks its
- * whole journey (OP → fields → village → crossroads → LZ) back and forth, enemy groups keep
- * arriving along the map's approach paths and at its spawn points, and convoys drive the map's
- * vehicle paths.
+ * Where enemies come from on the map (PLAN.md §7.12, §7.14): groups that appear along the map's
+ * approach paths and at its spawn points, trickling in away from where the sensor looks. The
+ * mission script asks for groups at named sites (`queueAt`) and switches the background waves
+ * on and off per zone (`auto`, `zone`). `ConvoySpawner` is the old free-running convoy loop
+ * (kept for tests and tools; the mission sends its own convoys).
  */
 
 /** Ridgeback's full journey: every route segment in order, joined into one route. */
@@ -28,13 +29,16 @@ export function journeyRoute(map: MapData = MAP): RoutePoint[] {
   return out;
 }
 
-export type TestSceneConfig = { readonly [K in keyof typeof CONFIG.testScene]: number };
+export type SpawningConfig = { readonly [K in keyof typeof CONFIG.spawning]: number };
 
 /** Enemies stay inside the playable map (with a margin). */
 const MAP_LIMIT = CONFIG.map.size / 2 - 20;
 
 /** A place a group can appear: an approach path's start (the group then follows it), or a spawn point. */
 interface SpawnSite {
+  /** Enemy path id, or `zone:index` for a spawn point (how the mission script names it). */
+  readonly id: string;
+  readonly zone: ZoneId | null;
   readonly x: number;
   readonly z: number;
   readonly path: Path | null;
@@ -58,6 +62,12 @@ interface Pending {
  * `spawnCooldown` s, scattered over `groupRadius`, one soldier every `trickleInterval` s.
  */
 export class WaveSpawner {
+  /** Background waves on schedule (off: only the groups the mission asks for). */
+  auto = true;
+  /** Background waves only use sites of this zone (null: any site around the team). */
+  zone: ZoneId | null = null;
+  /** Seconds between background waves (starts at the config's). */
+  waveInterval: number;
   private timer: number;
   private started = false;
   private time = 0;
@@ -66,21 +76,63 @@ export class WaveSpawner {
 
   constructor(
     private readonly rng: Rng,
-    private readonly cfg: TestSceneConfig = CONFIG.testScene,
+    private readonly cfg: SpawningConfig = CONFIG.spawning,
     /** Approach paths and spawn points come from here; null = random bearings only. */
-    map: MapData | null = MAP,
+    private readonly map: MapData | null = MAP,
   ) {
-    this.timer = cfg.waveInterval;
+    this.timer = this.waveInterval = cfg.waveInterval;
     if (!map) return;
-    for (const p of Object.values(map.enemyPaths)) {
+    for (const [id, p] of Object.entries(map.enemyPaths)) {
       const path = new Path(toPathPoints(p.points));
-      this.sites.push({ x: path.start.x, z: path.start.z, path, lastUsed: -Infinity });
+      this.sites.push({
+        id,
+        zone: p.zone,
+        x: path.start.x,
+        z: path.start.z,
+        path,
+        lastUsed: -Infinity,
+      });
     }
-    for (const [x, z] of Object.values(map.spawnPoints).flat()) {
-      // A spawn point at a path's start is that path's site already.
-      if (this.sites.some((s) => Math.hypot(s.x - x, s.z - z) < 5)) continue;
-      this.sites.push({ x, z, path: null, lastUsed: -Infinity });
+    for (const [zone, points] of Object.entries(map.spawnPoints) as [ZoneId, readonly Vec2[]][]) {
+      points.forEach(([x, z], i) => {
+        // A spawn point at a path's start is that path's site already.
+        if (this.sites.some((s) => Math.hypot(s.x - x, s.z - z) < 5)) return;
+        this.sites.push({ id: `${zone}:${i}`, zone, x, z, path: null, lastUsed: -Infinity });
+      });
     }
+  }
+
+  /** True if `id` names a site (an enemy path id or `zone:index`), for checking mission data. */
+  hasSite(id: string): boolean {
+    return this.siteById(id) !== null;
+  }
+
+  /**
+   * The mission asks for a group of `count` at a named site (PLAN.md §7.14 `spawnWave`): they
+   * trickle in like any group (and follow the site's approach path, if it has one). `zone:index`
+   * names a spawn point; a spawn point at a path's start resolves to that path. Returns how many
+   * were queued (fewer near the enemy cap), or 0 for an unknown site.
+   */
+  queueAt(units: UnitManager, id: string, count: number): number {
+    const site = this.siteById(id);
+    if (!site) return 0;
+    site.lastUsed = this.time;
+    return this.enqueue(units, site.x, site.z, site.path, count, this.cfg.trickleInterval);
+  }
+
+  /** Drops every soldier still waiting to appear (phase skips). */
+  clearQueue(): void {
+    this.pending.length = 0;
+  }
+
+  private siteById(id: string): SpawnSite | null {
+    const direct = this.sites.find((s) => s.id === id);
+    if (direct) return direct;
+    // `zone:index` of a spawn point that was merged into a path's site.
+    const m = /^([a-z]+):(\d+)$/.exec(id);
+    const pt = m ? this.map?.spawnPoints[m[1] as ZoneId]?.[Number(m[2])] : undefined;
+    if (!pt) return null;
+    return this.sites.find((s) => Math.hypot(s.x - pt[0], s.z - pt[1]) < 5) ?? null;
   }
 
   /** Soldiers still waiting to appear. */
@@ -94,13 +146,16 @@ export class WaveSpawner {
    */
   update(dt: number, units: UnitManager, aim: { x: number; z: number } | null = null): number {
     this.time += dt;
-    if (!this.started) {
+    if (!this.auto) {
+      this.started = true; // the opening groups belong to the free-running mode only
+      this.timer = this.waveInterval;
+    } else if (!this.started) {
       this.started = true;
       for (let g = 0; g < this.cfg.initialGroups; g++) this.queueGroup(units, aim);
     } else {
       this.timer -= dt;
       if (this.timer <= 0) {
-        this.timer += this.cfg.waveInterval;
+        this.timer += this.waveInterval;
         this.queueGroup(units, aim);
       }
     }
@@ -151,6 +206,22 @@ export class WaveSpawner {
       cx = clamp(team.x + Math.sin(bearing) * dist);
       cz = clamp(team.z + Math.cos(bearing) * dist);
     }
+    return this.enqueue(units, cx, cz, path, size, interval);
+  }
+
+  /** Queues `count` soldiers (capped by room under `maxEnemies`) scattered around (cx, cz). */
+  private enqueue(
+    units: UnitManager,
+    cx: number,
+    cz: number,
+    path: Path | null,
+    count: number,
+    interval: number,
+  ): number {
+    const c = this.cfg;
+    const room = c.maxEnemies - units.aliveEnemies - this.pending.length;
+    const size = Math.min(room, count);
+    if (size <= 0) return 0;
     // Queue after anything already waiting, so groups don't overlap in time either.
     let at = Math.max(
       this.time,
@@ -177,11 +248,20 @@ export class WaveSpawner {
       const d = Math.hypot(s.x - team.x, s.z - team.z);
       if (d < c.spawnMin || d > c.spawnMax) return false;
       if (aim && Math.hypot(s.x - aim.x, s.z - aim.z) < c.avoidAimRadius) return false;
+      if (this.zone && s.zone !== this.zone) return false;
       return !rested || this.time - s.lastUsed >= c.spawnCooldown;
     };
     // Prefer rested sites; if every site in range was used recently, take any not in view.
     let pool = this.sites.filter((s) => ok(s, true));
     if (pool.length === 0) pool = this.sites.filter((s) => ok(s, false));
+    // Zone waves with no site in the ring: any site of the zone the sensor isn't looking at.
+    if (pool.length === 0 && this.zone) {
+      pool = this.sites.filter(
+        (s) =>
+          s.zone === this.zone &&
+          (!aim || Math.hypot(s.x - aim.x, s.z - aim.z) >= c.avoidAimRadius),
+      );
+    }
     return pool.length ? pool[Math.floor(this.rng() * pool.length)] : null;
   }
 }
@@ -201,7 +281,7 @@ export class ConvoySpawner {
   constructor(
     private readonly rng: Rng,
     roads: readonly (readonly Vec2[])[] = Object.values(MAP.vehiclePaths),
-    private readonly cfg: TestSceneConfig = CONFIG.testScene,
+    private readonly cfg: SpawningConfig = CONFIG.spawning,
   ) {
     this.roads = roads.map((r) => new Path(toPathPoints(r)));
     this.timer = cfg.convoyFirst;

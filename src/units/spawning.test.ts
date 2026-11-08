@@ -3,7 +3,7 @@ import { CONFIG } from '../config';
 import { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
 import { createRng } from '../core/rng';
-import { ConvoySpawner, WaveSpawner, journeyRoute } from './TestScene';
+import { ConvoySpawner, WaveSpawner, journeyRoute } from './spawning';
 import { MAP } from '../world/MapData';
 
 const TEST_ROUTE = journeyRoute();
@@ -12,7 +12,7 @@ import { VehicleManager } from './VehicleManager';
 
 const DT = 1 / 60;
 const flat = () => 0;
-const cfg = CONFIG.testScene;
+const cfg = CONFIG.spawning;
 
 function rig() {
   const units = new UnitManager(flat, new EventBus<GameEvents>(), createRng(2), TEST_ROUTE);
@@ -189,5 +189,76 @@ describe('ConvoySpawner', () => {
     for (const r of spawner.roads) {
       expect(d).toBeLessThanOrEqual(Math.hypot(r.end.x - t.x, r.end.z - t.z));
     }
+  });
+});
+
+describe('WaveSpawner under the mission script (M7)', () => {
+  const run = (s: WaveSpawner, u: UnitManager, seconds: number) => {
+    let n = 0;
+    for (let k = 0; k < Math.round(seconds / DT); k++) n += s.update(DT, u);
+    return n;
+  };
+
+  it('with auto off, nothing appears unless the script asks', () => {
+    const { units, spawner } = rig();
+    spawner.auto = false;
+    expect(run(spawner, units, 60)).toBe(0);
+  });
+
+  it('queueAt: a group trickles in at a named path start and follows the path', () => {
+    const { units, spawner } = rig();
+    spawner.auto = false;
+    expect(spawner.queueAt(units, 'fields_treeline', 6)).toBe(6);
+    expect(spawner.queued).toBe(6);
+    expect(run(spawner, units, 10)).toBe(6);
+    const [sx, sz] = MAP.enemyPaths.fields_treeline.points[0];
+    for (const e of units.enemies) {
+      expect(Math.hypot(e.position.x - sx, e.position.z - sz)).toBeLessThan(
+        cfg.groupRadius * 1.5 + 30,
+      );
+      expect(e.path).not.toBeNull();
+    }
+  });
+
+  it('queueAt: `zone:index` names a spawn point (a doorway); unknown sites queue nothing', () => {
+    const { units, spawner } = rig();
+    spawner.auto = false;
+    const [x, z] = MAP.spawnPoints.fields[8];
+    expect(spawner.hasSite('fields:8')).toBe(true);
+    spawner.queueAt(units, 'fields:8', 3);
+    run(spawner, units, 5);
+    for (const e of units.enemies) {
+      expect(Math.hypot(e.position.x - x, e.position.z - z)).toBeLessThan(
+        cfg.groupRadius * 1.5 + 10,
+      );
+    }
+    expect(spawner.hasSite('nowhere')).toBe(false);
+    expect(spawner.queueAt(units, 'nowhere', 3)).toBe(0);
+    expect(spawner.queueAt(units, 'fields:99', 3)).toBe(0);
+  });
+
+  it('zone waves only use that zone’s sites', () => {
+    const { units, spawner } = rig();
+    units.squad.anchor.set(MAP.zones.lz.center[0], 0, MAP.zones.lz.center[1]);
+    spawner.zone = 'lz';
+    spawner.waveInterval = 5;
+    run(spawner, units, 60);
+    expect(units.aliveEnemies).toBeGreaterThan(10);
+    const lz = MAP.zones.lz;
+    for (const e of units.enemies) {
+      if (!e.alive) continue;
+      // Every LZ site is within ~300 m of the LZ (soldiers walk inward from there).
+      expect(Math.hypot(e.position.x - lz.center[0], e.position.z - lz.center[1])).toBeLessThan(
+        320,
+      );
+    }
+  });
+
+  it('clearQueue drops soldiers who have not appeared yet', () => {
+    const { units, spawner } = rig();
+    spawner.auto = false;
+    spawner.queueAt(units, 'lz_ne', 8);
+    spawner.clearQueue();
+    expect(run(spawner, units, 10)).toBe(0);
   });
 });

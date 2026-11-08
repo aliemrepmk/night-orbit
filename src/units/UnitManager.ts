@@ -73,10 +73,21 @@ export const OPEN_GROUND: UnitWorld = {
   },
 };
 
+/** A friendly aircraft enemies may shoot at while it is low (Kestrel 6, M7). */
+export interface AirTarget {
+  readonly position: Vector3;
+  /** Low enough to hit from the ground. */
+  readonly exposed: boolean;
+  /** Takes `amount` HP of enemy small-arms fire. */
+  takeFire(amount: number): void;
+}
+
 export interface UnitOptions {
   readonly world?: UnitWorld;
   readonly cover?: CoverSet;
   readonly cfg?: UnitsConfig;
+  /** Ridgeback walks its route back and forth (tests); the mission walks it one way (`walk`). */
+  readonly loopRoute?: boolean;
 }
 
 export interface SpawnOptions {
@@ -121,6 +132,13 @@ export class UnitManager {
   private nextTracer = 0;
   private failed = false;
   time = 0;
+  /**
+   * Ridgeback is aboard the extraction helicopter (M7): the members are gone from the ground,
+   * so nobody can target, hit or draw them.
+   */
+  boarded = false;
+  /** The extraction helicopter, once there is one (enemies shoot it while it is low). */
+  airTarget: AirTarget | null = null;
   /** Called for every visible burst (Game hooks the muzzle-flash effect in). */
   onMuzzleFlash: (at: Vector3) => void = () => {};
 
@@ -135,7 +153,7 @@ export class UnitManager {
     this.world = options.world ?? OPEN_GROUND;
     this.cover = options.cover ?? new CoverSet();
     this.team = new TeamHealth(cfg.ridgeback);
-    this.squad = new Squad(route, cfg.ridgeback);
+    this.squad = new Squad(route, cfg.ridgeback, options.loopRoute ?? true);
     for (let i = 0; i < 4; i++) {
       const f = new Infantry(this.nextId++, 'friendly', INFANTRY.ridgeback, groundAt, cfg.infantry);
       this.squad.slot(i, this.slotPos);
@@ -193,7 +211,10 @@ export class UnitManager {
     const f = this.friendlies[0];
     u.spawn(def, x, z, Math.atan2(f.position.x - x, f.position.z - z));
     const ef = this.cfg.enemyFire;
-    u.standoff = range(this.rng, ef.standoffMin, ef.standoffMax);
+    u.assault = def.type === 'rifleman' && this.rng() < ef.assaultChance;
+    u.standoff = u.assault
+      ? range(this.rng, ef.assaultStandoffMin, ef.assaultStandoffMax)
+      : range(this.rng, ef.standoffMin, ef.standoffMax);
     u.thinkTimer = range(this.rng, 0, this.cfg.infantry.thinkInterval); // staggered thinking
     u.fireTimer = range(this.rng, 0, ef.burstMax);
     if (opts.home) u.home.set(opts.home.x, 0, opts.home.z);
@@ -209,6 +230,7 @@ export class UnitManager {
 
   /** Nearest living Ridgeback member to `pos`, or null. */
   nearestFriendlyTo(pos: Vector3): Infantry | null {
+    if (this.boarded) return null;
     let best: Infantry | null = null;
     let bestD = Infinity;
     for (const f of this.friendlies) {
@@ -235,7 +257,13 @@ export class UnitManager {
   }
 
   /** A visible burst from any shooter (soldier or mounted gun). */
-  burstFrom(from: Vector3, to: Infantry, count: number, side: 'enemy' | 'friendly', heavy = false) {
+  burstFrom(
+    from: Vector3,
+    to: { readonly position: Vector3 },
+    count: number,
+    side: 'enemy' | 'friendly',
+    heavy = false,
+  ) {
     this.onMuzzleFlash(from);
     const g = this.cfg.groundFire;
     for (let k = 0; k < count; k++) {
@@ -266,14 +294,66 @@ export class UnitManager {
     this.awayFrom(e, x, z, 60);
   }
 
+  /** Living enemies within `radius` of (x, z) (mission "zone clear" conditions). */
+  enemiesWithin(x: number, z: number, radius: number): number {
+    let n = 0;
+    for (const e of this.enemies) {
+      if (e.alive && Math.hypot(e.position.x - x, e.position.z - z) <= radius) n++;
+    }
+    return n;
+  }
+
+  /**
+   * The mission's safety valve (PLAN.md §7.14): every living enemy within `radius` of (x, z)
+   * gives up and runs away from Ridgeback for `seconds`, so a hidden one can't soft-lock a step.
+   */
+  routEnemiesWithin(x: number, z: number, radius: number, seconds: number): number {
+    const t = this.teamPosition;
+    let n = 0;
+    for (const e of this.enemies) {
+      if (!e.alive || Math.hypot(e.position.x - x, e.position.z - z) > radius) continue;
+      this.scare(e, t.x, t.z, seconds);
+      n++;
+    }
+    return n;
+  }
+
+  /** Dev cheat `K`: every living enemy dies (counted as Ridgeback's kills, not the player's). */
+  killAllEnemies(): number {
+    let n = 0;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.takeDamage(e.def.hp * 10, 'team', this.teamPosition);
+      if (!e.alive) {
+        n++;
+        this.bus.emit('unitKilled', { kind: 'infantry', by: 'team' });
+      }
+    }
+    return n;
+  }
+
+  /** Puts Ridgeback (anchor and members, in formation) at (x, z), holding (phase skips). */
+  placeTeam(x: number, z: number): void {
+    this.squad.placeAt(x, z);
+    for (let i = 0; i < this.friendlies.length; i++) {
+      const f = this.friendlies[i];
+      this.squad.slot(i, this.slotPos);
+      f.position.set(this.slotPos.x, this.groundAt(this.slotPos.x, this.slotPos.z), this.slotPos.z);
+      f.velocity.set(0, 0, 0);
+    }
+  }
+
   update(dt: number): void {
     this.time += dt;
     this.squad.update(dt);
     this.handleDeaths();
     this.rebuildGrid();
-    for (let i = 0; i < this.friendlies.length; i++) this.updateFriendly(this.friendlies[i], i, dt);
+    if (!this.boarded) {
+      for (let i = 0; i < this.friendlies.length; i++)
+        this.updateFriendly(this.friendlies[i], i, dt);
+    }
     for (const e of this.enemies) if (e.alive) this.updateEnemy(e, dt);
-    for (const f of this.friendlies) this.integrate(f, dt);
+    if (!this.boarded) for (const f of this.friendlies) this.integrate(f, dt);
     for (const e of this.enemies) this.integrate(e, dt);
     this.updateTracers(dt);
 
@@ -286,7 +366,7 @@ export class UnitManager {
 
   private rebuildGrid(): void {
     this.grid.clear();
-    for (const f of this.friendlies) if (f.alive) this.grid.insert(f);
+    if (!this.boarded) for (const f of this.friendlies) if (f.alive) this.grid.insert(f);
     for (const e of this.enemies) if (e.alive) this.grid.insert(e);
     for (const o of this.others) if (o.alive) this.grid.insert(o);
   }
@@ -381,6 +461,22 @@ export class UnitManager {
       this.releaseCover(e);
     }
     e.action = action;
+    e.shootsAir = action === 'fire' && this.wantsAirTarget(e, dist);
+  }
+
+  /**
+   * Shoot Kestrel 6 instead of Ridgeback? Only while it is low, in range and in sight; then the
+   * soldiers it is closer to than the team switch to it, and every other one of the rest does
+   * too, so a landed helicopter draws heavy fire without the team being ignored.
+   */
+  private wantsAirTarget(e: Infantry, teamDist: number): boolean {
+    const air = this.airTarget;
+    if (!air || !air.exposed) return false;
+    const d = Math.hypot(air.position.x - e.position.x, air.position.z - e.position.z);
+    if (d > e.def.range || (d >= teamDist && e.id % 2 === 0)) return false;
+    this.eyeA.copy(e.position).setY(e.position.y + this.cfg.ai.eyeHeight);
+    this.eyeB.copy(air.position).setY(air.position.y + 2);
+    return this.world.lineOfSight(this.eyeA, this.eyeB);
   }
 
   /** Carries out the current decision every tick (steering, firing). */
@@ -428,6 +524,11 @@ export class UnitManager {
           return;
         }
         e.state = 'firing';
+        const air = this.airTarget;
+        if (e.shootsAir && air && air.exposed) {
+          this.fireAtAir(e, air, dt);
+          return;
+        }
         e.turnToward(Math.atan2(dx, dz), dt);
         this.team.damage(e.def.dps * enemyAccuracy(dist, e.def.range, this.cfg.enemyFire) * dt);
         e.fireTimer -= dt;
@@ -512,7 +613,8 @@ export class UnitManager {
    */
   private findCover(e: Infantry, t: Infantry, dist: number): CoverPoint | null {
     const ai = this.cfg.ai;
-    const reach = e.def.range * ai.coverReach;
+    // An assaulter only stops in cover about as close as it means to fight from.
+    const reach = e.def.range * (e.assault ? e.standoff + 0.1 : ai.coverReach);
     const eye = this.eyeA;
     this.eyeB.copy(t.position).setY(t.position.y + ai.eyeHeight);
     return this.cover.nearestFree(e.position.x, e.position.z, ai.coverSearchRadius, (p) => {
@@ -643,6 +745,22 @@ export class UnitManager {
   }
 
   /** A soldier's burst: muzzle flash plus a few tracers that scatter around the target. */
+  /** One soldier firing on Kestrel 6 for `dt` (tracers climb toward it). */
+  private fireAtAir(e: Infantry, air: AirTarget, dt: number): void {
+    const dx = air.position.x - e.position.x;
+    const dz = air.position.z - e.position.z;
+    const d = Math.hypot(dx, dz);
+    e.turnToward(Math.atan2(dx, dz), dt);
+    const ef = this.cfg.enemyFire;
+    air.takeFire(e.def.dps * enemyAccuracy(d, e.def.range, ef) * ef.vsAircraft * dt);
+    e.fireTimer -= dt;
+    if (e.fireTimer <= 0) {
+      e.fireTimer = range(this.rng, ef.burstMin, ef.burstMax);
+      this.eyeA.copy(e.position).setY(e.position.y + 0.3);
+      this.burstFrom(this.eyeA, air, e.def.burst, 'enemy');
+    }
+  }
+
   private burst(from: Infantry, to: Infantry, side: 'enemy' | 'friendly'): void {
     this.eyeA.copy(from.position).setY(from.position.y + 0.3);
     this.burstFrom(this.eyeA, to, from.def.burst, side);

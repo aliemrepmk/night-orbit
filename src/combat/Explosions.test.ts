@@ -10,6 +10,7 @@ import { Sensor } from '../gunship/Sensor';
 import { STRIKES } from '../gunship/airSupportDefs';
 import { WEAPONS } from '../gunship/weaponDefs';
 import { SensorFX } from '../render/SensorFX';
+import { Helicopter } from '../units/Helicopter';
 import { ARMOR } from './Damage';
 import { Explosions, shakeFor, whiteoutFor, type Target } from './Explosions';
 
@@ -177,5 +178,51 @@ describe('Explosions.detonate', () => {
     r.bus.on('unitKilled', (e) => kills.push(e.by));
     ex.detonate(r.sensor.aim.clone(), STRIKES.gunrun.ordnance, true);
     expect(kills).toEqual(['gunrun']);
+  });
+});
+
+describe('Explosions and Kestrel 6 (M7)', () => {
+  function heliRig(height: number) {
+    const gunship = new Gunship();
+    gunship.snapTo(0, 0);
+    const sensor = new Sensor(gunship, { heightAt: () => 0 }, 16 / 9);
+    sensor.syncCamera();
+    const bus = new EventBus<GameEvents>();
+    const heli = new Helicopter(() => 0);
+    heli.call(sensor.aim.x - 500, sensor.aim.z, sensor.aim.x, sensor.aim.z);
+    heli.position.set(sensor.aim.x + 2, height, sensor.aim.z);
+    const ex = new Explosions(
+      new Effects(() => 0, createRng(1)),
+      sensor,
+      new SensorFX(),
+      bus,
+      () => [heli],
+    );
+    const log: string[] = [];
+    bus.on('friendlyKilledByPlayer', (e) => log.push(`friendlyKilled:${e.weapon}`));
+    bus.on('missionFailed', (e) => log.push(`failed:${e.reason}`));
+    bus.on('dangerClose', (e) => log.push(`dangerClose:${e.weapon}`));
+    return { sensor, heli, ex, log };
+  }
+
+  it('a 105 mm round next to the landed helicopter destroys it: its own fail reason', () => {
+    const { sensor, heli, ex, log } = heliRig(0);
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    expect(heli.state).toBe('destroyed');
+    expect(log).toEqual(['friendlyKilled:105', 'failed:helicopter_friendly_fire']);
+  });
+
+  it('a 40 mm hit only damages it, and counts as danger close', () => {
+    const { sensor, heli, ex, log } = heliRig(0);
+    ex.detonate(sensor.aim.clone(), WEAPONS['40'], true);
+    expect(heli.alive).toBe(true);
+    expect(heli.hp).toBeLessThan(heli.maxHp);
+    expect(log).toEqual(['dangerClose:40']);
+  });
+
+  it('a ground impact under it while it flies high does not touch it (3D distance)', () => {
+    const { sensor, heli, ex } = heliRig(70);
+    ex.detonate(sensor.aim.clone(), WEAPONS['105'], true);
+    expect(heli.hp).toBe(heli.maxHp);
   });
 });

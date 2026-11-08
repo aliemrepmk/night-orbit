@@ -56,7 +56,7 @@ export class InfantryRenderer {
   /** Per rendered frame: instance matrices + signatures, and the lit strobes. */
   sync(units: UnitManager, heightPx: number, fovDeg: number): void {
     let n = 0;
-    for (const f of units.friendlies) n = this.write(f, n);
+    if (!units.boarded) for (const f of units.friendlies) n = this.write(f, n);
     for (const e of units.enemies) n = this.write(e, n);
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
@@ -68,7 +68,8 @@ export class InfantryRenderer {
     for (let i = 0; i < units.friendlies.length; i++) {
       const f = units.friendlies[i];
       // Each member's strobe is slightly out of step with the others, like real ones.
-      if (!f.alive || !strobeOn(units.time, rb.strobeHz, rb.strobeDuty, i * 0.29)) continue;
+      if (units.boarded || !f.alive || !strobeOn(units.time, rb.strobeHz, rb.strobeDuty, i * 0.29))
+        continue;
       const top = f.position.y + 1.2 * CONFIG.infantry.scale;
       this.strobes.push(
         f.position.x,

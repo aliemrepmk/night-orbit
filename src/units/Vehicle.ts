@@ -37,10 +37,21 @@ export class Vehicle implements Target {
   speed = 0;
   s = 0;
   path: Path | null = null;
+  /** Set by the mission script to find its vehicles again (`vehiclesDestroyed(tag)`); '' = none. */
+  tag = '';
   /** Reached the end of its path. */
   arrived = false;
   /** Seconds it has been held up by something ahead. */
   blockedFor = 0;
+  /**
+   * Sideways offset from the road's centerline (m, toward (cos h, −sin h)) and where it steers
+   * it: vehicles swerve around a wreck or a stopped vehicle (M7 play test: wrecks used to plug
+   * the road, so the vehicles behind never reached Ridgeback). `passing` is what it is going
+   * around.
+   */
+  lateral = 0;
+  lateralTarget = 0;
+  passing: Vehicle | null = null;
   /** Soldiers still inside, and seconds until the next one climbs out. */
   cargo = 0;
   unloadTimer = 0;
@@ -67,6 +78,7 @@ export class Vehicle implements Target {
   /** (Re)starts this vehicle at distance `s` along `path`, carrying `cargo` soldiers. */
   spawn(def: VehicleDef, path: Path, s = 0, cargo = 0): void {
     this.def = def;
+    this.tag = '';
     this.path = path;
     this.s = Math.min(s, path.length);
     this.hp = def.hp;
@@ -74,6 +86,9 @@ export class Vehicle implements Target {
     this.speed = 0;
     this.arrived = false;
     this.blockedFor = 0;
+    this.lateral = 0;
+    this.lateralTarget = 0;
+    this.passing = null;
     this.cargo = cargo;
     this.unloadTimer = 0;
     this.target = null;
@@ -129,14 +144,16 @@ export class Vehicle implements Target {
   }
 
   /**
-   * Drives along the path: toward cruising speed (slower near corners), braking to a stop
-   * when `blocked`; the body turns smoothly toward the road direction.
+   * Drives along the path: toward cruising speed (slower near corners, at most `maxSpeed`),
+   * braking to a stop when `blocked`; it slides toward `lateralTarget` while it goes, and the
+   * body turns smoothly toward where it is heading (the road, plus the swerve).
    */
-  drive(dt: number, blocked: boolean): void {
+  drive(dt: number, blocked: boolean, maxSpeed = Infinity): void {
     const path = this.path;
     if (!path || this.state !== 'driving') return;
     const c = this.cfg;
-    const want = blocked ? 0 : this.def.speed * path.cornerFactor(this.s, c.cornerSlowRadius);
+    const cruise = this.def.speed * path.cornerFactor(this.s, c.cornerSlowRadius);
+    const want = blocked ? 0 : Math.min(maxSpeed, cruise);
     if (this.speed < want) this.speed = Math.min(want, this.speed + c.accel * dt);
     else this.speed = Math.max(want, this.speed - c.brake * dt);
     this.s += this.speed * dt;
@@ -145,7 +162,12 @@ export class Vehicle implements Target {
       this.speed = 0;
       this.arrived = true;
     }
-    let diff = path.headingAt(this.s) - this.heading;
+    const dl = this.lateralTarget - this.lateral;
+    const slide = Math.max(-c.swerveRate * dt, Math.min(c.swerveRate * dt, dl));
+    this.lateral += slide;
+    // Nose into the swerve: the side speed against the forward speed (never below a crawl).
+    const yaw = dt > 0 ? Math.atan2(slide / dt, Math.max(this.speed, 3)) : 0;
+    let diff = path.headingAt(this.s) + (Math.abs(dl) > 0.05 ? yaw : 0) - this.heading;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     const max = c.turnRate * dt;
     this.heading += Math.max(-max, Math.min(max, diff));
@@ -160,6 +182,11 @@ export class Vehicle implements Target {
   private place(): void {
     if (!this.path) return;
     this.path.pointAt(this.s, this.position);
+    if (this.lateral !== 0) {
+      const h = this.path.headingAt(this.s);
+      this.position.x += Math.cos(h) * this.lateral;
+      this.position.z -= Math.sin(h) * this.lateral;
+    }
     this.position.y = this.groundAt(this.position.x, this.position.z) + this.def.lift;
   }
 }

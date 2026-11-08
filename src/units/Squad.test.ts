@@ -84,3 +84,61 @@ describe('strobeOn', () => {
     expect(strobeOn(0, 2, 0.25, 0.5)).toBe(false);
   });
 });
+
+describe('Squad one-way walking (mission moveTeam / teamHold, M7)', () => {
+  const route = [
+    { x: 0, z: 0 },
+    { x: 0, z: -20 },
+    { x: 20, z: -20 },
+  ];
+
+  it('walks a route once, straight through its waypoints, and stops at the end', () => {
+    const s = new Squad(route, cfg, false);
+    step(s, 9); // 18 m: no hold at the first waypoint, already turning east
+    expect(s.moving).toBe(true);
+    step(s, 15);
+    expect(s.arrived).toBe(true);
+    expect(s.moving).toBe(false);
+    expect(s.anchor.x).toBeCloseTo(20);
+    expect(s.anchor.z).toBeCloseTo(-20);
+    step(s, 30);
+    expect(s.anchor.x).toBeCloseTo(20); // stays there (no ping-pong)
+  });
+
+  it('walk() starts a new route from where it stands, skipping a first point it is on', () => {
+    const s = new Squad(route, cfg, false);
+    step(s, 30);
+    s.walk([
+      { x: 20, z: -20 },
+      { x: 20, z: 0 },
+    ]);
+    expect(s.arrived).toBe(false);
+    expect(s.nextPoint).toEqual({ x: 20, z: 0 });
+    step(s, 12);
+    expect(s.arrived).toBe(true);
+    expect(s.anchor.z).toBeCloseTo(0);
+  });
+
+  it('halt() stops it where it stands (the team then fights), placeAt() moves it', () => {
+    const s = new Squad(route, cfg, false);
+    step(s, 3);
+    s.halt();
+    const z = s.anchor.z;
+    step(s, 5);
+    expect(s.anchor.z).toBe(z);
+    expect(s.moving).toBe(false);
+    s.placeAt(100, 50);
+    expect([s.anchor.x, s.anchor.z]).toEqual([100, 50]);
+    expect(s.arrived).toBe(true);
+  });
+
+  it('a looping squad told to walk stops looping', () => {
+    const s = new Squad(route, cfg);
+    s.walk([
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+    ]);
+    step(s, 60);
+    expect(s.anchor.x).toBeCloseTo(10);
+  });
+});

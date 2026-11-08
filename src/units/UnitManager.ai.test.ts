@@ -18,11 +18,17 @@ const ROUTE = [
   { x: 0, z: 0 },
   { x: 0, z: -2000 },
 ];
-/** A team that holds still and doesn't shoot back, so only enemy behavior is tested. */
+/**
+ * A team that holds still and doesn't shoot back, so only enemy behavior is tested. Nobody is
+ * an assaulter here (they have their own tests below), so the M5 cover/standoff rules hold.
+ */
 const STILL: UnitsConfig = {
   ...CONFIG,
   ridgeback: { ...CONFIG.ridgeback, speed: 0, fireRange: 0 },
+  enemyFire: { ...CONFIG.enemyFire, assaultChance: 0 },
 };
+/** The same, with the game's share of assaulters. */
+const STILL_ASSAULT: UnitsConfig = { ...STILL, enemyFire: CONFIG.enemyFire };
 
 function rig(opts: UnitOptions = {}) {
   const bus = new EventBus<GameEvents>();
@@ -208,6 +214,8 @@ describe('UnitManager enemy AI (M5)', () => {
       { x: 250, z: 0 },
     ]);
     const e = units.spawnEnemy(INFANTRY.rifleman, 400, 300, { path })!;
+    e.assault = false;
+    e.standoff = 0.95; // opens fire as soon as it is in range at the path's end
     let nearCorner = false;
     for (let k = 0; k < 60 * 200; k++) {
       units.update(DT);
@@ -278,5 +286,54 @@ describe('UnitManager stream crossing (M6 feedback)', () => {
       lastX = x;
     }
     expect(e.position.x).toBeLessThan(100); // it did get across
+  });
+});
+
+describe('UnitManager assaulters (M7 play test: more enemies get close to Ridgeback)', () => {
+  it('about the configured share of riflemen assault; machine gunners never do', () => {
+    const { units } = rig({ cfg: STILL_ASSAULT });
+    let riflemen = 0;
+    let assault = 0;
+    for (let k = 0; k < 50; k++) {
+      const r = units.spawnEnemy(INFANTRY.rifleman, 400 + k, 300)!;
+      const m = units.spawnEnemy(INFANTRY.machineGunner, 400 + k, 320)!;
+      riflemen++;
+      if (r.assault) assault++;
+      expect(m.assault).toBe(false);
+      expect(m.standoff).toBeGreaterThanOrEqual(CONFIG.enemyFire.standoffMin);
+      if (r.assault) expect(r.standoff).toBeLessThanOrEqual(CONFIG.enemyFire.assaultStandoffMax);
+    }
+    const share = assault / riflemen;
+    expect(share).toBeGreaterThan(CONFIG.enemyFire.assaultChance - 0.2);
+    expect(share).toBeLessThan(CONFIG.enemyFire.assaultChance + 0.2);
+  });
+
+  it('an assaulter walks in to close range before it opens fire', () => {
+    const { units } = rig({ cfg: STILL_ASSAULT });
+    const e = units.spawnEnemy(INFANTRY.rifleman, 250, 0)!;
+    e.assault = true;
+    e.standoff = 0.3; // 60 m
+    step(units, 30);
+    expect(distToTeam(units, e.position)).toBeGreaterThan(100); // still closing at 30 s
+    expect(e.state).toBe('moving');
+    step(units, 60);
+    expect(e.state).toBe('firing');
+    expect(distToTeam(units, e.position)).toBeLessThanOrEqual(60 + CONFIG.ridgeback.spacing + 1); // 60 m from the nearest member
+  });
+
+  it('an assaulter passes up far cover and takes cover only near its fighting distance', () => {
+    const cover = new CoverSet();
+    const far = cover.add(160, 10);
+    const near = cover.add(55, 4);
+    const { units } = rig({ cfg: STILL_ASSAULT, cover });
+    const e = units.spawnEnemy(INFANTRY.rifleman, 190, 0)!;
+    e.assault = true;
+    e.standoff = 0.3;
+    step(units, 0.5);
+    expect(e.cover).not.toBe(far);
+    step(units, 70);
+    expect(e.cover).toBe(near);
+    expect(e.inCover).toBe(true);
+    expect(e.state).toBe('firing');
   });
 });

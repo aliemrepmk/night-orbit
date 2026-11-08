@@ -11,8 +11,9 @@ import type { VehicleDef } from './vehicleDefs';
 
 /**
  * Owns every enemy vehicle (PLAN.md §7.10, §6 step 8): drives them along their roads, keeps
- * them from driving through each other or through wrecks (a destroyed vehicle blocks the road,
- * so the ones behind stop and unload early), unloads trucks, fires mounted guns at Ridgeback,
+ * them from driving through each other or through wrecks (they queue behind moving vehicles
+ * and swerve around wrecks and stopped ones; only with no room to pass do they stop and unload
+ * early), unloads trucks, fires mounted guns at Ridgeback,
  * and lets soldiers bail out of burning wrecks. Vehicles are blast targets in the unit grid.
  */
 export class VehicleManager {
@@ -33,6 +34,24 @@ export class VehicleManager {
   get alive(): number {
     let n = 0;
     for (const v of this.vehicles) if (v.inUse && v.alive) n++;
+    return n;
+  }
+
+  /** Living vehicles carrying the mission tag `tag`. */
+  aliveTagged(tag: string): number {
+    let n = 0;
+    for (const v of this.vehicles) if (v.inUse && v.alive && v.tag === tag) n++;
+    return n;
+  }
+
+  /** Dev cheat `K`: every living vehicle becomes a wreck. */
+  destroyAll(): number {
+    let n = 0;
+    for (const v of this.vehicles) {
+      if (!v.inUse || !v.alive) continue;
+      v.takeDamage(v.hp * 100 + 1e6, 'team', v.position);
+      if (!v.alive) n++;
+    }
     return n;
   }
 
@@ -90,30 +109,96 @@ export class VehicleManager {
    * braking distance, so a fast vehicle still stops `blockDistance` short.
    */
   blocked(v: Vehicle): boolean {
-    const reach = this.cfg.blockDistance + (v.speed * v.speed) / (2 * this.cfg.brake);
+    return this.look(v).blocked;
+  }
+
+  /**
+   * What is ahead of `v`: `blocked` if it must brake now (a moving vehicle in its lane, or an
+   * obstacle it can't get around yet), and `obstacle`, the nearest wreck or stopped vehicle in
+   * its lane that it could swerve around (M7 play test: wrecks used to plug the road for good).
+   */
+  private look(v: Vehicle): { blocked: boolean; obstacle: Vehicle | null } {
+    const c = this.cfg;
+    const reach = c.blockDistance + (v.speed * v.speed) / (2 * c.brake);
     const h = v.roadHeading;
     const fx = Math.sin(h);
     const fz = Math.cos(h);
+    let blocked = false;
+    let obstacle: Vehicle | null = null;
+    let nearest = Infinity;
     for (const o of this.vehicles) {
       if (o === v || !o.inUse) continue;
       const rx = o.position.x - v.position.x;
       const rz = o.position.z - v.position.z;
       const ahead = rx * fx + rz * fz;
       if (ahead <= 0 || ahead > reach) continue;
-      if (Math.abs(rx * fz - rz * fx) < this.cfg.blockWidth) return true;
+      const side = rx * fz - rz * fx; // + toward (cos h, −sin h), like `lateral`
+      // Already swerving: what matters is where it is going, not where it is now.
+      const steer = o === v.passing ? v.lateralTarget - v.lateral : 0;
+      if (Math.abs(side - steer) >= c.blockWidth) {
+        // Off to the side, but too close to slip past before the swerve is done.
+        if (Math.abs(side) < c.blockWidth && ahead < this.clearance(v, o)) blocked = true;
+        continue;
+      }
+      if (o.alive && o.state === 'driving') blocked = true; // queue behind a moving vehicle
+      else if (ahead < nearest) {
+        nearest = ahead;
+        obstacle = o;
+      }
     }
-    return false;
+    return { blocked, obstacle };
+  }
+
+  /** Nose-to-tail distance between two vehicles, plus a little room. */
+  private clearance(a: Vehicle, b: Vehicle): number {
+    return (a.def.length + b.def.length) / 2 + 2;
   }
 
   private driveStep(v: Vehicle, dt: number): void {
-    const blocked = this.blocked(v);
-    v.drive(dt, blocked);
-    v.blockedFor = blocked && v.speed === 0 ? v.blockedFor + dt : 0;
+    const c = this.cfg;
+    const look = this.look(v);
+    const obstacle = look.obstacle;
+    let blocked = look.blocked;
+    if (obstacle && obstacle !== v.passing) {
+      // Pass on the side away from it, if that stays near the road.
+      const h = v.roadHeading;
+      const rx = obstacle.position.x - v.position.x;
+      const rz = obstacle.position.z - v.position.z;
+      const at = rx * Math.cos(h) - rz * Math.sin(h) + v.lateral; // its offset from the centerline
+      const target = at >= 0 ? at - c.swerveOffset : at + c.swerveOffset;
+      if (Math.abs(target) <= c.swerveMax) {
+        v.passing = obstacle;
+        v.lateralTarget = target;
+      } else blocked = true; // no room (wrecks side by side): stop, as before
+    } else if (obstacle) {
+      // Still in its lane after picking a side: slide over before reaching it.
+      if (Math.abs(v.lateralTarget - v.lateral) > 0.3) {
+        const d = obstacle.position.distanceTo(v.position);
+        if (d < this.clearance(v, obstacle)) blocked = true;
+      }
+    }
+    // Past what it was going around: back to the middle of the road.
+    if (v.passing && !obstacle && this.behind(v, v.passing)) {
+      v.passing = null;
+      v.lateralTarget = 0;
+    }
+    v.drive(dt, blocked, v.passing ? c.swerveSpeed : Infinity);
+    // Waiting for its own swerve to finish isn't being stuck.
+    const swerving = v.passing !== null && Math.abs(v.lateralTarget - v.lateral) > 0.3;
+    v.blockedFor = blocked && v.speed === 0 && !swerving ? v.blockedFor + dt : 0;
     // At its spot, or stuck behind a wreck/queue for a while: stop here (PLAN.md §7.10).
-    if (v.arrived || v.blockedFor >= this.cfg.blockedWait) {
+    if (v.arrived || v.blockedFor >= c.blockedWait) {
       v.speed = 0;
       v.state = v.cargo > 0 ? 'unloading' : v.def.cargoMax > 0 ? 'parked' : 'stopped';
     }
+  }
+
+  /** True once `o` is fully behind `v` (its tail clear of `v`'s rear). */
+  private behind(v: Vehicle, o: Vehicle): boolean {
+    const h = v.roadHeading;
+    const ahead =
+      (o.position.x - v.position.x) * Math.sin(h) + (o.position.z - v.position.z) * Math.cos(h);
+    return ahead < -this.clearance(v, o);
   }
 
   /** One soldier climbs out of the back every `unloadInterval` seconds. */

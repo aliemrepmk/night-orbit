@@ -7,6 +7,10 @@ import {
   failReasonText,
   gunLine,
   inboundLine,
+  kestrelLine,
+  objectiveLine,
+  subtitleLine,
+  timerLine,
   strikeLine,
   teamLine,
   type GunReadout,
@@ -78,6 +82,9 @@ describe('failReasonText', () => {
   it('names every fail reason', () => {
     expect(failReasonText('friendly_fire')).toContain('FRIENDLY FIRE');
     expect(failReasonText('team_overrun')).toContain('OVERRUN');
+    expect(failReasonText('clinic_hit')).toContain('CLINIC');
+    expect(failReasonText('helicopter_friendly_fire')).toContain('KESTREL 6');
+    expect(failReasonText('helicopter_lost')).toContain('SHOT DOWN');
   });
 });
 
@@ -91,5 +98,31 @@ describe('HUD air-support lines', () => {
   it('counts an inbound strike down in whole seconds, never showing 0', () => {
     expect(inboundLine('HAMMER 1-1', 4.2)).toBe('HAMMER 1-1 INBOUND 5');
     expect(inboundLine('SABRE 2-2', 0.05)).toBe('SABRE 2-2 INBOUND 1');
+  });
+});
+
+describe('HUD mission lines (M7)', () => {
+  it('radio subtitles name the speaker', () => {
+    expect(subtitleLine('FCO', 'Splash. Good hits.')).toBe('[FCO] Splash. Good hits.');
+  });
+
+  it('the objective reads in capitals, and is empty with no objective', () => {
+    expect(objectiveLine('Hold the square')).toBe('OBJ: HOLD THE SQUARE');
+    expect(objectiveLine('')).toBe('');
+  });
+
+  it('countdowns read mm:ss, rounded up, never negative', () => {
+    expect(timerLine('KESTREL 6', 180)).toBe('KESTREL 6  03:00');
+    expect(timerLine('KESTREL 6', 179.2)).toBe('KESTREL 6  03:00');
+    expect(timerLine('KESTREL 6', 59.5)).toBe('KESTREL 6  01:00');
+    expect(timerLine('KESTREL 6', 0.4)).toBe('KESTREL 6  00:01');
+    expect(timerLine('KESTREL 6', -3)).toBe('KESTREL 6  00:00');
+  });
+});
+
+describe('HUD Kestrel 6 line (M7)', () => {
+  it('shows its health and when it is under fire', () => {
+    expect(kestrelLine(400, 400, false)).toBe('KESTREL 6 ▮▮▮▮▮▮▮▮▮▮ 100%');
+    expect(kestrelLine(200, 400, true)).toBe('KESTREL 6 ▮▮▮▮▮▯▯▯▯▯  50%  UNDER FIRE');
   });
 });

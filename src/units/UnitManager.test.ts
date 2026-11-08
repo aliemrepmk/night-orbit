@@ -68,6 +68,7 @@ describe('UnitManager', () => {
     };
     const { units } = rig(still);
     const e = units.spawnEnemy(INFANTRY.rifleman, 400, 0)!;
+    e.assault = false; // a long-range shooter (assaulters have their own test)
     e.standoff = 0.8; // stops at 160 m
     step(units, 1);
     expect(e.state).toBe('moving');
@@ -77,7 +78,12 @@ describe('UnitManager', () => {
     const d = Math.hypot(e.position.x - units.teamPosition.x, e.position.z - units.teamPosition.z);
     expect(d).toBeLessThanOrEqual(INFANTRY.rifleman.range + 10);
     expect(units.team.value).toBeLessThan(100);
-    expect(units.tracers.some((t) => t.active && t.side === 'enemy')).toBe(true);
+    let tracer = false;
+    for (let k = 0; k < 60 && !tracer; k++) {
+      step(units, 0.05);
+      tracer = units.tracers.some((t) => t.active && t.side === 'enemy');
+    }
+    expect(tracer).toBe(true);
   });
 
   it('drains team health by dps × accuracy × time while enemies fire', () => {
@@ -194,5 +200,81 @@ describe('UnitManager', () => {
     truck.hp = 0;
     units.update(DT);
     expect(units.targetsNear(truck.position, 5)).not.toContain(truck);
+  });
+});
+
+describe('UnitManager mission hooks (M7)', () => {
+  it('counts and routs the enemies inside a circle (zone clear / safety valve)', () => {
+    const { units } = rig();
+    for (let i = 0; i < 4; i++) units.spawnEnemy(INFANTRY.rifleman, 300 + i * 3, 0);
+    units.spawnEnemy(INFANTRY.rifleman, -300, 0);
+    expect(units.enemiesWithin(300, 0, 30)).toBe(4);
+    expect(units.routEnemiesWithin(300, 0, 30, 20)).toBe(4);
+    expect(units.enemies.filter((e) => e.action === 'flee')).toHaveLength(4);
+  });
+
+  it('kill-all (cheat K) kills every enemy as Ridgeback kills, not the player', () => {
+    const { units, log } = rig();
+    for (let i = 0; i < 3; i++) units.spawnEnemy(INFANTRY.rifleman, 200, i * 5);
+    expect(units.killAllEnemies()).toBe(3);
+    expect(units.aliveEnemies).toBe(0);
+    expect(log).toEqual(['killed:team', 'killed:team', 'killed:team']);
+  });
+
+  it('placeTeam puts the anchor and every member at the spot, holding', () => {
+    const { units } = rig();
+    units.placeTeam(500, 200);
+    expect(units.squad.arrived).toBe(true);
+    for (const f of units.friendlies) {
+      expect(Math.hypot(f.position.x - 500, f.position.z - 200)).toBeLessThan(15);
+    }
+  });
+
+  it('once boarded, Ridgeback can no longer be targeted or hit', () => {
+    const { units } = rig();
+    units.boarded = true;
+    expect(units.nearestFriendlyTo(new Vector3(0, 0, 0))).toBeNull();
+    step(units, 0.1);
+    const near = units.targetsNear(units.friendlies[0].position, 10);
+    expect(near.filter((t) => t.side === 'friendly')).toHaveLength(0);
+  });
+});
+
+describe('UnitManager: enemies fire on Kestrel 6 while it is low (M7)', () => {
+  function airRig(exposed: boolean) {
+    // Ridgeback holds its fire, so the soldier lives long enough to choose a target.
+    const r = rig({ ...CONFIG, ridgeback: { ...CONFIG.ridgeback, fireRange: 0 } });
+    const air = {
+      position: new Vector3(0, 0, -60),
+      exposed,
+      taken: 0,
+      takeFire(a: number) {
+        this.taken += a;
+      },
+    };
+    r.units.airTarget = air;
+    r.units.squad.halt();
+    // A rifleman 40 m from the helicopter, further from the team: it switches to the aircraft.
+    r.units.spawnEnemy(INFANTRY.rifleman, 0, -100);
+    return { ...r, air };
+  }
+
+  it('soldiers in range shoot the landed helicopter (with tracers)', () => {
+    const { units, air } = airRig(true);
+    let tracers = false;
+    for (let k = 0; k < 6 * 60; k++) {
+      units.update(DT);
+      tracers ||= units.tracers.some((t) => t.active && t.side === 'enemy');
+    }
+    expect(air.taken).toBeGreaterThan(0);
+    expect(units.enemies[0].shootsAir).toBe(true);
+    expect(tracers).toBe(true);
+    expect(units.team.value).toBe(units.team.max); // busy with the helicopter, not the team
+  });
+
+  it('nobody can hit it while it is high', () => {
+    const { units, air } = airRig(false);
+    step(units, 6);
+    expect(air.taken).toBe(0);
   });
 });

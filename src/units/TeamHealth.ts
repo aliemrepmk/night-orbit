@@ -13,6 +13,8 @@ export interface TeamHealthConfig {
  */
 export class TeamHealth {
   value: number;
+  /** Dev cheat `G` (god mode): enemy fire no longer drains the team. */
+  invulnerable = false;
   /** Seconds since an enemy last fired at the team. */
   private quiet = Infinity;
 
@@ -36,6 +38,7 @@ export class TeamHealth {
   damage(amount: number): void {
     if (amount <= 0) return;
     this.quiet = 0;
+    if (this.invulnerable) return;
     this.value = Math.max(0, this.value - amount);
   }
 

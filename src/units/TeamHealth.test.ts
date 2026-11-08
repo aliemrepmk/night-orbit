@@ -53,3 +53,14 @@ describe('TeamHealth', () => {
     expect(t.value).toBe(0);
   });
 });
+
+describe('TeamHealth god mode (dev cheat G)', () => {
+  it('still counts as under fire, but loses no health', () => {
+    const t = new TeamHealth(cfg);
+    t.invulnerable = true;
+    t.damage(500);
+    expect(t.value).toBe(100);
+    expect(t.underFire).toBe(true);
+    expect(t.overrun).toBe(false);
+  });
+});

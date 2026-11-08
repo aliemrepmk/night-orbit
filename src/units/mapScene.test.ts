@@ -9,7 +9,7 @@ import { MAP } from '../world/MapData';
 import { Terrain } from '../world/Terrain';
 import { mapHeightField } from '../world/terrainShape';
 import { WorldBuilder } from '../world/WorldBuilder';
-import { WaveSpawner, journeyRoute } from './TestScene';
+import { WaveSpawner, journeyRoute } from './spawning';
 import { UnitManager } from './UnitManager';
 
 const DT = 1 / 60;

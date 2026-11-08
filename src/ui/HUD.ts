@@ -16,6 +16,8 @@ export interface HudData {
   /** Sensor mode label: "WHT HOT", "BLK HOT" or "NV". */
   sensorMode: string;
   clock: number;
+  /** Kestrel 6's health line while it is in the picture ('' otherwise). */
+  kestrel: string;
   /** Ridgeback's shared health, its maximum, and whether enemies are shooting at it. */
   team: number;
   teamMax: number;
@@ -29,6 +31,11 @@ export interface HudData {
     /** Footprint outline in CSS pixels while aiming a strike; `danger` = friendlies too close. */
     preview: { points: readonly (readonly [number, number])[]; danger: boolean } | null;
   };
+  /** Mission (M7): objective line, radio subtitle, countdowns, and the clinic marker outline. */
+  objective: string;
+  subtitle: string;
+  timers: readonly string[];
+  clinicMark: readonly (readonly [number, number])[] | null;
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
@@ -38,6 +45,9 @@ export interface HudData {
     kills: number;
     enemies: number;
     vehicles: number;
+    /** Mission phase / step (and its timer), and active cheats. */
+    mission: string;
+    cheats: string;
   } | null;
 }
 
@@ -73,7 +83,8 @@ export class HUD {
           <div data-k="hdg"></div>
         </div>
         <div class="hud-block center">
-          <div data-k="obj">OBJ: COVER RIDGEBACK</div>
+          <div data-k="obj"></div>
+          <div class="hud-timers" data-k="timers"></div>
           <div class="hud-inbound" data-k="inbound"></div>
         </div>
         <div class="hud-block right">
@@ -83,10 +94,13 @@ export class HUD {
         </div>
       </div>
       <svg class="footprint" data-k="footprint"><polygon data-k="footprintShape"/></svg>
+      <svg class="clinic-mark hidden" data-k="clinic"><polygon data-k="clinicShape"/></svg>
+      <div class="hud-subtitle" data-k="subtitle"></div>
       <svg class="reticle" viewBox="-100 -100 200 200" data-k="reticle"></svg>
       <div class="hud-alert" data-k="alert"></div>
       <div class="hud-row bottom">
         <div class="hud-block">
+          <div class="hud-team" data-k="kestrel"></div>
           <div class="hud-team" data-k="team"></div>
           <div data-k="weapons"></div>
           <div class="hud-air" data-k="air"></div>
@@ -120,6 +134,7 @@ export class HUD {
     this.set('fov', `FOV ${d.fov.toFixed(1)}`);
     this.set('clock', clock(d.clock));
     this.set('team', teamLine(d.team, d.teamMax, d.underFire));
+    this.set('kestrel', d.kestrel);
     const preview = d.air.preview;
     this.set(
       'alert',
@@ -130,6 +145,10 @@ export class HUD {
       d.air.strikes.map((s) => strikeLine(s.label, s.cooldownLeft, s.selected)).join('\n'),
     );
     this.set('inbound', d.air.inbound.map((s) => inboundLine(s.callsign, s.eta)).join('\n'));
+    this.set('obj', d.objective);
+    this.set('subtitle', d.subtitle);
+    this.set('timers', d.timers.join('\n'));
+    this.setPolygon('clinic', 'clinicShape', d.clinicMark);
     this.setFootprint(preview);
     this.set('weapons', WEAPON_ORDER.map((id) => gunLine(d.guns[id], id === d.weapon)).join('\n'));
 
@@ -142,7 +161,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}`
+        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}\n${d.debug.mission}  ${d.debug.cheats}`
         : '',
     );
   }
@@ -156,6 +175,19 @@ export class HUD {
     this.el.footprintShape.setAttribute('points', points);
     this.el.footprint.classList.toggle('danger', p?.danger === true);
     this.el.footprint.classList.toggle('hidden', p === null);
+  }
+
+  /** Draws (or hides) a screen-space outline (the clinic marker). */
+  private setPolygon(
+    svgKey: string,
+    shapeKey: string,
+    points: readonly (readonly [number, number])[] | null,
+  ): void {
+    const text = points ? points.map(([x, y]) => `${x.toFixed(0)},${y.toFixed(0)}`).join(' ') : '';
+    if (this.cache.get(svgKey) === text) return;
+    this.cache.set(svgKey, text);
+    this.el[shapeKey].setAttribute('points', text);
+    this.el[svgKey].classList.toggle('hidden', points === null);
   }
 
   private set(key: string, text: string): void {

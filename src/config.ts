@@ -214,12 +214,23 @@ export const CONFIG = {
 
   /** Enemy small-arms fire at Ridgeback (PLAN.md §7.8: no real bullets, damage to team health). */
   enemyFire: {
+    /** Enemy fire on Kestrel 6: dps × accuracy × this = HP per second (≈10 soldiers down it in
+     * ~8 s). Tuned in Chrome: at 12 an undefended LZ still let it escape (19% left). */
+    vsAircraft: 18,
     /** Hit fraction at point-blank and at the shooter's maximum range (linear in between). */
     accuracyNear: 0.6,
     accuracyFar: 0.25,
     /** Each enemy stops to shoot at a random fraction of its range. */
     standoffMin: 0.6,
     standoffMax: 0.95,
+    /**
+     * Assaulters (M7 play test: "a lot more enemies on foot should get close to Ridgeback"):
+     * this share of riflemen push in to 15–35% of their range (30–70 m), bounding from cover
+     * to cover, and only take cover that close. Machine gunners always hang back.
+     */
+    assaultChance: 0.45,
+    assaultStandoffMin: 0.15,
+    assaultStandoffMax: 0.35,
     /** Seconds between visible bursts (tracers + muzzle flash) from one shooter. */
     burstMin: 0.6,
     burstMax: 1.8,
@@ -269,6 +280,15 @@ export const CONFIG = {
     blockWidth: 3.5,
     /** Seconds stuck behind something before unloading / opening fire right there. */
     blockedWait: 2,
+    /**
+     * Swerving around a wreck or a stopped vehicle (M7 play test): pass this far to the side of
+     * it (m), never more than `swerveMax` off the centerline, sliding sideways at `swerveRate`
+     * (m/s) and at most `swerveSpeed` (m/s) while alongside it.
+     */
+    swerveOffset: 5,
+    swerveMax: 7,
+    swerveRate: 2.5,
+    swerveSpeed: 6,
     /** One soldier climbs out of a truck every this many seconds. */
     unloadInterval: 0.6,
     /** Chance that each soldier still inside a destroyed vehicle bails out (and runs). */
@@ -303,7 +323,7 @@ export const CONFIG = {
   },
 
   /** TEMPORARY test scene on the real map (M7's mission script replaces it): waves attacking a moving team. */
-  testScene: {
+  spawning: {
     /** Most enemies alive at once (M4 "done when": 60 enemies attacking a moving team). */
     maxEnemies: 60,
     /** Groups spawned at the start, then one more every `waveInterval` seconds. */
@@ -331,9 +351,79 @@ export const CONFIG = {
     apcChance: 0.3,
   },
 
+  /** The mission script's host (PLAN.md §7.14, §8; M7). */
+  mission: {
+    /** Seconds the last enemies of a zone run for when a step times out (the safety valve). */
+    routSeconds: 30,
+    /** Spacing between the vehicles of a scripted convoy (m). */
+    convoyGap: 22,
+    /** Ridgeback stops this far beside the landed helicopter to climb in (m). */
+    boardOffset: 6,
+    /** The crosshair within this distance of the clinic counts as "on the clinic" (m). */
+    clinicHoverRadius: 12,
+    /** "Off target": a 40/105 round that hits nobody with an enemy within this distance (m). */
+    missNear: 40,
+    /** Ridgeback calls for help once team health is below this fraction while under fire. */
+    teamHurtFraction: 0.35,
+    /** Kestrel 6 says it is badly hit below this fraction of its HP. */
+    heloHurtFraction: 0.5,
+  },
+
+  /** Subtitled radio (PLAN.md §7.15). */
+  radio: {
+    /** A line stays on air for base + per-character seconds, at most `maxSeconds`. */
+    baseSeconds: 1.6,
+    secondsPerChar: 0.055,
+    maxSeconds: 7,
+    /** Silence between two lines. */
+    gapSeconds: 0.35,
+    /** Chatter / warnings waiting longer than this are dropped (stale). Warnings outlast the
+     * longest story line, so a "check fire" is never lost behind a briefing. */
+    chatterMaxWait: 2.5,
+    warningMaxWait: 10,
+  },
+
+  /** Reactive radio chatter (PLAN.md §7.15); each pool's own cooldown is in `mission/lines.ts`. */
+  chatter: {
+    /** Kills within this window are one call; this many or more is a "multiple down" call. */
+    multiKillWindow: 1.2,
+    multiKillCount: 3,
+    /** Seconds the crosshair rests on the clinic before the FCO warns. */
+    clinicHoverSeconds: 0.6,
+  },
+
+  /** The protected clinic (PLAN.md §8 phase 2). */
+  clinic: {
+    /** An impact this close (or inside the weapon's full-damage radius) hits the clinic: mission failed. */
+    hitMinRadius: 1.5,
+    /** An impact whose blast reaches within this distance draws a "check fire" warning. */
+    nearMissRadius: 15,
+  },
+
+  /** Kestrel 6, the extraction helicopter (PLAN.md §8 phase 4). */
+  helicopter: {
+    /** Hit points: one 105 mm or bomb kills it, a 40 mm direct hit takes half (armor in Damage.ts). */
+    hp: 400,
+    /** Below this height above the ground, enemy soldiers in range can hit it (m). */
+    exposedHeight: 25,
+    cruiseHeight: 70,
+    speed: 45,
+    /** Starts slowing and descending this far from the pad (m). */
+    approachDistance: 140,
+    /** Time constant of the final glide onto the pad (s). */
+    landingTau: 2.2,
+    /** Seconds on the ground with Ridgeback aboard before lift-off, and of the climb-out. */
+    boardSeconds: 2,
+    climbSeconds: 6,
+    /** Seconds after lift-off until it is out of the picture. */
+    departSeconds: 14,
+  },
+
   hud: {
     /** How long "DANGER CLOSE" stays up after a close impact (seconds). */
     dangerCloseSeconds: 2.5,
+    /** Calibration: the "slew the sensor" prompt completes after this much mouse movement (px). */
+    calibrationSlewPx: 400,
   },
 
   fx: {

@@ -12,7 +12,8 @@ export type Side = 'enemy' | 'friendly';
 
 /** A damageable thing that also says what it is and whose side it's on. */
 export interface Target extends Damageable {
-  readonly kind: 'infantry' | 'vehicle';
+  /** `aircraft`: the extraction helicopter (a friendly, M7). */
+  readonly kind: 'infantry' | 'vehicle' | 'aircraft';
   readonly side: Side;
 }
 
@@ -55,11 +56,18 @@ export class Explosions {
     // Query out to the danger-close distance: it is wider than the blast.
     const near = this.targetsNear(point, Math.max(w.blastRadius, w.dangerClose));
     let friendlyKilled = false;
+    let aircraftKilled = false;
     for (const hit of applyRadial(point, w, near)) {
       const t = hit.target as Target;
       if (t.alive) continue;
-      if (t.side === 'friendly') friendlyKilled = true;
+      if (t.kind === 'aircraft') aircraftKilled = true;
+      else if (t.side === 'friendly') friendlyKilled = true;
       else this.bus.emit('unitKilled', { kind: t.kind, by: w.id });
+    }
+    if (aircraftKilled) {
+      // Kestrel 6 (M7): the player's own round brought the extraction helicopter down.
+      this.bus.emit('friendlyKilledByPlayer', { weapon: w.id });
+      this.bus.emit('missionFailed', { reason: 'helicopter_friendly_fire' });
     }
     this.checkFriendlies(point, w, near, friendlyKilled);
 

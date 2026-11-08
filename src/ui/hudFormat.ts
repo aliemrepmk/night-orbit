@@ -74,5 +74,36 @@ export function failReasonText(reason: FailReason): string {
       return 'FRIENDLY FIRE: YOU HIT RIDGEBACK';
     case 'team_overrun':
       return 'RIDGEBACK OVERRUN';
+    case 'clinic_hit':
+      return 'YOU FIRED ON THE PROTECTED CLINIC';
+    case 'helicopter_friendly_fire':
+      return 'FRIENDLY FIRE: YOU HIT KESTREL 6';
+    case 'helicopter_lost':
+      return 'KESTREL 6 WAS SHOT DOWN';
   }
+}
+
+/** A radio subtitle, e.g. `[FCO] Splash. Good hits.` (PLAN.md §7.15). */
+export function subtitleLine(speaker: string, text: string): string {
+  return `[${speaker}] ${text}`;
+}
+
+/** The objective line at the top of the HUD, e.g. `OBJ: HOLD THE SQUARE`. */
+export function objectiveLine(objective: string): string {
+  return objective ? `OBJ: ${objective.toUpperCase()}` : '';
+}
+
+/** A mission countdown, e.g. `KESTREL 6  02:59` (seconds rounded up). */
+export function timerLine(label: string, seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds - 1e-9));
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${label}  ${mm}:${ss}`;
+}
+
+/** Kestrel 6's health line while it is in the picture, e.g. `KESTREL 6 ▮▮▮▮▮▮▮▯▯▯  70%  UNDER FIRE`. */
+export function kestrelLine(hp: number, max: number, underFire: boolean): string {
+  const f = Math.min(1, Math.max(0, hp / max));
+  const pct = String(Math.ceil(f * 100 - 1e-9)).padStart(3);
+  return `KESTREL 6 ${bar(f, 10)} ${pct}%${underFire ? '  UNDER FIRE' : ''}`;
 }

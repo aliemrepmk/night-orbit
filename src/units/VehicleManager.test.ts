@@ -70,14 +70,49 @@ describe('VehicleManager', () => {
     }
   });
 
-  it('a wreck blocks the road: the truck behind stops short of it and unloads early', () => {
+  it('a wreck no longer plugs the road: the truck behind swerves around it and drives on (M7 play test)', () => {
     const { vm, step } = rig();
     const lead = vm.spawn(VEHICLES.truck, ROAD, 30)!;
     const next = vm.spawn(VEHICLES.truck, ROAD, 0)!;
     step(8);
     lead.takeDamage(1e4, '105', lead.position);
-    step(10);
+    let closest = Infinity;
+    let widest = 0;
+    for (let k = 0; k < 120 && !next.arrived; k++) {
+      step(0.5);
+      closest = Math.min(closest, next.position.distanceTo(lead.position));
+      widest = Math.max(widest, Math.abs(next.lateral));
+    }
     expect(lead.state).toBe('destroyed');
+    expect(next.arrived).toBe(true); // reached the end of its road, near Ridgeback
+    expect(closest).toBeGreaterThan(CONFIG.vehicles.blockWidth); // went around, not through
+    expect(widest).toBeLessThanOrEqual(CONFIG.vehicles.swerveMax);
+    expect(Math.abs(next.lateral)).toBeLessThan(0.5); // back in the middle of the road after
+  });
+
+  it('a column gets past a stopped technical and a second wreck further on', () => {
+    const { vm, step } = rig();
+    const tech = vm.spawn(VEHICLES.technical, ROAD, 120)!;
+    const wreck = vm.spawn(VEHICLES.truck, ROAD, 60)!;
+    step(0.1);
+    tech.state = 'stopped';
+    tech.speed = 0;
+    wreck.takeDamage(1e4, '105', wreck.position);
+    const a = vm.spawn(VEHICLES.truck, ROAD, 0)!;
+    step(6);
+    const b = vm.spawn(VEHICLES.truck, ROAD, 0)!;
+    for (let k = 0; k < 160 && !(a.arrived && b.arrived); k++) step(0.5);
+    expect(a.arrived).toBe(true);
+    expect(b.arrived).toBe(true);
+  });
+
+  it('with no room to pass (two wrecks side by side) it stops short and unloads, as before', () => {
+    const { vm, step } = rig({ ...CONFIG.vehicles, swerveMax: 2 });
+    const lead = vm.spawn(VEHICLES.truck, ROAD, 30)!;
+    const next = vm.spawn(VEHICLES.truck, ROAD, 0)!;
+    step(8);
+    lead.takeDamage(1e4, '105', lead.position);
+    step(10);
     expect(next.arrived).toBe(false);
     expect(next.state === 'unloading' || next.state === 'parked').toBe(true);
     const gap = next.position.distanceTo(lead.position);
@@ -165,5 +200,29 @@ describe('VehicleManager', () => {
     expect(a.state).toBe('parked');
     expect(vm.spawn(VEHICLES.apc, ROAD)).toBe(a); // the empty truck goes first
     expect(a.def.type).toBe('apc');
+  });
+});
+
+describe('VehicleManager mission tags (M7)', () => {
+  it('counts living vehicles per tag; a recycled slot loses its old tag', () => {
+    const { vm } = rig();
+    const a = vm.spawn(VEHICLES.truck, ROAD, 0)!;
+    const b = vm.spawn(VEHICLES.apc, ROAD, 30)!;
+    a.tag = 'convoy';
+    b.tag = 'convoy';
+    expect(vm.aliveTagged('convoy')).toBe(2);
+    a.takeDamage(1e6, '105', a.position);
+    expect(vm.aliveTagged('convoy')).toBe(1);
+    expect(vm.aliveTagged('other')).toBe(0);
+    a.spawn(VEHICLES.truck, ROAD, 0);
+    expect(a.tag).toBe('');
+  });
+
+  it('destroyAll (cheat K) wrecks every living vehicle, armor or not', () => {
+    const { vm } = rig();
+    vm.spawn(VEHICLES.apc, ROAD, 0);
+    vm.spawn(VEHICLES.technical, ROAD, 30);
+    expect(vm.destroyAll()).toBe(2);
+    expect(vm.alive).toBe(0);
   });
 });

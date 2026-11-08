@@ -46,6 +46,8 @@ export class Infantry implements Target {
   fireTimer = 0;
   /** Fraction of its range at which this soldier stops to fire (varies per soldier). */
   standoff = 0.8;
+  /** An assaulter closes in on Ridgeback instead of sniping from far off (`enemyFire.assaultChance`). */
+  assault = false;
   /** Who it is shooting at while `firing`. */
   target: Infantry | null = null;
   /** What killed it (a gunship weapon or Ridgeback), or null while alive. */
@@ -76,6 +78,8 @@ export class Infantry implements Target {
   slideSign = 0;
   /** The manager has reacted to this death (morale, cover release). */
   deathHandled = false;
+  /** Shooting at Kestrel 6 instead of Ridgeback (decided when thinking; M7). */
+  shootsAir = false;
 
   constructor(
     readonly id: number,
@@ -108,6 +112,7 @@ export class Infantry implements Target {
     this.wallLeft = 0;
     this.slideSign = 0;
     this.deathHandled = false;
+    this.shootsAir = false;
     this.velocity.set(0, 0, 0);
     this.position.set(x, this.groundAt(x, z) + this.cfg.lift, z);
     this.home.set(x, 0, z);
