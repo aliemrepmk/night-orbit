@@ -88,3 +88,13 @@ export function grainForFov(
   const t = Math.min(1, Math.max(0, (fovDeg - narrowFov) / (wideFov - narrowFov)));
   return grainNarrow + (grainWide - grainNarrow) * t;
 }
+
+/**
+ * How thick the ground fog is (0–1, M8+ Phase F): it rolls in over `fade` seconds, holds, and
+ * clears over the last `fade` seconds of `total`. `left` is the time remaining.
+ */
+export function fogEnvelope(left: number, total: number, fade: number): number {
+  if (left <= 0 || total <= 0) return 0;
+  const elapsed = total - left;
+  return Math.min(1, elapsed / fade, left / fade);
+}

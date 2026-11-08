@@ -8,7 +8,8 @@ import type { Ordnance } from '../gunship/weaponDefs';
 import type { SensorFX } from '../render/SensorFX';
 import { applyRadial, falloff, type Damageable } from './Damage';
 
-export type Side = 'enemy' | 'friendly';
+/** `civilian`: a protected vehicle (the bus, M8+ Phase F): hitting it fails the mission. */
+export type Side = 'enemy' | 'friendly' | 'civilian';
 
 /** A damageable thing that also says what it is and whose side it's on. */
 export interface Target extends Damageable {
@@ -60,10 +61,12 @@ export class Explosions {
     let friendlyKilled = false;
     let aircraftKilled = false;
     let enemiesHit = 0;
+    let civilianHit = false;
     for (const hit of applyRadial(point, w, near)) {
       const t = hit.target as Target;
-      if (t.side !== 'friendly' && t.kind !== 'aircraft') enemiesHit++;
-      if (t.alive) continue;
+      if (t.side === 'civilian') civilianHit = true;
+      else if (t.side !== 'friendly' && t.kind !== 'aircraft') enemiesHit++;
+      if (t.alive || t.side === 'civilian') continue;
       if (t.kind === 'aircraft') aircraftKilled = true;
       else if (t.side === 'friendly') friendlyKilled = true;
       else this.bus.emit('unitKilled', { kind: t.kind, by: w.id, aa: t.aa });
@@ -73,6 +76,7 @@ export class Explosions {
       this.bus.emit('friendlyKilledByPlayer', { weapon: w.id });
       this.bus.emit('missionFailed', { reason: 'helicopter_friendly_fire' });
     }
+    if (civilianHit) this.bus.emit('missionFailed', { reason: 'civilian_hit' });
     this.checkFriendlies(point, w, near, friendlyKilled);
 
     this.effects.explosion(point, w, onGround);

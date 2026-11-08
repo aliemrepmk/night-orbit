@@ -139,6 +139,20 @@ export class Helicopter implements Target {
     }
   }
 
+  /**
+   * Breaks off the approach (M8+ Phase F: hidden AA opened up on it): turns back the way it came
+   * and climbs out, gone after `departSeconds`. A later `call` brings it in again.
+   */
+  abort(): void {
+    if (this.state !== 'inbound' && this.state !== 'landing') return;
+    this.pad.set(this.position.x, this.groundAt(this.position.x, this.position.z), this.position.z);
+    this.state = 'departing';
+    // Already at cruise height: start the departure past its climb (the climb is from the pad).
+    this.pad.y = this.position.y - this.cfg.cruiseHeight;
+    this.departTime = this.cfg.climbSeconds;
+    this.heading = Math.atan2(this.from.x - this.position.x, this.from.z - this.position.z);
+  }
+
   /** Ridgeback is aboard: lift off after a moment. */
   board(): void {
     if (this.state !== 'landed') return;

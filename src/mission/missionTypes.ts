@@ -57,6 +57,21 @@ export type Action =
     }
   /** Bring the AA gun emplacement `site` into action (M8+ Phase E). */
   | { readonly kind: 'activateAA'; readonly site: string }
+  // ---- Twists (M8+ Phase F) ----
+  /** A two-man mortar crew sets up at `at` and starts shelling Ridgeback. */
+  | { readonly kind: 'startMortar'; readonly at: Vec2 }
+  /** A Ridgeback member is hit: slower walking, more damage taken, for the rest of the run. */
+  | { readonly kind: 'woundTeam' }
+  /** The 105 mm jams for `seconds`. */
+  | { readonly kind: 'jamGun'; readonly seconds: number }
+  /** Ground fog rolls in for `seconds`. */
+  | { readonly kind: 'fogIn'; readonly seconds: number }
+  /** A strike pilot ejects and comes down at `at`: hold the enemy off him (a bonus). */
+  | { readonly kind: 'downPilot'; readonly at: Vec2 }
+  /** Kestrel 6 breaks off its approach and leaves. */
+  | { readonly kind: 'abortHelicopter' }
+  /** The HVT run is over: a bonus if its car is a wreck. */
+  | { readonly kind: 'resolveHvt' }
   /** Vehicles in a column along a map vehicle path, lead first, each carrying `tag`. */
   | {
       readonly kind: 'spawnConvoy';

@@ -243,7 +243,7 @@ export const CONFIG = {
     regenPerSecond: 1,
     quietTime: 4,
     /** Squad walking speed along its route, and how long it holds at each waypoint. */
-    speed: 2.2,
+    speed: 2.65, // 20 % quicker (M8+ Phase F: less waiting for Ridgeback to walk; was 2.2)
     holdTime: 18,
     /** Distance between members in the diamond formation. */
     spacing: 5,
@@ -547,6 +547,31 @@ export const CONFIG = {
     strikeCover: 650,
     abortAt: 2,
     jetHitChance: 0.4,
+  },
+
+  /** Mission twists (M8+ Phase F, `mission/twists.ts`). */
+  twists: {
+    /** Mortar team: seconds between rounds (per tube), damage at the team, and blast reach. */
+    mortarInterval: 8,
+    mortarDamage: 10,
+    mortarRadius: 18,
+    /** The first round lands this far off; each one after walks in by `mortarWalkIn`, to `mortarSpread`. */
+    mortarFirstMiss: 60,
+    mortarWalkIn: 12,
+    mortarSpread: 8,
+    /** Wounded operator: the team walks this much slower and takes this much more damage. */
+    woundSpeed: 0.75,
+    woundDamage: 1.3,
+    jamSeconds: 30,
+    fogSeconds: 120,
+    /** Fog strength at its thickest (0–1), and seconds to roll in / out. */
+    fogHaze: 0.55,
+    fogFade: 12,
+    /** Downed pilot: hold the enemy off for this long; this close for 3 s means he is taken. */
+    pilotHold: 70,
+    pilotCaptureRadius: 20,
+    /** Rating points per bonus objective (pilot rescued, HVT destroyed). */
+    bonusPoints: 5,
   },
 
   /** The fuel depot's tanks (M8+ Phase D): HP, the delay before one goes up, how long it burns. */

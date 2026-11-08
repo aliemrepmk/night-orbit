@@ -17,6 +17,8 @@ export interface MissionSummary {
   readonly dangerClose: number;
   /** Mission time in seconds. */
   readonly seconds: number;
+  /** Bonus objectives achieved (M8+ Phase F: pilot rescued, HVT destroyed). */
+  readonly bonuses?: readonly string[];
 }
 
 export interface Rating {
@@ -54,8 +56,9 @@ export class MissionStats {
     bus.on('dangerClose', () => this.dangerClose++);
   }
 
-  summary(damageTaken: number, seconds: number): MissionSummary {
+  summary(damageTaken: number, seconds: number, bonuses: readonly string[] = []): MissionSummary {
     return {
+      bonuses: [...bonuses],
       kills: this.kills,
       impacts: this.impacts,
       hits: this.hits,
@@ -78,7 +81,8 @@ export function rateMission(s: MissionSummary, cfg: RatingConfig = CONFIG.rating
       : 0;
   const late = Math.max(0, s.seconds - cfg.parSeconds) / 60;
   const time = Math.min(cfg.timeMax, late * cfg.perMinuteOver);
-  const score = Math.round(clamp(100 - damage - danger - time + accuracy, 0, 100));
+  const bonus = (s.bonuses?.length ?? 0) * CONFIG.twists.bonusPoints;
+  const score = Math.round(clamp(100 - damage - danger - time + accuracy + bonus, 0, 100));
   const g = cfg.grades.find((x) => score >= x.min) ?? cfg.grades[cfg.grades.length - 1];
   return { score, grade: g.grade, label: g.label };
 }
@@ -103,5 +107,8 @@ export function summaryRows(s: MissionSummary): [string, string][] {
     ['DAMAGE TAKEN', String(Math.round(s.damageTaken))],
     ['DANGER CLOSE', String(s.dangerClose)],
     ['TIME', formatDuration(s.seconds)],
+    ...(s.bonuses && s.bonuses.length > 0
+      ? ([['BONUS', s.bonuses.join(', ')]] as [string, string][])
+      : []),
   ];
 }

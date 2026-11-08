@@ -82,6 +82,8 @@ export function failReasonText(reason: FailReason): string {
       return 'KESTREL 6 WAS SHOT DOWN';
     case 'gunship_lost':
       return 'LANTERN 2-1 SHOT DOWN';
+    case 'civilian_hit':
+      return 'YOU FIRED ON THE CIVILIAN BUS';
   }
 }
 

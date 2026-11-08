@@ -145,6 +145,8 @@ export class UnitManager {
   plane: { readonly position: Vector3 } | null = null;
   /** A MANPADS team launched a missile from `from` (wired to `AirDefense.launch`). */
   onLaunch: (from: Vector3) => void = () => {};
+  /** A mortar round lands at (x, z) (M8+ Phase F): the battle hurts the team and shows the blast. */
+  onMortar: (x: number, z: number) => void = () => {};
   /** Called for every visible burst (Game hooks the muzzle-flash effect in). */
   onMuzzleFlash: (at: Vector3) => void = () => {};
 
@@ -225,6 +227,7 @@ export class UnitManager {
     u.fireTimer = range(this.rng, 0, ef.burstMax);
     // A missile team needs a moment to set up before its first launch.
     if (def.launcher) u.launchCooldown = range(this.rng, 4, 9);
+    if (def.mortar) u.mortarTimer = range(this.rng, 5, 9); // setting up the tube
     if (opts.home) u.home.set(opts.home.x, 0, opts.home.z);
     u.path = opts.path ?? null;
     return u;
@@ -418,6 +421,10 @@ export class UnitManager {
   /** One enemy tick: think every `thinkInterval` (staggered), then carry out the decision. */
   private updateEnemy(e: Infantry, dt: number): void {
     if (e.def.launcher && this.launcherStep(e, dt)) return;
+    if (e.def.mortar) {
+      this.mortarStep(e, dt);
+      return;
+    }
     e.thinkTimer -= dt;
     if (e.thinkTimer <= 0 || !e.target) {
       e.thinkTimer += this.cfg.infantry.thinkInterval;
@@ -458,6 +465,30 @@ export class UnitManager {
     this.eyeA.copy(e.position).setY(e.position.y + 0.6);
     this.onLaunch(this.eyeA);
     return true;
+  }
+
+  /**
+   * A mortar crew member (M8+ Phase F): kneels where it was placed and drops a round near
+   * Ridgeback every `mortarInterval` s, the first well off, each next one closer (walking in).
+   * The tube's flash shows where it is; killing the crew ends it.
+   */
+  private mortarStep(e: Infantry, dt: number): void {
+    const c = CONFIG.twists;
+    e.velocity.set(0, 0, 0);
+    e.inCover = true; // kneeling at the tube
+    e.state = 'idle';
+    e.mortarTimer -= dt;
+    if (e.mortarTimer > 0 || this.boarded) return;
+    e.mortarTimer = c.mortarInterval * range(this.rng, 0.85, 1.15);
+    const miss = Math.max(c.mortarSpread, c.mortarFirstMiss - e.mortarShots * c.mortarWalkIn);
+    e.mortarShots++;
+    const team = this.teamPosition;
+    const a = range(this.rng, 0, Math.PI * 2);
+    const d = range(this.rng, 0.5, 1) * miss;
+    e.state = 'firing';
+    e.sinceShot = 0;
+    this.onMuzzleFlash(e.position);
+    this.onMortar(team.x + Math.cos(a) * d, team.z + Math.sin(a) * d);
   }
 
   /** Gathers the situation and asks `EnemyBrain.decide` what to do (PLAN.md §7.11). */

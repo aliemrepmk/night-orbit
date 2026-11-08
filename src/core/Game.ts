@@ -37,6 +37,15 @@ import { InfantryRenderer } from '../units/InfantryRenderer';
 import { TANK_BLAST, type Explosives } from '../world/explosives';
 import type { AirDefense } from '../combat/AirDefense';
 import { createBattle, createWorld, type StaticWorld } from '../mission/battle';
+import {
+  describeRoll,
+  rollTwists,
+  seedFromUrl,
+  twistsFromUrl,
+  type TwistRoll,
+} from '../mission/twists';
+import { fogEnvelope } from '../render/thermalMath';
+import { shakeFor } from '../combat/Explosions';
 import { rateMission, summaryRows, type MissionStats } from '../mission/stats';
 import { edgeArrow } from '../ui/edgeArrow';
 import type { FriendlyArrow } from '../ui/HUD';
@@ -48,7 +57,6 @@ import { formatPlacement, mapOverlay, nextTourStop } from '../debug/mapOverlay';
 import { HelicopterRenderer } from '../units/HelicopterRenderer';
 import { AirRenderer } from '../render/AirRenderer';
 import { CHEAT_KEYS, nextTimeScale, phaseFromUrl } from '../debug/cheats';
-import { MISSION } from '../mission/missionDef';
 import { largestFootprint } from '../mission/clinic';
 import type { MissionHost } from '../mission/MissionHost';
 import type { UnitManager } from '../units/UnitManager';
@@ -117,6 +125,14 @@ export class Game {
   private airDefense!: AirDefense;
   /** Seconds to the next missile-warning beep. */
   private beepLeft = 0;
+  /** This run's seed and twists (M8+ Phase F); `?seed=` sets the first one (dev builds). */
+  private seed = 0;
+  private nextSeed: number | null = null;
+  private roll!: TwistRoll;
+  /** Ground fog left (s) and the pilot beacon's blink timer. */
+  private fogLeft = 0;
+  private fogTotal = 1;
+  private beaconLeft = 0;
   private weapons!: Weapons;
   private projectiles!: Projectiles;
   private explosions!: Explosions;
@@ -179,6 +195,7 @@ export class Game {
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
+    if (import.meta.env.DEV || this.debug) this.nextSeed = seedFromUrl(location.search);
     this.newRun();
     this.go('lockLost'); // shows the title screen
   }
@@ -187,9 +204,15 @@ export class Game {
    * Starts a fresh run on the same world: new bus, soldiers, vehicles, mission, guns and stats
    * (seeded the same way every time), effects cleared, and the orbit back over the OP.
    */
-  private newRun(): void {
+  private newRun(newSeed = true): void {
     this.effects.clear();
-    const b = createBattle(this.w);
+    // Every new run gets a new seed (its twists); a restart / retry replays the same one.
+    if (newSeed) this.seed = this.nextSeed ?? Math.floor(Math.random() * 1e6);
+    this.nextSeed = null;
+    const cheats = import.meta.env.DEV || this.debug;
+    const roll = rollTwists(this.seed, cheats ? twistsFromUrl(location.search) : []);
+    const b = createBattle(this.w, roll);
+    this.roll = roll;
     this.bus = b.bus;
     this.units = b.units;
     this.vehicles = b.vehicles;
@@ -217,6 +240,7 @@ export class Game {
     this.missionClock = 0;
     this.dangerCloseLeft = 0;
     this.help = false;
+    this.fogLeft = 0;
 
     this.bus.on('dangerClose', () => (this.dangerCloseLeft = CONFIG.hud.dangerCloseSeconds));
     this.bus.on('missionFailed', (e) => this.fail(e.reason));
@@ -237,6 +261,18 @@ export class Game {
       this.sensor.jitterScale = CONFIG.airDefense.engineOutJitter;
       this.audio.setEnginesRunning(3);
     });
+    // Twists (M8+ Phase F): enemy mortar rounds, a jammed 105 mm, ground fog.
+    this.bus.on('enemyShell', (e) => {
+      const at = new Vector3(e.x, this.terrain.heightAt(e.x, e.z), e.z);
+      this.effects.explosion(at, WEAPONS['40'], true);
+      const d = Math.hypot(e.x - this.sensor.aim.x, e.z - this.sensor.aim.z);
+      this.audio.play('impact40', impactVolume(d));
+      this.sensor.addShake(shakeFor(WEAPONS['40'], d));
+    });
+    this.bus.on('gunJammed', (e) => this.weapons.guns['105'].jam(e.seconds));
+    this.bus.on('fog', (e) => {
+      this.fogLeft = this.fogTotal = e.seconds;
+    });
     this.bus.on('flares', (e) => {
       if (e.result === 'empty') return;
       this.audio.play('flare');
@@ -244,12 +280,11 @@ export class Game {
     });
 
     // `?phase=village` starts at a phase (dev builds or ?debug=1).
-    const cheats = import.meta.env.DEV || this.debug;
     this.host.start(
       cheats
         ? phaseFromUrl(
             location.search,
-            MISSION.phases.map((p) => p.id),
+            b.mission.phases.map((p) => p.id),
           )
         : undefined,
     );
@@ -275,7 +310,7 @@ export class Game {
       case 'restart':
       case 'retry':
       case 'again':
-        this.newRun();
+        this.newRun(b === 'again'); // retry the same run; PLAY AGAIN rolls new events
         this.go('restart');
         this.screens.setLockHint('');
         this.input.requestLock();
@@ -391,6 +426,15 @@ export class Game {
         this.burnAt.set(def.x + ox * def.radius, def.y + 3.5, def.z + oz * def.radius);
         this.effects.fire(this.burnAt, dt, 1.6 * intensity);
       }
+    }
+    if (playing) this.fogLeft = Math.max(0, this.fogLeft - dt);
+    // The downed pilot's IR strobe (M8+ Phase F).
+    const pilot = this.host.pilot;
+    this.beaconLeft -= dt;
+    if (pilot && pilot.state === 'down' && this.beaconLeft <= 0) {
+      this.beaconLeft = 0.8;
+      this.burnAt.set(pilot.x, this.terrain.heightAt(pilot.x, pilot.z) + 1, pilot.z);
+      this.effects.beacon(this.burnAt);
     }
     // Missiles in flight leave a smoke trail; destroyed AA guns burn for a while.
     for (const m of this.airDefense.missiles)
@@ -644,8 +688,8 @@ export class Game {
   /** Mission complete: Ridgeback is out. Freeze the fight and show the stats and rating. */
   private complete(): void {
     if (this.flow.ended) return;
-    const s = this.stats.summary(this.units.team.taken, this.missionClock);
-    this.screens.setComplete(rateMission(s), summaryRows(s));
+    const s = this.stats.summary(this.units.team.taken, this.missionClock, this.host.bonuses);
+    this.screens.setComplete(rateMission(s), summaryRows(s), this.eventsLine());
     this.go('complete');
     if (document.pointerLockElement) document.exitPointerLock();
   }
@@ -714,6 +758,7 @@ export class Game {
 
   private readonly projected = new Vector3();
   private readonly burnAt = new Vector3();
+  private readonly pilotAt = new Vector3();
   private readonly viewSpace = new Vector3();
 
   /** Edge arrows toward Ridgeback and Kestrel 6 while they are off-screen (M8). */
@@ -740,7 +785,12 @@ export class Game {
     this.teamPoint.y = this.terrain.heightAt(this.teamPoint.x, this.teamPoint.z) + 1;
     add(this.teamPoint, 'RIDGEBACK');
     if (this.host.helicopter.alive) add(this.host.helicopter.position, 'KESTREL 6');
-    for (const m of this.airDefense.inbound.slice(0, 2)) add(m.position, 'MISSILE');
+    for (const m of this.airDefense.inbound.slice(0, 1)) add(m.position, 'MISSILE');
+    const pilot = this.host.pilot;
+    if (pilot && pilot.state === 'down') {
+      this.pilotAt.set(pilot.x, this.terrain.heightAt(pilot.x, pilot.z) + 1, pilot.z);
+      add(this.pilotAt, 'PILOT');
+    }
     return out;
   }
 
@@ -840,16 +890,22 @@ export class Game {
       staticAmount: this.sensorFx.staticAmount,
       blurPx: this.sensorFx.blurPx,
       whiteout: this.sensorFx.whiteout,
+      haze: CONFIG.twists.fogHaze * fogEnvelope(this.fogLeft, this.fogTotal, CONFIG.twists.fogFade),
     };
   }
 
   /** Mission failed (friendly fire, overrun, clinic, Kestrel 6): freeze the fight and show why. */
   private fail(reason: FailReason): void {
     if (this.flow.ended) return;
-    const s = this.stats.summary(this.units.team.taken, this.missionClock);
-    this.screens.setFailed(failReasonText(reason), summaryRows(s));
+    const s = this.stats.summary(this.units.team.taken, this.missionClock, this.host.bonuses);
+    this.screens.setFailed(failReasonText(reason), summaryRows(s), this.eventsLine());
     this.go('fail');
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+
+  /** The run's events and seed for the end screens (M8+ Phase F). */
+  private eventsLine(): string {
+    return `EVENTS: ${describeRoll(this.roll)}  ·  SEED ${this.seed}`;
   }
 
   /** Feeds the screen state machine and shows whatever screen it lands on. */

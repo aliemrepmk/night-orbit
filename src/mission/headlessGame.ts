@@ -1,3 +1,4 @@
+import type { TwistRoll } from './twists';
 import { createBattle, createWorld, type StaticWorld } from './battle';
 
 /**
@@ -5,8 +6,8 @@ import { createBattle, createWorld, type StaticWorld } from './battle';
  * the auto-play and host tests and for headless tuning runs. No renderer, no DOM. Pass a
  * `world` to reuse one (a restart, M8).
  */
-export function headlessGame(world: StaticWorld = createWorld()) {
-  const b = createBattle(world);
+export function headlessGame(world: StaticWorld = createWorld(), roll?: TwistRoll) {
+  const b = createBattle(world, roll);
   const failures: string[] = [];
   b.bus.on('missionFailed', (e) => failures.push(e.reason));
   return { ...b, world, failures, footprints: world.footprints };

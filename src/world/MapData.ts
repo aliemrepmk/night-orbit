@@ -1064,6 +1064,30 @@ export const MAP: MapData = {
       [640, -250],
       [606, -342],
     ],
+    // M8+ Phase F: the commander's car fleeing from the north road down the east road, and the
+    // civilian bus crossing the village on the main road.
+    hvt_escape: [
+      [345, -500],
+      [360, -300],
+      [338, -120],
+      [330, 20],
+      [450, 12],
+      [600, 0],
+      [790, -10],
+    ],
+    bus_route: [
+      [790, -10],
+      [600, 0],
+      [450, 12],
+      [330, 20],
+      [200, 35],
+      [130, 45],
+      [70, 50],
+      [20, 48],
+      [-20, 50],
+      [-60, 62],
+      [-110, 80],
+    ],
     // M7: technicals that drive up the quarry track at Ridgeback during the extraction.
     lz_technical: [
       [790, -10],

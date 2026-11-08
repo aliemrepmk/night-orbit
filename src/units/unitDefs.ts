@@ -1,5 +1,6 @@
 /** `manpads`: a militia soldier with a shoulder-fired missile (M8+ Phase E). */
-export type InfantryType = 'rifleman' | 'machineGunner' | 'ridgeback' | 'manpads';
+/** `mortar`: a mortar crew member that stays put and shells Ridgeback (M8+ Phase F). */
+export type InfantryType = 'rifleman' | 'machineGunner' | 'ridgeback' | 'manpads' | 'mortar';
 
 /** Stats for one kind of soldier (PLAN.md §9 enemy table). These WILL be tuned in playtesting. */
 export interface InfantryDef {
@@ -15,6 +16,8 @@ export interface InfantryDef {
   readonly burst: number;
   /** Carries a shoulder-fired missile and launches it at the gunship (M8+ Phase E). */
   readonly launcher?: boolean;
+  /** Mans a mortar: stays in place and drops rounds near Ridgeback (M8+ Phase F). */
+  readonly mortar?: boolean;
 }
 
 export const INFANTRY: Readonly<Record<InfantryType, InfantryDef>> = {
@@ -33,4 +36,5 @@ export const INFANTRY: Readonly<Record<InfantryType, InfantryDef>> = {
     burst: 1,
     launcher: true,
   },
+  mortar: { type: 'mortar', hp: 100, dps: 0, range: 0, speed: 0, burst: 0, mortar: true },
 };

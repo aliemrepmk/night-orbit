@@ -27,7 +27,10 @@ export type VehicleConfig = { readonly [K in keyof typeof CONFIG.vehicles]: numb
  */
 export class Vehicle implements Target {
   readonly kind = 'vehicle' as const;
-  readonly side = 'enemy' as const;
+  /** Civilian vehicles (the bus) are protected; everything else is the enemy's. */
+  get side(): 'enemy' | 'civilian' {
+    return this.def.civilian ? 'civilian' : 'enemy';
+  }
   readonly position = new Vector3();
   def: VehicleDef;
   state: VehicleState = 'unused';

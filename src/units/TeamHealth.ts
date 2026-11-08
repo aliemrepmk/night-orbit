@@ -15,6 +15,8 @@ export class TeamHealth {
   value: number;
   /** Dev cheat `G` (god mode): enemy fire no longer drains the team. */
   invulnerable = false;
+  /** Damage factor (a wounded operator makes the team easier to hurt, M8+ Phase F). */
+  damageScale = 1;
   /** Health lost to enemy fire so far (the mission's "damage taken", M8). */
   taken = 0;
   /** Seconds since an enemy last fired at the team. */
@@ -42,7 +44,7 @@ export class TeamHealth {
     this.quiet = 0;
     if (this.invulnerable) return;
     const before = this.value;
-    this.value = Math.max(0, this.value - amount);
+    this.value = Math.max(0, this.value - amount * this.damageScale);
     this.taken += before - this.value;
   }
 

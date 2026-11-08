@@ -335,6 +335,24 @@ export class Effects {
     }
   }
 
+  /** An IR strobe blink (the downed pilot, M8+ Phase F): one short, very bright point. */
+  beacon(p: Vector3): void {
+    this.hot.spawn({
+      ...still(p.x, p.y, p.z),
+      life: 0.18,
+      size0: 1.6,
+      size1: 1.6,
+      heat0: 1,
+      heat1: 1,
+      glow0: GLOW.irStrobe,
+      glow1: GLOW.irStrobe,
+      albedo: 0,
+      gravity: 0,
+      drag: 0,
+      alpha: 1,
+    });
+  }
+
   /** Dark smoke from a damaged vehicle: call every tick. */
   smokePuff(p: Vector3, dt: number, intensity = 1): void {
     const rng = this.rng;

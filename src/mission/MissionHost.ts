@@ -1,3 +1,4 @@
+import { INFANTRY } from '../units/unitDefs';
 import type { AirDefense } from '../combat/AirDefense';
 import { Path } from '../ai/Paths';
 import { CONFIG } from '../config';
@@ -53,6 +54,16 @@ export class MissionHost implements MissionWorld {
   clinicMarkLeft = 0;
   private route: string | null = null;
   private boarding = false;
+  /** Bonus objectives achieved this run (M8+ Phase F), for the end screen and rating. */
+  readonly bonuses: string[] = [];
+  /** A downed strike pilot to protect (M8+ Phase F), or null. */
+  pilot: {
+    readonly x: number;
+    readonly z: number;
+    state: 'down' | 'rescued' | 'captured';
+    time: number;
+    near: number;
+  } | null = null;
   private wasUnderFire = false;
   private readonly roads = new Map<string, Path>();
   private readonly cfg: MissionHostConfig;
@@ -89,7 +100,10 @@ export class MissionHost implements MissionWorld {
     bus.on('missionFailed', () => this.mission.fail());
     // Air defense (M8+ Phase E): the crew calls what is happening to the aircraft.
     bus.on('aaFiring', () => this.chatter.say('aaFiring'));
-    bus.on('aaDestroyed', () => this.chatter.say('aaDestroyed'));
+    bus.on('aaDestroyed', (e) => {
+      this.chatter.say('aaDestroyed');
+      this.mission.setFlag(`aaDown:${e.id}`); // e.g. the forest gun must die before Kestrel returns
+    });
     bus.on('hullHit', (e) => this.chatter.say(e.by === 'missile' ? 'missileHit' : 'hullHit'));
     bus.on('engineLost', () => this.chatter.say('engineLost'));
     bus.on('missileLaunch', () => this.chatter.say('missileLaunch'));
@@ -139,6 +153,8 @@ export class MissionHost implements MissionWorld {
     this.helicopter.update(dt);
     this.updateHelicopterDamage();
     this.updateBoarding();
+    this.updatePilot(dt);
+    this.updateHvt();
     this.updateTeamChatter();
     this.clinicMarkLeft = Math.max(0, this.clinicMarkLeft - dt);
     const onClinic =
@@ -186,6 +202,40 @@ export class MissionHost implements MissionWorld {
       case 'activateAA':
         this.d.airDefense?.activate(a.site);
         return;
+      case 'startMortar':
+        for (const [dx, dz] of [
+          [0, 0],
+          [3, 2],
+        ]) {
+          units.spawnEnemy(INFANTRY.mortar, a.at[0] + dx, a.at[1] + dz);
+        }
+        return;
+      case 'woundTeam':
+        units.squad.speedScale = CONFIG.twists.woundSpeed;
+        units.team.damageScale = CONFIG.twists.woundDamage;
+        return;
+      case 'jamGun':
+        this.d.bus.emit('gunJammed', { seconds: a.seconds });
+        return;
+      case 'fogIn':
+        this.d.bus.emit('fog', { seconds: a.seconds });
+        return;
+      case 'downPilot':
+        this.pilot = { x: a.at[0], z: a.at[1], state: 'down', time: 0, near: 0 };
+        return;
+      case 'abortHelicopter':
+        this.helicopter.abort();
+        return;
+      case 'resolveHvt': {
+        const hvt = vehicles.vehicles.find((v) => v.tag === 'hvt');
+        if (hvt && !hvt.alive) {
+          this.bonuses.push('HVT destroyed');
+          this.radio.say('FCO', 'Commander’s car is burning. That one counts.', 2);
+        } else {
+          this.radio.say('NAV', 'The commander got away down the east road.', 2);
+        }
+        return;
+      }
       case 'spawnConvoy': {
         const road = this.roads.get(a.path);
         if (!road) throw new Error(`Unknown vehicle path "${a.path}"`);
@@ -257,6 +307,34 @@ export class MissionHost implements MissionWorld {
       this.boarding = false;
       this.helicopter.board();
     }
+  }
+
+  /** The downed pilot (M8+ Phase F): rescued after holding long enough, taken if enemies close in. */
+  private updatePilot(dt: number): void {
+    const p = this.pilot;
+    if (!p || p.state !== 'down') return;
+    const c = CONFIG.twists;
+    p.time += dt;
+    const close = this.d.units.enemies.some(
+      (e) => e.alive && Math.hypot(e.position.x - p.x, e.position.z - p.z) < c.pilotCaptureRadius,
+    );
+    p.near = close ? p.near + dt : 0;
+    if (p.near >= 3) {
+      p.state = 'captured';
+      this.mission.setFlag('pilotDone');
+      this.radio.say('NAV', 'They reached the pilot. He is gone. Nothing we can do now.', 2);
+    } else if (p.time >= c.pilotHold) {
+      p.state = 'rescued';
+      this.bonuses.push('Pilot rescued');
+      this.mission.setFlag('pilotDone');
+      this.radio.say('NAV', 'Rescue bird has the pilot. Good work keeping them off him.', 2);
+    }
+  }
+
+  /** The HVT's car got to the end of the road: it escaped (M8+ Phase F). */
+  private updateHvt(): void {
+    const hvt = this.d.vehicles.vehicles.find((v) => v.tag === 'hvt' && v.inUse);
+    if (hvt && hvt.alive && hvt.state !== 'driving') this.mission.setFlag('hvtEscaped');
   }
 
   /** Kestrel 6 under fire: its radio calls, and the fail when enemy fire brings it down. */

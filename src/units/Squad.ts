@@ -30,6 +30,8 @@ const FORMATION: readonly (readonly [number, number])[] = [
  * once, then hold at its end) and `halt`; a squad built with `loop` walks its route back and forth.
  */
 export class Squad {
+  /** Walking-speed factor (a wounded operator slows the team, M8+ Phase F). */
+  speedScale = 1;
   readonly anchor = new Vector3();
   /** Facing in radians: forward is (sin h, cos h). */
   heading = 0;
@@ -111,7 +113,7 @@ export class Squad {
     const dx = target.x - this.anchor.x;
     const dz = target.z - this.anchor.z;
     const dist = Math.hypot(dx, dz);
-    const stepLen = this.cfg.speed * dt;
+    const stepLen = this.cfg.speed * this.speedScale * dt;
     if (dist > 1e-6) this.heading = Math.atan2(dx, dz);
     if (dist <= stepLen) {
       this.anchor.x = target.x;

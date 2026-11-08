@@ -77,3 +77,12 @@ export const setFlag = (name: string): Action => ({ kind: 'setFlag', name });
 export const clearFlag = (name: string): Action => ({ kind: 'clearFlag', name });
 export const nextPhase = (): Action => ({ kind: 'nextPhase' });
 export const completeMission = (): Action => ({ kind: 'completeMission' });
+
+// ---- Twists (M8+ Phase F) ----
+export const startMortar = (at: Vec2): Action => ({ kind: 'startMortar', at });
+export const woundTeam = (): Action => ({ kind: 'woundTeam' });
+export const jamGun = (seconds: number): Action => ({ kind: 'jamGun', seconds });
+export const fogIn = (seconds: number): Action => ({ kind: 'fogIn', seconds });
+export const downPilot = (at: Vec2): Action => ({ kind: 'downPilot', at });
+export const abortHelicopter = (): Action => ({ kind: 'abortHelicopter' });
+export const resolveHvt = (): Action => ({ kind: 'resolveHvt' });

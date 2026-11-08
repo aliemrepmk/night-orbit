@@ -17,7 +17,8 @@ import { Explosives } from '../world/explosives';
 import { inForest } from '../world/forest';
 import { ORDNANCE } from '../gunship/airSupportDefs';
 import type { Footprint } from './clinic';
-import { MISSION } from './missionDef';
+import { buildMission, DEFAULT_ROLL } from './missionDef';
+import type { TwistRoll } from './twists';
 import { MissionHost } from './MissionHost';
 import { MissionStats } from './stats';
 
@@ -47,7 +48,7 @@ export type StaticWorld = ReturnType<typeof createWorld>;
  * a new one on the same static world, so nothing from the last run leaks into the next (the
  * fixed seeds make every run start the same way).
  */
-export function createBattle(w: StaticWorld) {
+export function createBattle(w: StaticWorld, roll: TwistRoll = DEFAULT_ROLL) {
   // The world's cover points are shared: free every reservation the last run left behind.
   w.world.cover.releaseAll();
   const bus = new EventBus<GameEvents>();
@@ -95,7 +96,16 @@ export function createBattle(w: StaticWorld) {
   for (const g of airDefense.guns) units.addTarget(g);
   airDefense.trucks = () => aaTrucks(vehicles);
   units.onLaunch = (from) => airDefense.launch(from);
-  const host = new MissionHost(MISSION, {
+  // Mortar rounds (M8+ Phase F): hurt the team when close, and show as enemy shells.
+  units.onMortar = (x, z) => {
+    bus.emit('enemyShell', { x, z });
+    const t = units.teamPosition;
+    const d = Math.hypot(t.x - x, t.z - z);
+    const r = CONFIG.twists.mortarRadius;
+    if (d < r) units.team.damage(CONFIG.twists.mortarDamage * (1 - d / r));
+  };
+  const mission = buildMission(roll);
+  const host = new MissionHost(mission, {
     map: MAP,
     bus,
     units,
@@ -110,7 +120,7 @@ export function createBattle(w: StaticWorld) {
   // The fuel depot's tanks: every impact near them hurts them (fresh each run).
   const depot = new Explosives(w.world.explosives);
   bus.on('impact', (e) => depot.hit(e.pos.x, e.pos.z, ORDNANCE[e.weapon]));
-  return { bus, units, vehicles, spawner, host, stats, ground, depot, airDefense };
+  return { bus, units, vehicles, spawner, host, stats, ground, depot, airDefense, roll, mission };
 }
 
 /** Live AA trucks as air-defense shooters (they fire once in place or on the move). */

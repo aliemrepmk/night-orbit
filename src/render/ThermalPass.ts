@@ -14,6 +14,8 @@ export interface ThermalFrame {
   blurPx: number;
   /** 0–1 sensor saturation from a nearby blast (added to the raw value before the curve). */
   whiteout: number;
+  /** 0–1 ground fog (M8+ Phase F): the picture washes toward flat gray, contrast drops. */
+  haze?: number;
 }
 
 /**
@@ -45,6 +47,7 @@ const ThermalShader = {
     uStatic: { value: 0 },
     uBlurPx: { value: 0 },
     uWhiteout: { value: 0 },
+    uHaze: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -73,6 +76,7 @@ const ThermalShader = {
     uniform float uStatic;
     uniform float uBlurPx;
     uniform float uWhiteout;
+    uniform float uHaze;
     varying vec2 vUv;
 
     float hash(vec2 p) {
@@ -113,6 +117,9 @@ const ThermalShader = {
         // Image intensifier: gain, then gamma (same as thermalMath.nvCurve).
         v = pow(clamp(h * uNvGain, 0.0, 1.0), uGamma);
       }
+
+      // Ground fog: the picture washes out toward a flat gray.
+      v = mix(v, 0.42, uHaze);
 
       // Animated sensor grain (new pattern every frame).
       vec2 px = gl_FragCoord.xy / uPixelRatio;
@@ -178,5 +185,6 @@ export class ThermalPass extends ShaderPass {
     u.uStatic.value = f.staticAmount;
     u.uBlurPx.value = f.blurPx;
     u.uWhiteout.value = f.whiteout;
+    u.uHaze.value = f.haze ?? 0;
   }
 }

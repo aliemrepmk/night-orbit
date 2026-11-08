@@ -26,6 +26,11 @@ export class WeaponState {
     this.rounds = def.capacity;
   }
 
+  /** The gun is jammed (M8+ Phase F): no fire for `seconds` (shown as loading). */
+  jam(seconds: number): void {
+    this.reloadLeft = Math.max(this.reloadLeft, seconds);
+  }
+
   get status(): WeaponStatus {
     if (this.reloadLeft > 0) return this.def.fireMode === 'auto' ? 'overheated' : 'reloading';
     if (this.cycle > 0) return 'cycling';

@@ -1,7 +1,8 @@
 import { ARMOR, type Armor } from '../combat/Damage';
 
 /** `aaa`: a pickup with a twin AA gun (M8+ Phase E): fires at aircraft, never at Ridgeback. */
-export type VehicleType = 'truck' | 'technical' | 'apc' | 'aaa';
+/** `bus`: a civilian bus (protected); `suv`: the fleeing commander's car (M8+ Phase F). */
+export type VehicleType = 'truck' | 'technical' | 'apc' | 'aaa' | 'bus' | 'suv';
 
 /** What a box part of a vehicle is made of, which sets its heat (`VehicleRenderer`). */
 export type PartKind = 'body' | 'engine' | 'exhaust' | 'wheels' | 'gun';
@@ -33,6 +34,8 @@ export interface VehicleDef {
   readonly firesWhileMoving: boolean;
   /** An anti-aircraft gun: `AirDefense` fires it at the gunship and the strike jets. */
   readonly antiAir?: boolean;
+  /** A civilian vehicle: protected (hitting it fails the mission), nobody shoots it. */
+  readonly civilian?: boolean;
   /** Soldiers carried (trucks unload them). */
   readonly cargoMin: number;
   readonly cargoMax: number;
@@ -146,6 +149,49 @@ export const VEHICLES: Readonly<Record<VehicleType, VehicleDef>> = {
       part('gun', [0, 1.75, -1.0], [1.2, 0.6, 1.2], false), // gun mount
       part('gun', [-0.22, 2.75, -0.9], [0.16, 1.9, 0.16], false), // barrels, pointing up
       part('gun', [0.22, 2.75, -0.9], [0.16, 1.9, 0.16], false),
+    ],
+  },
+  // M8+ Phase F: a civilian bus on the main road during a fight. Protected: don't hit it.
+  bus: {
+    type: 'bus',
+    hp: 400,
+    armor: ARMOR.truck,
+    speed: 8,
+    dps: 0,
+    range: 0,
+    burst: 0,
+    firesWhileMoving: false,
+    civilian: true,
+    cargoMin: 0,
+    cargoMax: 0,
+    lift: 1.5,
+    gunHeight: 0,
+    length: 10,
+    parts: [
+      part('body', [0, 1.9, 0], [2.5, 2.4, 9.6]),
+      part('engine', [0, 1.2, -4.4], [2.2, 0.8, 0.8]),
+      part('wheels', [0, 0.5, 0], [2.6, 0.9, 8.8]),
+    ],
+  },
+  // M8+ Phase F: the commander's SUV, fleeing fast (a bonus target).
+  suv: {
+    type: 'suv',
+    hp: 160,
+    armor: ARMOR.technical,
+    speed: 15,
+    dps: 0,
+    range: 0,
+    burst: 0,
+    firesWhileMoving: false,
+    cargoMin: 0,
+    cargoMax: 0,
+    lift: 0.9,
+    gunHeight: 0,
+    length: 4.8,
+    parts: [
+      part('body', [0, 1.2, 0], [2.0, 1.3, 4.6]),
+      part('engine', [0, 0.95, 1.9], [1.7, 0.5, 0.8]),
+      part('wheels', [0, 0.4, 0], [2.1, 0.7, 4.4]),
     ],
   },
 };

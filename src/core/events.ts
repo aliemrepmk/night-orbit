@@ -12,7 +12,9 @@ export type FailReason =
   /** Enemy fire shot Kestrel 6 down at the LZ. */
   | 'helicopter_lost'
   /** AA and missiles destroyed the gunship (M8+ Phase E). */
-  | 'gunship_lost';
+  | 'gunship_lost'
+  /** The player's fire hit the protected civilian bus (M8+ Phase F). */
+  | 'civilian_hit';
 
 /** Everything that can "happen" in the game (PLAN.md §6). Extend as systems are added. */
 export type GameEvents = {
@@ -47,4 +49,11 @@ export type GameEvents = {
   /** AA near the target: a strike jet was hit, or the pilot aborted the strike. */
   jetHit: { strike: StrikeId };
   strikeAborted: { strike: StrikeId };
+  // ---- Mission twists (M8+ Phase F) ----
+  /** An enemy mortar round landed at (x, z). */
+  enemyShell: { x: number; z: number };
+  /** The 105 mm is jammed for `seconds`. */
+  gunJammed: { seconds: number };
+  /** Ground fog rolls in for `seconds`. */
+  fog: { seconds: number };
 };

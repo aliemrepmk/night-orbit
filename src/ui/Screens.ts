@@ -80,6 +80,7 @@ export class Screens {
         <h2>MISSION FAILED</h2>
         <p class="reason" data-k="failReason"></p>
         <table class="stats" data-k="failStats"></table>
+        <p class="hint events" data-k="failEvents"></p>
         <div class="buttons"><button class="primary" data-b="retry">RETRY</button></div>
       </section>
       <section class="panel" data-screen="complete">
@@ -87,6 +88,7 @@ export class Screens {
         <p class="sub">RIDGEBACK IS OUT</p>
         <div class="rating"><span data-k="grade"></span><span data-k="ratingLabel"></span></div>
         <table class="stats" data-k="completeStats"></table>
+        <p class="hint events" data-k="completeEvents"></p>
         <div class="buttons"><button class="primary" data-b="again">PLAY AGAIN</button></div>
       </section>`;
 
@@ -133,12 +135,14 @@ export class Screens {
   }
 
   /** The fail screen: why, and the stats so far. */
-  setFailed(reason: string, rows: readonly [string, string][]): void {
+  setFailed(reason: string, rows: readonly [string, string][], events = ''): void {
     this.text('failReason', reason);
     this.el('failStats').innerHTML = statRows(rows);
+    this.text('failEvents', events);
   }
 
-  setComplete(rating: Rating, rows: readonly [string, string][]): void {
+  setComplete(rating: Rating, rows: readonly [string, string][], events = ''): void {
+    this.text('completeEvents', events);
     this.text('grade', rating.grade);
     this.text('ratingLabel', `${rating.label} · ${rating.score}`);
     this.el('completeStats').innerHTML = statRows(rows);

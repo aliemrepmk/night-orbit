@@ -49,6 +49,9 @@ export class Infantry implements Target {
   /** MANPADS (M8+ Phase E): seconds until it may launch again, and aiming time left (< 0: not aiming). */
   launchCooldown = 0;
   aimLeft = -1;
+  /** Mortar crew (M8+ Phase F): seconds to the next round, and rounds fired (they walk in). */
+  mortarTimer = 0;
+  mortarShots = 0;
   /** Fraction of its range at which this soldier stops to fire (varies per soldier). */
   standoff = 0.8;
   /** An assaulter closes in on Ridgeback instead of sniping from far off (`enemyFire.assaultChance`). */
@@ -106,6 +109,8 @@ export class Infantry implements Target {
     this.sinceShot = Infinity;
     this.launchCooldown = 0;
     this.aimLeft = -1;
+    this.mortarTimer = 0;
+    this.mortarShots = 0;
     this.target = null;
     this.killedBy = null;
     this.action = 'advance';

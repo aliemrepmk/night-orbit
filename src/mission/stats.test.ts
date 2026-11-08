@@ -37,6 +37,7 @@ describe('MissionStats', () => {
     bus.emit('dangerClose', { weapon: '105', distance: 20 });
     const sum = s.summary(42, 600);
     expect(sum).toEqual({
+      bonuses: [],
       kills: 2,
       impacts: 3,
       hits: 2,
