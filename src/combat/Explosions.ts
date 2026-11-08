@@ -23,7 +23,7 @@ export interface Target extends Damageable {
  */
 export function shakeFor(w: Ordnance, distanceToAim: number): number {
   const r = w.blastRadius;
-  return w.fx.shakeDeg * falloff(distanceToAim, r, r * CONFIG.fx.shakeReach);
+  return w.fx.shakeDeg * falloff(distanceToAim, r, r * (w.fx.shakeReach ?? CONFIG.fx.shakeReach));
 }
 
 /**
@@ -76,7 +76,7 @@ export class Explosions {
     this.effects.explosion(point, w, onGround);
 
     const distanceToAim = point.distanceTo(this.sensor.aim);
-    this.sensor.addShake(shakeFor(w, distanceToAim));
+    this.sensor.addShake(shakeFor(w, distanceToAim), w.fx.shakeSeconds);
 
     const cam = this.sensor.camera;
     const p = this.ndc.copy(point).project(cam);

@@ -187,6 +187,31 @@ export class Effects {
       });
     }
 
+    // Dust: a low, wide cloud rolling out along the ground and hanging there (the bomb's "fog").
+    for (let i = 0; i < (fx.dust ?? 0); i++) {
+      const a = range(rng, 0, Math.PI * 2);
+      const speed = (fx.dustSpeed ?? 0) * range(rng, 0.45, 1);
+      this.smoke.spawn({
+        x: p.x + Math.cos(a) * range(rng, 2, 8),
+        y: p.y + range(rng, 0.5, 3),
+        z: p.z + Math.sin(a) * range(rng, 2, 8),
+        vx: Math.cos(a) * speed + wind[0] * 0.5,
+        vy: range(rng, 0.1, 0.6),
+        vz: Math.sin(a) * speed + wind[2] * 0.5,
+        life: range(rng, 12, 20),
+        size0: fx.smokeSize * 0.3,
+        size1: fx.smokeSize * range(rng, 0.8, 1.2),
+        heat0: 0.5,
+        heat1: 0.16,
+        glow0: 0,
+        glow1: 0,
+        albedo: 0.32,
+        gravity: -0.03,
+        drag: 0.45, // rolls out fast, then slows and hangs
+        alpha: 0.55,
+      });
+    }
+
     if (fx.shockwave) this.shockwave(p, w.blastRadius * CONFIG.fx.shockwaveScale);
     if (onGround && fx.craterRadius > 0) this.crater(p, fx.craterRadius);
   }
@@ -277,17 +302,18 @@ export class Effects {
     this.craters[i].age = 0;
     this.craters[i].active = true;
 
-    // Orient the disc to the terrain slope so it doesn't stick out of hillsides.
-    const e = 1;
-    const n = this.v
-      .set(
-        this.groundAt(p.x - e, p.z) - this.groundAt(p.x + e, p.z),
-        2 * e,
-        this.groundAt(p.x, p.z - e) - this.groundAt(p.x, p.z + e),
-      )
-      .normalize();
+    // Orient the disc to the terrain slope across its own size (a big bomb crater on rolling
+    // ground would otherwise sink into one side), and sit it on the higher of the center and the
+    // average rim height, so no part of it hides under the ground.
+    const e = Math.max(1, radius);
+    const west = this.groundAt(p.x - e, p.z);
+    const east = this.groundAt(p.x + e, p.z);
+    const north = this.groundAt(p.x, p.z - e);
+    const south = this.groundAt(p.x, p.z + e);
+    const n = this.v.set(west - east, 2 * e, north - south).normalize();
     this.q.setFromUnitVectors(UP, n);
-    const pos = this.s.set(p.x, this.groundAt(p.x, p.z), p.z).addScaledVector(n, 0.12);
+    const y = Math.max(this.groundAt(p.x, p.z), (west + east + north + south) / 4);
+    const pos = this.s.set(p.x, y, p.z).addScaledVector(n, 0.12 + radius * 0.01);
     this.m.compose(pos, this.q, new Vector3(radius, 1, radius));
     this.craterMesh.setMatrixAt(i, this.m);
     this.craterMesh.instanceMatrix.needsUpdate = true;
@@ -375,6 +401,12 @@ export class Effects {
 
   get activeCraters(): number {
     return this.craters.filter((c) => c.active).length;
+  }
+
+  /** The placement matrix of crater slot `i` (tests). */
+  craterMatrix(i: number, out: Matrix4): Matrix4 {
+    this.craterMesh.getMatrixAt(i, out);
+    return out;
   }
 
   /** Heat of crater slot `i` (for tests / debug). */

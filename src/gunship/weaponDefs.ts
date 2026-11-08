@@ -26,6 +26,13 @@ export interface ImpactFx {
   readonly shockwave: boolean;
   /** Camera shake in degrees when the impact is at the aim point. */
   readonly shakeDeg: number;
+  /** How long the shake rumbles: its decay time constant (s; default `CONFIG.sensor.shakeTau`). */
+  readonly shakeSeconds?: number;
+  /** Shake fades to zero this many blast radii from the aim point (default `CONFIG.fx.shakeReach`). */
+  readonly shakeReach?: number;
+  /** A low dust cloud rolling out along the ground (the bomb): puffs and their outward speed (m/s). */
+  readonly dust?: number;
+  readonly dustSpeed?: number;
   /** Brief sensor whiteout (0–1) when the impact is in view. */
   readonly whiteout: number;
 }

@@ -7,7 +7,7 @@ import { createRng } from '../core/rng';
 import { Effects } from '../fx/Effects';
 import { Gunship } from '../gunship/Gunship';
 import { Sensor } from '../gunship/Sensor';
-import { STRIKES } from '../gunship/airSupportDefs';
+import { ORDNANCE, STRIKES } from '../gunship/airSupportDefs';
 import { WEAPONS } from '../gunship/weaponDefs';
 import { SensorFX } from '../render/SensorFX';
 import { Helicopter } from '../units/Helicopter';
@@ -20,6 +20,14 @@ describe('impact feedback scaling', () => {
     expect(shakeFor(w, 0)).toBe(w.fx.shakeDeg);
     expect(shakeFor(w, w.blastRadius * 3)).toBeLessThan(w.fx.shakeDeg);
     expect(shakeFor(w, w.blastRadius * CONFIG.fx.shakeReach)).toBe(0);
+  });
+
+  it('the bomb shakes harder than the 105 mm, and from much further away (M8+ play test)', () => {
+    const bomb = ORDNANCE.bomb;
+    expect(shakeFor(bomb, 0)).toBeGreaterThan(shakeFor(WEAPONS['105'], 0));
+    expect(shakeFor(WEAPONS['105'], 300)).toBe(0);
+    expect(shakeFor(bomb, 300)).toBeGreaterThan(0);
+    expect(bomb.fx.shakeSeconds).toBeGreaterThan(CONFIG.sensor.shakeTau * 2); // a rumble, not a kick
   });
 
   it('shakes more for heavier weapons at the same spot', () => {

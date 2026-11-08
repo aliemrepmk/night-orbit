@@ -94,17 +94,25 @@ export class Sensor {
   }
 
   /** Adds camera shake (impacts, 105 mm recoil). Shakes don't stack beyond the strongest + 50%. */
-  addShake(deg: number): void {
+  addShake(deg: number, tau: number = this.cfg.shakeTau): void {
     deg *= this.shakeScale;
     if (deg <= 0) return;
     this.shakeDeg = Math.max(this.shakeDeg, deg) + 0.5 * Math.min(this.shakeDeg, deg);
+    // A longer rumble (the bomb) keeps the slowest decay until the shake has died down.
+    this.shakeTauNow = Math.max(this.shakeTauNow, tau);
   }
+
+  /** Decay time constant of the current shake (s); 0 = the default `cfg.shakeTau`. */
+  private shakeTauNow = 0;
 
   /** Fixed-step update: zoom animation, shake decay, gimbal limit (the orbit center may move). */
   update(dt: number): void {
     this.time += dt;
-    this.shakeDeg *= Math.exp(-dt / this.cfg.shakeTau);
-    if (this.shakeDeg < 1e-4) this.shakeDeg = 0;
+    this.shakeDeg *= Math.exp(-dt / Math.max(this.shakeTauNow, this.cfg.shakeTau));
+    if (this.shakeDeg < 1e-4) {
+      this.shakeDeg = 0;
+      this.shakeTauNow = 0;
+    }
     this.fovDeg = approach(this.fovDeg, this.targetFovDeg, dt, this.cfg.zoomTau);
     this.constrainAim();
   }
@@ -147,6 +155,7 @@ export class Sensor {
     this.weapon = '105';
     this.fovDeg = this.targetFovDeg;
     this.shakeDeg = 0;
+    this.shakeTauNow = 0;
     this.aim.set(x, 0, z);
     this.constrainAim();
     this.syncCamera();

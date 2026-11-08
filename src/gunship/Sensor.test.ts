@@ -186,3 +186,22 @@ describe('Sensor settings and reset (M8)', () => {
     expect(sensor.aim.z).toBeCloseTo(gunship.center.z - 20);
   });
 });
+
+describe('Sensor long shake (M8+ play test: bigger bomb shake)', () => {
+  it('a long shake rumbles for longer, then later shakes are short again', () => {
+    const a = setup().sensor;
+    const b = setup().sensor;
+    a.addShake(0.5);
+    b.addShake(0.5, 0.75);
+    for (let i = 0; i < 30; i++) {
+      a.update(DT);
+      b.update(DT);
+    }
+    expect(b.shakeDeg).toBeGreaterThan(a.shakeDeg * 3);
+    for (let i = 0; i < 60 * 15; i++) b.update(DT);
+    expect(b.shakeDeg).toBe(0);
+    b.addShake(0.5);
+    for (let i = 0; i < 30; i++) b.update(DT);
+    expect(b.shakeDeg).toBeCloseTo(a.shakeDeg, 5);
+  });
+});

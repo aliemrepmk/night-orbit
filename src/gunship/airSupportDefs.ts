@@ -99,11 +99,16 @@ export const STRIKES: Readonly<Record<StrikeId, StrikeDef>> = {
         flashSize: 48,
         debris: 140,
         debrisSpeed: 45,
-        smoke: 18,
-        smokeSize: 36,
-        craterRadius: 9,
+        // M8+ play test: "make the impact shake and fog bigger for the bomb".
+        smoke: 40,
+        smokeSize: 60,
+        craterRadius: 18, // M8+ play test: "make the crater it left bigger" (was 9)
         shockwave: true,
-        shakeDeg: 0.45,
+        shakeDeg: 0.8,
+        shakeReach: 14, // felt anywhere within ~560 m of the crosshair
+        shakeSeconds: 0.75, // a ~2 s rumble instead of the guns' short kick
+        dust: 64,
+        dustSpeed: 30,
         whiteout: 0.9,
       },
     },
