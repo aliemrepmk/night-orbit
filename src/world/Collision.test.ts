@@ -129,3 +129,77 @@ describe('Collision special boxes', () => {
     expect(c.pushOut(1, 1, 0.5, out)).toBe(false);
   });
 });
+
+describe('Collision box grid (M7: the bigger village)', () => {
+  // The answers from looping over every box, to compare the grid against.
+  function bruteLos(c: Collision, a: Vector3, b: Vector3): boolean {
+    const len = a.distanceTo(b);
+    const dir = b.clone().sub(a).normalize();
+    return !c.boxes.some((box) => {
+      const t = rayBox(a, dir, box);
+      return t !== null && t < len;
+    });
+  }
+
+  function scatter() {
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const c = new Collision(flat, 0);
+    for (let i = 0; i < 150; i++) {
+      c.addBox({
+        center: new Vector3(rnd() * 600 - 300, 4, rnd() * 600 - 300),
+        half: new Vector3(2 + rnd() * 6, 4, 2 + rnd() * 6),
+        rotY: rnd() * Math.PI,
+      });
+    }
+    return { c, rnd };
+  }
+
+  it('line of sight agrees with testing every box, for segments in every direction', () => {
+    const { c, rnd } = scatter();
+    let blocked = 0;
+    for (let k = 0; k < 2000; k++) {
+      const a = new Vector3(rnd() * 700 - 350, 1 + rnd() * 3, rnd() * 700 - 350);
+      const b = new Vector3(rnd() * 700 - 350, 1 + rnd() * 3, rnd() * 700 - 350);
+      if (k % 4 === 0) b.x = a.x; // straight north-south
+      if (k % 4 === 1) b.z = a.z; // straight east-west
+      const want = bruteLos(c, a, b);
+      expect(c.lineOfSight(a, b)).toBe(want);
+      if (!want) blocked++;
+    }
+    expect(blocked).toBeGreaterThan(200); // the test really covers blocked lines too
+  });
+
+  it('pushOut finds the same walls as before (bodies near cell edges included)', () => {
+    const { c, rnd } = scatter();
+    for (let k = 0; k < 3000; k++) {
+      const x = rnd() * 640 - 320;
+      const z = rnd() * 640 - 320;
+      const fast = { x: 0, z: 0 };
+      const slow = { x: 0, z: 0 };
+      const moved = c.pushOut(x, z, 0.6, fast);
+      let m = false;
+      slow.x = x;
+      slow.z = z;
+      for (const box of c.boxes) {
+        const cs = Math.cos(box.rotY);
+        const sn = Math.sin(box.rotY);
+        const ox = slow.x - box.center.x;
+        const oz = slow.z - box.center.z;
+        let lx = cs * ox - sn * oz;
+        let lz = sn * ox + cs * oz;
+        const hx = box.half.x + 0.6;
+        const hz = box.half.z + 0.6;
+        if (Math.abs(lx) >= hx || Math.abs(lz) >= hz) continue;
+        if (hx - Math.abs(lx) < hz - Math.abs(lz)) lx = (lx < 0 ? -1 : 1) * hx;
+        else lz = (lz < 0 ? -1 : 1) * hz;
+        slow.x = box.center.x + cs * lx + sn * lz;
+        slow.z = box.center.z - sn * lx + cs * lz;
+        m = true;
+      }
+      expect(moved).toBe(m);
+      expect(fast.x).toBeCloseTo(slow.x, 9);
+      expect(fast.z).toBeCloseTo(slow.z, 9);
+    }
+  });
+});

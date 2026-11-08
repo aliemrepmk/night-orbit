@@ -18,6 +18,12 @@ export interface RayHit {
   readonly box: number;
 }
 
+/** Side of a cell in the box grid (m), and the margin boxes are filed with (covers `pushOut` radii). */
+const CELL = 32;
+const CELL_PAD = 2;
+/** Cell coordinates are offset so negative ones pack into one positive key. */
+const CELL_OFFSET = 1 << 12;
+
 /** March step along the ray when searching for the terrain surface (meters). */
 const GROUND_STEP = 4;
 const BISECT_ITERATIONS = 24;
@@ -30,6 +36,14 @@ const BISECT_ITERATIONS = 24;
 export class Collision {
   readonly boxes: CollisionBox[] = [];
   private readonly losDir = new Vector3();
+  /**
+   * Boxes filed by ground cell (M7: the village grew to ~145 houses, and every soldier's sight
+   * and wall checks used to loop over every box). A box sits in each cell its footprint circle
+   * (+ `CELL_PAD`) touches; `stamp` keeps a box from being tested twice in one query.
+   */
+  private readonly cells = new Map<number, number[]>();
+  private readonly stamp: number[] = [];
+  private query = 0;
 
   /** `maxGroundHeight` bounds the terrain so the march can skip empty air. */
   constructor(
@@ -38,8 +52,22 @@ export class Collision {
   ) {}
 
   addBox(box: CollisionBox): number {
-    this.boxes.push(box);
-    return this.boxes.length - 1;
+    const i = this.boxes.push(box) - 1;
+    this.stamp.push(0);
+    const r = Math.hypot(box.half.x, box.half.z) + CELL_PAD;
+    const x0 = Math.floor((box.center.x - r) / CELL);
+    const x1 = Math.floor((box.center.x + r) / CELL);
+    const z0 = Math.floor((box.center.z - r) / CELL);
+    const z1 = Math.floor((box.center.z + r) / CELL);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const key = cellKey(cx, cz);
+        let list = this.cells.get(key);
+        if (!list) this.cells.set(key, (list = []));
+        list.push(i);
+      }
+    }
+    return i;
   }
 
   /** First hit along the ray from `origin` in direction `dir` (normalized), or null. */
@@ -73,14 +101,43 @@ export class Collision {
       if (from.y + dy * t < this.ground.heightAt(from.x + dx * t, from.z + dz * t)) return false;
     }
     this.losDir.set(dx / len, dy / len, dz / len);
-    for (const box of this.boxes) {
-      if (box.walkable) continue;
-      const reach = Math.hypot(box.half.x, box.half.z);
-      if (segmentPointDistance2D(from, to, box.center.x, box.center.z) > reach) continue;
-      const t = rayBox(from, this.losDir, box);
-      if (t !== null && t < len) return false;
+    const q = ++this.query;
+    // Walk the grid cells the segment crosses (2D DDA), testing each box once.
+    let cx = Math.floor(from.x / CELL);
+    let cz = Math.floor(from.z / CELL);
+    const ex = Math.floor(to.x / CELL);
+    const ez = Math.floor(to.z / CELL);
+    const sx = dx > 0 ? 1 : -1;
+    const sz = dz > 0 ? 1 : -1;
+    const tdx = dx !== 0 ? Math.abs(CELL / dx) : Infinity;
+    const tdz = dz !== 0 ? Math.abs(CELL / dz) : Infinity;
+    let tx = dx !== 0 ? ((dx > 0 ? (cx + 1) * CELL : cx * CELL) - from.x) / dx : Infinity;
+    let tz = dz !== 0 ? ((dz > 0 ? (cz + 1) * CELL : cz * CELL) - from.z) / dz : Infinity;
+    for (;;) {
+      const list = this.cells.get(cellKey(cx, cz));
+      if (list) {
+        for (const i of list) {
+          if (this.stamp[i] === q) continue;
+          this.stamp[i] = q;
+          const box = this.boxes[i];
+          if (box.walkable) continue;
+          const reach = Math.hypot(box.half.x, box.half.z);
+          if (segmentPointDistance2D(from, to, box.center.x, box.center.z) > reach) continue;
+          const t = rayBox(from, this.losDir, box);
+          if (t !== null && t < len) return false;
+        }
+      }
+      if (cx === ex && cz === ez) return true;
+      if (tx < tz) {
+        if (tx > 1) return true;
+        cx += sx;
+        tx += tdx;
+      } else {
+        if (tz > 1) return true;
+        cz += sz;
+        tz += tdz;
+      }
     }
-    return true;
   }
 
   /**
@@ -92,7 +149,14 @@ export class Collision {
     out.x = x;
     out.z = z;
     let moved = false;
-    for (const box of this.boxes) {
+    // A small body only meets the boxes filed in its own cell (they carry a `CELL_PAD` margin).
+    const list =
+      radius <= CELL_PAD
+        ? (this.cells.get(cellKey(Math.floor(x / CELL), Math.floor(z / CELL))) ?? NONE)
+        : null;
+    const n = list ? list.length : this.boxes.length;
+    for (let k = 0; k < n; k++) {
+      const box = this.boxes[list ? list[k] : k];
       if (box.walkable) continue;
       // Raised things (a gas-station canopy) don't block walking underneath.
       const bottom = box.center.y - box.half.y;
@@ -146,6 +210,12 @@ export class Collision {
     }
     return null;
   }
+}
+
+const NONE: readonly number[] = [];
+
+function cellKey(cx: number, cz: number): number {
+  return (cx + CELL_OFFSET) * (2 * CELL_OFFSET) + (cz + CELL_OFFSET);
 }
 
 /** Ground (x/z) distance from point (px, pz) to the segment a–b. */
