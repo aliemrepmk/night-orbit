@@ -955,7 +955,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
   - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
 
-### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–B done and play-tested, C code-complete
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–D done (A–B play-tested)
 
 The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
 grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
@@ -992,7 +992,7 @@ Phase A (its two screen fixes).
 - Budget: about 7 draw calls for up to 120 soldiers.
 - 🧪 A pure pose → joint-angle test.
 
-**Phase D — A fuller map (1.5 days; item 6)**
+**Phase D — A fuller map (1.5 days; item 6)** — ✅ done 2026-11-09 (trees don't block sight; enemy fire into the forest is ×0.55 instead; the sawmill route is a branch off the journey)
 
 - **Black Pine Forest** (north-east): dense instanced trees, a logging road, a sawmill clearing
   (alternate **LZ SAWMILL**) and a forester's lodge. The canopy partly hides soldiers, so you

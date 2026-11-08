@@ -10,24 +10,24 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                               | State                                                                                                                            |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **M0** Project setup                    | ✅ Done                                                                                                                          |
-| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                                                                |
-| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)                                                           |
-| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                                                                            |
-| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                                                                            |
-| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
-| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
-| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
-| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                                                                               |
-| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                                                                               |
-| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed                                                        |
-| **M8+** Content & threat expansion      | 🟨 A–C committed (2026-11-09); D, E, F in progress (user gave full control: implement, browser-test, commit each phase; no push) |
-| M9 – M10                                | ⬜ Not started                                                                                                                   |
+| Milestone                               | State                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| **M0** Project setup                    | ✅ Done                                                                   |
+| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)         |
+| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)    |
+| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                     |
+| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                     |
+| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                     |
+| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                        |
+| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                        |
+| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
+| **M8+** Content & threat expansion      | 🟨 A–D committed (2026-11-09); E (AA, jets, hull, MANPADS) next, then F   |
+| M9 – M10                                | ⬜ Not started                                                            |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **538 tests in 64 files**).
-`npm run build` works (≈730 kB JS, 199 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **552 tests in 66 files**).
+`npm run build` works (≈738 kB JS, 202 kB gzipped).
 
 **Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–C are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
@@ -122,6 +122,10 @@ src/
     mapTypes.ts            the MapData types (roads, stream, bridges, fields, buildings, walls,
                            props, zones, routes, enemy/vehicle paths, spawns)
     MapData.ts             THE handcrafted Varesh Valley map (data; edit this to change the map)
+    forest.ts (+test)      M8+: Black Pine Forest: point-in-forest (clearings excluded) and the
+                           jittered tree placement (off roads, stream, buildings)
+    explosives.ts (+test)  M8+: the fuel depot's tanks: damage from impacts, fuse, fireball
+                           (TANK_BLAST, chains to neighbors), burning
     validateMap.ts (+test) authoring checks + 2D geometry helpers (rects, polylines, crossings)
     terrainShape.ts (+test) the map's height field: hills, valley walls, flats, level roads, stream
     Terrain.ts (+test)     heightmap mesh + exact heightAt() (takes a height field)
@@ -757,6 +761,23 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     lean so feet stay under a leaning soldier. `crouchDrop` 0.45 → 0.75 so a crouched soldier
     kneels. `Infantry.sinceShot` (set when a soldier fires) drives recoil and a barrel that is
     hot for ~10 s. Ridgeback's strobes sit on the helmet.
+71. **Black Pine Forest and the fuller map** (M8+ Phase D): `MapData.forests` (polygon, spacing,
+    clearings) is filled by `forestTrees` (~2,100 pines, one instanced draw call); new zone
+    `forest` (LZ SAWMILL clearing at [598, −385]); logging road, forest track and relay track;
+    the radio relay (mast + compound), a farm hamlet, an orchard, a cemetery, burnt-out wrecks
+    and a power line. `route_lz_sawmill` is a **branch**: not in `routeOrder` (the journey and
+    the briefing stay OP → LZ QUARRY); validateMap accepts a route that starts where a journey
+    route ends. Trees don't block line of sight or shells; instead enemy fire at Ridgeback under
+    the trees is ×0.55 (`CONFIG.forest.concealment`, `UnitWorld.concealment`).
+72. **Fuel depot** (M8+ Phase D): three `explosive` tanks at the crossroads. `Explosives` (per
+    run, in `createBattle`) takes damage from every impact (`damageAt` to the tank wall; 250 HP:
+    one 40 mm direct hit is not enough, two are; the 25 mm needs ~4); a tank then goes up after
+    0.3 s as `TANK_BLAST` (id `bomb`, so kills are the player's), which is itself an impact and
+    sets neighbors off, and burns for 90 s.
+73. **Instanced pools count what they drop** (bug found in Phase D): `InstancedSignature.add`
+    silently ignored instances past its capacity; the hip-roof pool held 80, so since M7 most
+    village houses had no roof. Capacity 400, `dropped` is counted, and a test asserts the map
+    drops nothing and every house has a roof.
 
 ---
 
@@ -798,6 +819,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M7 Kestrel 6 as a target (Claude, Chrome)      | 4+ soldiers fire on it while it lands; HUD `KESTREL 6 69% UNDER FIRE`, tracers, Kestrel's calls. At `vsAircraft` 12 an undefended LZ (51 enemies) still let it escape with 19%; at 18 it is shot down → `KESTREL 6 WAS SHOT DOWN`, burning wreck. 60 FPS, GPU 7.6–7.8 ms                                                                                                                                    | `vsAircraft` 12 → 18; the perfect-bot auto-play still completes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-11-05 | M7 (Claude, Chrome)                            | Calibration prompts advance on real key presses; village clinic briefing + marker; 105 mm on the clinic → `YOU FIRED ON THE PROTECTED CLINIC`; extraction at ×4: countdown, Kestrel 6 lands, team boards, lift-off, MISSION COMPLETE screen; 60 FPS, GPU 7.3–8.1 ms, 28–29 calls                                                                                                                            | Fixed: marker on the generator, stale calibration lines in the village, sensor not following a phase skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-11-06 | M7 play test (user)                            | "Destroyed vehicles can block the roads so vehicles behind never get close to Ridgeback", "a lot more enemies on foot can approach Ridgeback, mission feels easy", "make the village a lot bigger"                                                                                                                                                                                                          | Swerving vehicles, assaulters + bigger waves, 143-house village with a collision grid (decisions 57–59); play test to repeat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-11-09 | M8+ Phase D (Claude, Chrome)                   | Briefing shows Black Pine Forest. F3 to the forest: a dense pine stand with the logging road and forest track meeting in the open sawmill clearing; 60 FPS, GPU 8.4 ms, 51 calls, 260K tris. One 105 mm shell on a depot tank: all three tanks went up in a chain (3 fireballs), then burned under the smoke. Radio relay mast and compound on the hill. Village at 105 mm: 60 FPS, GPU 7.9 ms, 50 calls    | Found and fixed: the hip-roof pool held 80 roofs, so since M7's 143-house village most houses had no roof (pools now count drops; a test asserts none). Briefing label "LZ SAWMILL" → "BLACK PINE" (no spoiler)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-11-09 | M8+ Phase C (Claude, Chrome)                   | Soldiers are jointed figures: walking militia read as people at 25 mm (~20 px tall); a close-up (FOV narrowed in the console) shows walking strides, Ridgeback's helmets, NVGs, plate carriers and shouldered rifles, kneeling militia firing from cover with a hot barrel. 72 enemies + Ridgeback: 60 FPS, GPU ~8 ms, 48 draw calls (soldiers 11)                                                          | The kneeling pose is the roughest from above (the forward thigh can read as an arm); for the C + D play test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-11-09 | Bomb crater (user)                             | "We can also make the crater it left bigger"                                                                                                                                                                                                                                                                                                                                                                | Bomb crater radius 9 → 18 m. Craters now take the slope across their own size and sit on the higher of the center and the average rim height (+1 % of the radius), so a big disc never sinks into a slope or a dip (test on a 15 % slope and a bowl). Chrome: a ~36 m warm scorch on the field, still visible 20 s later                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-11-09 | Bomb sound + look (user)                       | "Everything seems good, we can just lower the bomb sound just a little bit … and also we can make the impact shake and fog bigger for the bomb"                                                                                                                                                                                                                                                             | Bomb ~2 dB quieter (noise 1 → 0.82, thump 1 → 0.85). Shake 0.45° → 0.8°, felt within ~560 m of the crosshair (was 240 m) and rumbling ~2.5 s (a per-ordnance shake time, `shakeSeconds` 0.75). Smoke 18 → 40 puffs, 36 → 60 m, plus a new low dust ring (64 puffs, 30 m/s, rolling out ~60–80 m and hanging 12–20 s). Chrome: shake 0.69° → 0.21° at 1 s → 0.03° at 2.5 s; the cloud about twice as wide; 60 FPS, GPU 7.4 ms                                                                                                                                                                                                                                                                                                                                         |
