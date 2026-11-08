@@ -11,6 +11,7 @@ import { Gunship } from '../gunship/Gunship';
 import { Projectiles } from '../gunship/Projectiles';
 import { Sensor } from '../gunship/Sensor';
 import { Weapons } from '../gunship/Weapons';
+import { TriggerGate } from '../gunship/triggerGate';
 import { Renderer } from '../render/Renderer';
 import { SensorFX } from '../render/SensorFX';
 import {
@@ -106,6 +107,8 @@ export class Game {
   private slewed = 0;
   /** Orbit focus the mission asked for last (null: following Ridgeback). */
   private focus: ZoneId | null = null;
+  /** Who the trigger belongs to: the guns or the strike being aimed. */
+  private readonly trigger = new TriggerGate();
   /** Trigger state gathered per frame, consumed by the next fixed step. */
   private fireHeld = false;
   private fireClicks = 0;
@@ -185,6 +188,7 @@ export class Game {
     this.focus = null;
     this.fireHeld = false;
     this.fireClicks = 0;
+    this.trigger.reset();
     this.sensorMode = 'white';
     this.missionClock = 0;
     this.dangerCloseLeft = 0;
@@ -438,10 +442,14 @@ export class Game {
         this.air.axis = Math.atan2(this.sensor.aim.x - g.x, this.sensor.aim.z - g.z);
       }
     }
+    // The trigger belongs to the strike while aiming, and stays off the guns until released
+    // after a strike is called (M8+ Phase A).
+    const trigger = this.trigger.frame(this.air.mode !== null, this.input.isFireHeld, clicks);
+    this.fireHeld = trigger.gunHeld;
+    this.fireClicks += trigger.gunClicks;
     if (this.air.mode !== null) {
-      this.fireHeld = false;
       if (wheel !== 0) this.air.rotateAxis(Math.sign(wheel) * CONFIG.airSupport.axisStepRad);
-      if (clicks > 0) {
+      if (trigger.strikeClicks > 0) {
         const { x, z } = this.sensor.aim;
         const axis = this.air.axis;
         const def = this.air.call(x, z);
@@ -454,10 +462,8 @@ export class Game {
           this.bus.emit('strikeCalled', { strike: def.id, x, z, danger });
         }
       }
-    } else {
-      this.fireHeld = this.input.isFireHeld;
-      this.fireClicks += clicks;
-      if (wheel !== 0) this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
+    } else if (wheel !== 0) {
+      this.sensor.cycleWeapon(wheel > 0 ? 1 : -1);
     }
 
     if (this.input.wasPressed('Digit1')) this.sensor.selectWeapon('25');
@@ -467,7 +473,12 @@ export class Game {
     if (this.sensor.weapon !== weaponBefore) {
       this.host.playerDid(`weapon${this.sensor.weapon}`);
       this.sensorFx.triggerSwitch();
-      this.air.mode = null; // picking a gun takes the trigger back from air support
+      if (this.air.mode !== null) {
+        this.air.mode = null; // picking a gun takes the trigger back from air support…
+        this.fireHeld = false; // …but not this frame's press: wait for a release
+        this.fireClicks = 0;
+        this.trigger.frame(true, this.input.isFireHeld, 0);
+      }
     }
 
     // F cycles WHT HOT → BLK HOT → NV; switching sensors flashes static like an optic switch.
