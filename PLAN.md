@@ -955,7 +955,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
   - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
 
-### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–B done and play-tested
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; Phases A–B done and play-tested, C code-complete
 
 The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
 grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
@@ -983,7 +983,7 @@ Phase A (its two screen fixes).
   It is muffled while paused and fades in on DEPLOY. A new ENGINE volume slider in settings.
 - 🧪 Pure tests for the pitch and pan curves.
 
-**Phase C — Soldiers that look like soldiers (1.5 days; item 10)**
+**Phase C — Soldiers that look like soldiers (1.5 days; item 10)** — ✅ code-complete 2026-11-09 (11 draw calls, not ~7: one per part type)
 
 - Low-poly humans made of instanced parts: head or helmet, torso with plate carrier, arms, legs,
   rifle. Poses: walk and run cycles, crouch, prone, firing, falling, lying dead.

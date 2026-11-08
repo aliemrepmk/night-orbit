@@ -10,26 +10,26 @@ every session.
 
 ## 1. Where we are
 
-| Milestone                               | State                                                                                        |
-| --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **M0** Project setup                    | ✅ Done                                                                                      |
-| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                            |
-| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)                       |
-| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                                        |
-| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                                        |
-| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                        |
-| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                        |
-| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                        |
-| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                                           |
-| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                                           |
-| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed                    |
-| **M8+** Content & threat expansion      | 🟨 Phases A + B done, play-tested and committed (2026-11-09); next: Phase C (soldier models) |
-| M9 – M10                                | ⬜ Not started                                                                               |
+| Milestone                               | State                                                                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **M0** Project setup                    | ✅ Done                                                                                                                          |
+| **M1** Gunship, sensor & terrain        | ✅ Done. Automated tests pass; manual test passed 2026-11-03 (§6)                                                                |
+| **M2** Thermal look                     | ✅ Done. Automated tests pass; manual look test passed 2026-11-03 (§6)                                                           |
+| **M2+** Night-vision sensor             | ✅ Done. Tests pass; look test passed 2026-11-03 (§6)                                                                            |
+| **M3** Weapons, ballistics & explosions | ✅ Done. Tests pass; feel test passed 2026-11-04 (§6)                                                                            |
+| **M4** Infantry & friendlies            | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
+| **M5** Enemy AI & vehicles              | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
+| **M5+** Air support                     | ✅ Done. Tests pass; feel test passed 2026-11-05 (§6)                                                                            |
+| **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                                                                               |
+| **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                                                                               |
+| **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed                                                        |
+| **M8+** Content & threat expansion      | 🟨 A–C committed (2026-11-09); D, E, F in progress (user gave full control: implement, browser-test, commit each phase; no push) |
+| M9 – M10                                | ⬜ Not started                                                                                                                   |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **524 tests in 63 files**).
-`npm run build` works (≈726 kB JS, 198 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **538 tests in 64 files**).
+`npm run build` works (≈730 kB JS, 199 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–B (with the strike-sound and calibration fixes) are committed locally in 9 commits (2026-11-09), **not pushed yet**. Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–C are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -100,7 +100,11 @@ src/
     Squad.ts (+test)       route following with holds, diamond formation slots, strobe blink timing
     UnitManager.ts (+test) owns all soldiers + grid; runs EnemyBrain (cover, line of sight, panic,
                            morale), wall sliding, Ridgeback return fire, tracers, overrun → fail
-    InfantryRenderer.ts    ONE InstancedMesh for every soldier + IR strobe point layer
+    InfantryRenderer.ts    soldiers as jointed figures: one InstancedMesh per body part (11 calls)
+                           + IR strobe point layer (M8+ Phase C)
+    soldierRig.ts (+test)  M8+: the soldier figure, pure: part placement per state (walk/run
+                           strides, kneeling, shouldered rifle + recoil, flung/dead), kit (Ridgeback
+                           helmet + NVG + plates, militia caps), per-part heat (skin, cloth, barrel)
     vehicleDefs.ts         ALL vehicle stats + box-part layouts (truck, technical, APC), data
     Vehicle.ts (+test)     one vehicle: road driving (corner slowdown, smooth turning), armor,
                            intact → smoking → burning wreck; recyclable
@@ -456,8 +460,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 ## 4. Next steps
 
 1. **M8+ Content & threat expansion** (PLAN.md §10, approved 2026-11-09), from the user's M8
-   play test. **Phases A and B are done, play-tested and committed (2026-11-09). Next: Phase C
-   (soldier models).**
+   play test. **Phases A and B are done, play-tested and committed (2026-11-09). Phase C (soldier
+   models) is committed. The user handed over D, E and F: implement each, test it in the browser,
+   commit it in logical pieces, never push.**
    Order: A quick fixes (strike
    aiming must not fire the guns; green CLICK TO BEGIN, SETTINGS lower; briefing map and text of
    equal height) → B engine sound → C soldier models → D forest and fuller map → E AA, strike
@@ -746,6 +751,12 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     duration (`shakeSeconds`, a decay time constant the sensor keeps until the shake dies down),
     and add a low dust ring (`dust`, `dustSpeed`) that rolls out along the ground. Only the bomb
     uses them: 0.8° shake felt within ~560 m, rumbling ~2.5 s, a wide hanging cloud, and an 18 m crater (craters fit the slope across their own size).
+70. **Soldier figures** (M8+ Phase C): `soldierRig.ts` places 15–18 parts per soldier relative to
+    the hips (pure, tested); `InfantryRenderer` draws one InstancedMesh per part type (11 draw
+    calls) and composes each part with the root from `infantryPose`. The legs counter the root
+    lean so feet stay under a leaning soldier. `crouchDrop` 0.45 → 0.75 so a crouched soldier
+    kneels. `Infantry.sinceShot` (set when a soldier fires) drives recoil and a barrel that is
+    hot for ~10 s. Ridgeback's strobes sit on the helmet.
 
 ---
 
@@ -787,6 +798,7 @@ _(Fill in after testing.)_
 | 2026-11-05 | M7 Kestrel 6 as a target (Claude, Chrome)      | 4+ soldiers fire on it while it lands; HUD `KESTREL 6 69% UNDER FIRE`, tracers, Kestrel's calls. At `vsAircraft` 12 an undefended LZ (51 enemies) still let it escape with 19%; at 18 it is shot down → `KESTREL 6 WAS SHOT DOWN`, burning wreck. 60 FPS, GPU 7.6–7.8 ms                                                                                                                                    | `vsAircraft` 12 → 18; the perfect-bot auto-play still completes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-11-05 | M7 (Claude, Chrome)                            | Calibration prompts advance on real key presses; village clinic briefing + marker; 105 mm on the clinic → `YOU FIRED ON THE PROTECTED CLINIC`; extraction at ×4: countdown, Kestrel 6 lands, team boards, lift-off, MISSION COMPLETE screen; 60 FPS, GPU 7.3–8.1 ms, 28–29 calls                                                                                                                            | Fixed: marker on the generator, stale calibration lines in the village, sensor not following a phase skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-11-06 | M7 play test (user)                            | "Destroyed vehicles can block the roads so vehicles behind never get close to Ridgeback", "a lot more enemies on foot can approach Ridgeback, mission feels easy", "make the village a lot bigger"                                                                                                                                                                                                          | Swerving vehicles, assaulters + bigger waves, 143-house village with a collision grid (decisions 57–59); play test to repeat                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-11-09 | M8+ Phase C (Claude, Chrome)                   | Soldiers are jointed figures: walking militia read as people at 25 mm (~20 px tall); a close-up (FOV narrowed in the console) shows walking strides, Ridgeback's helmets, NVGs, plate carriers and shouldered rifles, kneeling militia firing from cover with a hot barrel. 72 enemies + Ridgeback: 60 FPS, GPU ~8 ms, 48 draw calls (soldiers 11)                                                          | The kneeling pose is the roughest from above (the forward thigh can read as an arm); for the C + D play test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-11-09 | Bomb crater (user)                             | "We can also make the crater it left bigger"                                                                                                                                                                                                                                                                                                                                                                | Bomb crater radius 9 → 18 m. Craters now take the slope across their own size and sit on the higher of the center and the average rim height (+1 % of the radius), so a big disc never sinks into a slope or a dip (test on a 15 % slope and a bowl). Chrome: a ~36 m warm scorch on the field, still visible 20 s later                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-11-09 | Bomb sound + look (user)                       | "Everything seems good, we can just lower the bomb sound just a little bit … and also we can make the impact shake and fog bigger for the bomb"                                                                                                                                                                                                                                                             | Bomb ~2 dB quieter (noise 1 → 0.82, thump 1 → 0.85). Shake 0.45° → 0.8°, felt within ~560 m of the crosshair (was 240 m) and rumbling ~2.5 s (a per-ordnance shake time, `shakeSeconds` 0.75). Smoke 18 → 40 puffs, 36 → 60 m, plus a new low dust ring (64 puffs, 30 m/s, rolling out ~60–80 m and hanging 12–20 s). Chrome: shake 0.69° → 0.21° at 1 s → 0.03° at 2.5 s; the cloud about twice as wide; 60 FPS, GPU 7.4 ms                                                                                                                                                                                                                                                                                                                                         |
 | 2026-11-09 | Strike sounds round 5 (user)                   | "Let's make the whistle 0.5s, a short sweep, and gun run feels louder than the bomb so we need to make the bomb louder, and bomb sounds duration still feels too short"                                                                                                                                                                                                                                     | **Root cause found:** every sound's noise layer used a 1 s noise buffer that was not looped (and started up to 0.5 s in), so any longer sound lost its noise after 0.5–1 s, leaving only sub-bass; the bomb's energy was also mostly below 150 Hz, which small speakers barely play. Fixed: the noise loops (regression test with a fake AudioContext); the bomb is a bigger 105 mm blast, brighter at the start (noise 1.0 from 1,200 → 180 Hz, thump 60 → 19 Hz, 12 s envelope); whistle 0.5 s. Chrome (energy ≥ 150 Hz): bomb peak −32 dB vs gun run −42 dB and total +7 dB over it; audible 3.9 s after impact (was 0.6 s), fading ~7 dB/s; whistle starts 0.49 s before impact                                                                                  |
@@ -807,6 +819,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue with M8+ Phase C."
+> "Read STATUS.md and PLAN.md. Let's continue with M8+ Phase D."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
