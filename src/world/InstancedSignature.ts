@@ -10,6 +10,8 @@ export class InstancedSignature {
   private readonly mesh: InstancedMesh;
   private readonly sig: Float32Array;
   private n = 0;
+  /** Instances that didn't fit (a pool too small for the map: drawn nothing, silently). */
+  dropped = 0;
 
   constructor(
     geometry: BufferGeometry,
@@ -32,7 +34,10 @@ export class InstancedSignature {
 
   /** Adds one instance; returns false (and draws nothing) once the capacity is used up. */
   add(matrix: Matrix4, s: Signature): boolean {
-    if (this.n >= this.capacity) return false;
+    if (this.n >= this.capacity) {
+      this.dropped++;
+      return false;
+    }
     this.mesh.setMatrixAt(this.n, matrix);
     this.sig[this.n * 3] = s.heat;
     this.sig[this.n * 3 + 1] = s.albedo;

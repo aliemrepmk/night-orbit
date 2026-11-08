@@ -20,6 +20,11 @@ describe('WorldBuilder', () => {
     expect(collision.boxes).toHaveLength(expected);
   });
 
+  it('regression: draws every instance (no pool overflows) and a roof on every house', () => {
+    expect(world.droppedInstances).toBe(0);
+    expect(world.roofCount).toBe(MAP.buildings.filter((b) => b.kind === 'house').length);
+  });
+
   it('marks the clinic (and its generator) as protected', () => {
     expect(world.protectedBoxes).toHaveLength(2);
     const clinic = MAP.buildings.find((b) => b.kind === 'clinic')!;

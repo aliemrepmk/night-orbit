@@ -87,7 +87,7 @@ export class WorldBuilder {
   private readonly rough = new InstancedSignature(new BoxGeometry(1, 1, 1), 400, 1.5);
   private readonly hipRoofs = new InstancedSignature(
     new ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0),
-    80,
+    400, // one per house (was 80: since M7's 143-house village, most houses had no roof)
     0.6,
   );
   private readonly trees = new InstancedSignature(
@@ -139,6 +139,16 @@ export class WorldBuilder {
   }
 
   /** Ground height for people walking: the terrain, or the deck where a bridge spans the stream. */
+  /** Instances every pool had to drop for lack of room (should be 0: a test checks it). */
+  get droppedInstances(): number {
+    return [this.boxes, this.rough, this.hipRoofs, this.trees].reduce((n, p) => n + p.dropped, 0);
+  }
+
+  /** Roofs drawn (one per house). */
+  get roofCount(): number {
+    return this.hipRoofs.count;
+  }
+
   surfaceAt(x: number, z: number): number {
     const h = this.terrain.heightAt(x, z);
     for (const b of this.bridges) if (inRect(b.rect, x, z)) return Math.max(h, b.top);
