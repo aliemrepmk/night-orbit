@@ -156,13 +156,15 @@ describe('ConvoySpawner', () => {
     return { units, vehicles, spawner: new ConvoySpawner(createRng(4)) };
   }
 
-  it('uses the map vehicle paths, each ending near the team journey', () => {
+  it('uses the map vehicle paths, each ending near the team journey (or its sawmill branch)', () => {
     const { spawner } = convoyRig();
     expect(spawner.roads).toHaveLength(Object.keys(MAP.vehiclePaths).length);
+    const stops = [
+      ...TEST_ROUTE,
+      ...MAP.friendlyRoutes.route_lz_sawmill.map(([x, z]) => ({ x, z })),
+    ];
     for (const road of spawner.roads) {
-      const nearest = Math.min(
-        ...TEST_ROUTE.map((r) => Math.hypot(r.x - road.end.x, r.z - road.end.z)),
-      );
+      const nearest = Math.min(...stops.map((r) => Math.hypot(r.x - road.end.x, r.z - road.end.z)));
       expect(nearest).toBeLessThan(260);
     }
   });

@@ -1,4 +1,4 @@
-import type { BuildingDef, MapData, PropDef } from './mapTypes';
+import type { BuildingDef, MapData, PropDef, Vec2 } from './mapTypes';
 
 /**
  * THE handcrafted map of the Varesh Valley (PLAN.md §7.12): west → east, Ridgeback's journey runs
@@ -198,6 +198,22 @@ const BUILDINGS: readonly BuildingDef[] = [
   { id: 'garage', kind: 'garage', pos: [290, -22], rot: -0.1, size: [12, 9] },
   { id: 'x_house1', kind: 'house', pos: [382, -22], rot: 0.1, size: [9, 8] },
   { id: 'x_house2', kind: 'house', pos: [420, 52], rot: -0.3, size: [10, 8] },
+  // M8+ Phase D: the fuel depot behind the crossroads garage. The tanks explode when hit.
+  { id: 'depot_tank1', kind: 'tank', pos: [268, -52], rot: 0, size: [9, 9], explosive: true },
+  { id: 'depot_tank2', kind: 'tank', pos: [268, -74], rot: 0, size: [9, 9], explosive: true },
+  { id: 'depot_tank3', kind: 'tank', pos: [290, -64], rot: 0, size: [9, 9], explosive: true },
+  // The radio relay on the hill north of the village (an AA site from Phase E).
+  { id: 'relay_mast', kind: 'mast', pos: [122, -475], rot: 0, size: [3, 3] },
+  { id: 'relay_hut', kind: 'shed', pos: [148, -470], rot: 0, size: [7, 5] },
+  // A farm hamlet on the south fields.
+  { id: 'hamlet_1', kind: 'house', pos: [-395, 300], rot: 0.15, size: [9, 8] },
+  { id: 'hamlet_2', kind: 'house', pos: [-370, 324], rot: -0.2, size: [8, 7] },
+  { id: 'hamlet_3', kind: 'house', pos: [-414, 330], rot: 0.4, size: [10, 8] },
+  { id: 'hamlet_barn', kind: 'barn', pos: [-345, 294], rot: 0.1, size: [15, 10] },
+  // Black Pine Forest: the sawmill (alternate LZ SAWMILL) and the forester's lodge.
+  { id: 'sawmill', kind: 'barn', pos: [626, -406], rot: 0.1, size: [24, 12] },
+  { id: 'mill_shed', kind: 'shed', pos: [566, -414], rot: -0.1, size: [8, 6] },
+  { id: 'lodge', kind: 'house', pos: [520, -250], rot: 0.3, size: [10, 8] },
 ];
 
 const PROPS: readonly PropDef[] = [
@@ -225,6 +241,18 @@ const PROPS: readonly PropDef[] = [
   { kind: 'car', pos: [310, 76], rot: 0.05 },
   { kind: 'car', pos: [372, -6], rot: 0.8 },
   { kind: 'crates', pos: [300, 4], rot: 0.3 },
+  // M8+ Phase D: burnt-out wrecks by the roads (cold, dark shapes).
+  { kind: 'wreck', pos: [336, -262], rot: 1.2 },
+  { kind: 'wreck', pos: [520, -14], rot: 0.3 },
+  { kind: 'wreck', pos: [-160, 180], rot: 2.1 },
+  { kind: 'wreck', pos: [690, -40], rot: -0.6 },
+  // Log piles at the sawmill.
+  { kind: 'crates', pos: [592, -432], rot: 0.1 },
+  { kind: 'crates', pos: [646, -380], rot: 0.5 },
+  // Headstones in the cemetery west of the village.
+  ...[0, 1, 2, 3].flatMap((i) =>
+    [0, 1, 2].map((j): PropDef => ({ kind: 'grave', pos: [-187 + i * 8, -47 + j * 8], rot: 0 })),
+  ),
 ];
 
 export const MAP: MapData = {
@@ -237,6 +265,8 @@ export const MAP: MapData = {
     { center: [10, 30], radius: 215, falloff: 30 }, // village (outer village too; stops short of the stream)
     { center: [330, 25], radius: 120, falloff: 60 }, // crossroads
     { center: [560, 300], radius: 130, falloff: 80 }, // quarry floor
+    { center: [600, -385], radius: 60, falloff: 40 }, // sawmill clearing (LZ SAWMILL)
+    { center: [135, -465], radius: 34, falloff: 30 }, // radio relay compound
   ],
 
   roads: [
@@ -382,6 +412,41 @@ export const MAP: MapData = {
         [330, 20],
       ],
     },
+    // M8+ Phase D: forest tracks and the relay track.
+    {
+      id: 'logging_road',
+      kind: 'dirt',
+      width: 5,
+      points: [
+        [358, -330],
+        [450, -352],
+        [540, -372],
+        [600, -382],
+      ],
+    },
+    {
+      id: 'forest_track',
+      kind: 'dirt',
+      width: 5,
+      points: [
+        [640, -2],
+        [655, -120],
+        [640, -250],
+        [606, -342],
+        [600, -382],
+      ],
+    },
+    {
+      id: 'relay_track',
+      kind: 'dirt',
+      width: 4,
+      points: [
+        [214, -190],
+        [192, -300],
+        [152, -410],
+        [137, -448],
+      ],
+    },
     {
       id: 'lz_track',
       kind: 'dirt',
@@ -501,6 +566,14 @@ export const MAP: MapData = {
   ],
 
   treeLines: [
+    // M8+ Phase D: an orchard west of the hamlet (rows of fruit trees).
+    ...[0, 1, 2, 3, 4].map((i) => ({
+      points: [
+        [-492, 290 + i * 11],
+        [-440, 290 + i * 11],
+      ] as Vec2[],
+      density: 1.7,
+    })),
     {
       points: [
         [-700, -95],
@@ -572,6 +645,33 @@ export const MAP: MapData = {
   buildings: BUILDINGS,
 
   walls: [
+    // M8+ Phase D: the cemetery west of the village (gate on the east side) and the relay compound.
+    {
+      kind: 'wall',
+      points: [
+        [-157, -40],
+        [-157, -55],
+        [-196, -55],
+        [-196, -25],
+        [-157, -25],
+        [-157, -32],
+      ],
+      height: 1.6,
+      thickness: 0.6,
+    },
+    {
+      kind: 'wall',
+      points: [
+        [128, -440],
+        [108, -440],
+        [108, -492],
+        [162, -492],
+        [162, -440],
+        [146, -440],
+      ],
+      height: 2.4,
+      thickness: 0.5,
+    },
     // Hedgerows between the fields (gaps where the farm track crosses)
     {
       kind: 'hedge',
@@ -677,6 +777,7 @@ export const MAP: MapData = {
     village: { center: [10, 30], radius: 240 },
     crossroads: { center: [330, 20], radius: 120 },
     lz: { center: [560, 300], radius: 140 },
+    forest: { center: [595, -380], radius: 230 },
   },
 
   friendlyRoutes: {
@@ -719,6 +820,19 @@ export const MAP: MapData = {
       [540, 278],
       [560, 300],
     ],
+    // M8+ Phase D, a branch (not in routeOrder: the briefing doesn't give it away): from the quarry out through its north-east gap, over the east road and up the forest track to LZ SAWMILL.
+    route_lz_sawmill: [
+      [560, 300],
+      [640, 262],
+      [681, 228],
+      [690, 170],
+      [668, 60],
+      [641, -2],
+      [655, -120],
+      [640, -250],
+      [607, -340],
+      [588, -362],
+    ],
   },
   routeOrder: [
     'route_op_fields',
@@ -731,6 +845,39 @@ export const MAP: MapData = {
   ],
 
   enemyPaths: {
+    // M8+ Phase D: into Black Pine Forest from every side.
+    forest_north: {
+      zone: 'forest',
+      points: [
+        [560, -690],
+        [578, -560],
+        [590, -450],
+      ],
+    },
+    forest_east: {
+      zone: 'forest',
+      points: [
+        [770, -390],
+        [705, -392],
+        [645, -378],
+      ],
+    },
+    forest_west: {
+      zone: 'forest',
+      points: [
+        [376, -470],
+        [470, -440],
+        [556, -400],
+      ],
+    },
+    forest_south: {
+      zone: 'forest',
+      points: [
+        [740, -70],
+        [705, -200],
+        [640, -300],
+      ],
+    },
     fields_treeline: {
       zone: 'fields',
       points: [
@@ -868,6 +1015,15 @@ export const MAP: MapData = {
       [780, 470],
       [380, 420],
     ],
+    forest: [
+      [560, -690],
+      [770, -390],
+      [376, -470],
+      [740, -70],
+      [460, -570],
+      [700, -560],
+      [470, -230],
+    ],
   },
 
   vehiclePaths: {
@@ -892,6 +1048,22 @@ export const MAP: MapData = {
       [200, 35],
       [140, 44],
     ],
+    // M8+ Phase D: down the north road and the logging road to the sawmill, and up the forest track.
+    logging_convoy: [
+      [330, -790],
+      [345, -500],
+      [358, -330],
+      [450, -352],
+      [540, -372],
+      [585, -380],
+    ],
+    forest_column: [
+      [790, -10],
+      [640, -2],
+      [655, -120],
+      [640, -250],
+      [606, -342],
+    ],
     // M7: technicals that drive up the quarry track at Ridgeback during the extraction.
     lz_technical: [
       [790, -10],
@@ -904,4 +1076,39 @@ export const MAP: MapData = {
       [512, 240],
     ],
   },
+
+  // M8+ Phase D: Black Pine Forest, north-east between the north road and the valley wall, with
+  // the sawmill clearing (LZ SAWMILL) in it.
+  forests: [
+    {
+      id: 'black_pine',
+      polygon: [
+        [410, -170],
+        [560, -135],
+        [700, -160],
+        [772, -260],
+        [772, -620],
+        [640, -720],
+        [470, -705],
+        [400, -560],
+        [396, -330],
+      ],
+      spacing: 9,
+      clearings: [{ center: [598, -385], radius: 70 }],
+    },
+  ],
+
+  // A power line along the east side of the north road.
+  powerLines: [
+    {
+      points: [
+        [362, -60],
+        [374, -200],
+        [386, -300],
+        [372, -500],
+        [356, -780],
+      ],
+      spacing: 45,
+    },
+  ],
 };

@@ -10,7 +10,8 @@ export function toPathPoints(points: readonly Vec2[]): { x: number; z: number }[
   return points.map(([x, z]) => ({ x, z }));
 }
 
-export type ZoneId = 'op' | 'fields' | 'village' | 'crossroads' | 'lz';
+/** `forest`: Black Pine Forest and the sawmill clearing, the alternate LZ (M8+ Phase D). */
+export type ZoneId = 'op' | 'fields' | 'village' | 'crossroads' | 'lz' | 'forest';
 
 export interface Zone {
   readonly center: Vec2;
@@ -69,7 +70,9 @@ export interface TreeLineDef {
   readonly density: number;
 }
 
-export type BuildingKind = 'house' | 'barn' | 'shed' | 'clinic' | 'garage' | 'canopy';
+/** `mast`: a radio relay mast; `tank`: a fuel tank (M8+ Phase D). */
+export type BuildingKind =
+  'house' | 'barn' | 'shed' | 'clinic' | 'garage' | 'canopy' | 'mast' | 'tank';
 
 export interface BuildingDef {
   readonly id: string;
@@ -81,6 +84,8 @@ export interface BuildingDef {
   readonly floors?: 1 | 2;
   /** Firing on it fails the mission (the clinic). */
   readonly protected?: boolean;
+  /** Goes up in a fireball when hit hard enough (the fuel depot's tanks). */
+  readonly explosive?: boolean;
 }
 
 /** Long solid strips: hedgerows, compound walls, quarry rock faces. */
@@ -94,12 +99,28 @@ export interface WallDef {
 }
 
 /** Small solid objects soldiers can hide behind. */
-export type PropKind = 'car' | 'hay' | 'crates';
+/** `wreck`: a burnt-out car (cold); `grave`: a headstone (M8+ Phase D). */
+export type PropKind = 'car' | 'hay' | 'crates' | 'wreck' | 'grave';
 
 export interface PropDef {
   readonly kind: PropKind;
   readonly pos: Vec2;
   readonly rot: number;
+}
+
+/** A forest: trees filling a polygon, except in its clearings (M8+ Phase D). */
+export interface ForestDef {
+  readonly id: string;
+  readonly polygon: readonly Vec2[];
+  /** Average distance between trees (m). */
+  readonly spacing: number;
+  readonly clearings: readonly { readonly center: Vec2; readonly radius: number }[];
+}
+
+/** Poles every `spacing` meters along a line, with wires between their tops. */
+export interface PowerLineDef {
+  readonly points: readonly Vec2[];
+  readonly spacing: number;
 }
 
 export interface EnemyPathDef {
@@ -115,6 +136,8 @@ export interface MapData {
   readonly bridges: readonly BridgeDef[];
   readonly fields: readonly FieldDef[];
   readonly treeLines: readonly TreeLineDef[];
+  readonly forests: readonly ForestDef[];
+  readonly powerLines: readonly PowerLineDef[];
   readonly buildings: readonly BuildingDef[];
   readonly walls: readonly WallDef[];
   readonly props: readonly PropDef[];

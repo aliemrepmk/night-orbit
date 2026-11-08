@@ -25,6 +25,16 @@ describe('WorldBuilder', () => {
     expect(world.roofCount).toBe(MAP.buildings.filter((b) => b.kind === 'house').length);
   });
 
+  it('builds the forest and finds the fuel depot tanks (M8+ Phase D)', () => {
+    expect(world.forestTreeCount).toBeGreaterThan(1200);
+    expect(world.explosives.map((e) => e.id).sort()).toEqual([
+      'depot_tank1',
+      'depot_tank2',
+      'depot_tank3',
+    ]);
+    for (const e of world.explosives) expect(e.radius).toBeGreaterThan(3);
+  });
+
   it('marks the clinic (and its generator) as protected', () => {
     expect(world.protectedBoxes).toHaveLength(2);
     const clinic = MAP.buildings.find((b) => b.kind === 'clinic')!;
@@ -80,8 +90,8 @@ describe('WorldBuilder', () => {
     world.root.traverse((o) => {
       if (o instanceof Mesh) meshes++;
     });
-    // ground + 8 roads + stream + 4 instanced kinds
-    expect(meshes).toBeLessThanOrEqual(MAP.roads.length + 6);
+    // ground + roads + stream + the instanced kinds (boxes, rough, roofs, trees, forest, tanks)
+    expect(meshes).toBeLessThanOrEqual(MAP.roads.length + 8);
   });
 });
 

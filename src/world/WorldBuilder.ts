@@ -2,6 +2,7 @@ import {
   BoxGeometry,
   BufferAttribute,
   ConeGeometry,
+  CylinderGeometry,
   Euler,
   Group,
   Matrix4,
@@ -16,6 +17,7 @@ import { HEAT } from '../fx/Heat';
 import { ALBEDO, GLOW, groundAlbedo, signature, type Signature } from '../fx/Light';
 import { ThermalMaterial } from '../render/ThermalMaterial';
 import type { Collision, CollisionBox } from './Collision';
+import { forestTrees } from './forest';
 import { createGroundHeat } from './groundHeat';
 import { InstancedSignature } from './InstancedSignature';
 import {
@@ -53,6 +55,14 @@ const SIG = {
   generator: signature(0.9, ALBEDO.vehicleBody),
   exhaust: signature(HEAT.exhaust, ALBEDO.vehicleBody),
   deck: signature(0.2, 0.3),
+  // M8+ Phase D
+  wreck: signature(0.15, 0.07), // burnt out: cold and dark
+  stone: signature(0.24, 0.45),
+  steel: signature(0.19, 0.35),
+  tank: signature(0.23, 0.55),
+  pole: signature(0.2, 0.22),
+  wire: signature(0.17, 0.2),
+  beacon: signature(0.75, 0.3, 0.9), // the mast's warning light glows in NV
   water: signature(HEAT.water, ALBEDO.water),
   paved: signature(HEAT.road, ALBEDO.road),
   dirt: signature(HEAT.road - 0.05, ALBEDO.road + 0.07),
@@ -81,9 +91,28 @@ export class WorldBuilder {
   readonly cover = new CoverSet();
   /** Collision boxes of protected buildings (the clinic and its generator), for M7's fail rule. */
   readonly protectedBoxes: number[] = [];
+  /** Things that blow up when hit (the fuel depot's tanks, M8+ Phase D): center and radius. */
+  readonly explosives: { id: string; x: number; y: number; z: number; radius: number }[] = [];
+  /** Trees placed in the forests (M8+ Phase D). */
+  readonly forestTreeCount: number;
+  private forest: InstancedSignature | null = null;
+
+  /** Instances every pool had to drop for lack of room (should be 0: a test checks it). */
+  get droppedInstances(): number {
+    return [this.boxes, this.rough, this.hipRoofs, this.trees, this.cylinders, this.forest].reduce(
+      (n, p) => n + (p?.dropped ?? 0),
+      0,
+    );
+  }
+
+  /** Roofs drawn (one per house). */
+  get roofCount(): number {
+    return this.hipRoofs.count;
+  }
   private readonly bridges: { rect: Rect; top: number }[] = [];
 
-  private readonly boxes = new InstancedSignature(new BoxGeometry(1, 1, 1), 1600, 0.6);
+  private readonly boxes = new InstancedSignature(new BoxGeometry(1, 1, 1), 2400, 0.6);
+  private readonly cylinders = new InstancedSignature(new CylinderGeometry(1, 1, 1, 16), 16, 0.5);
   private readonly rough = new InstancedSignature(new BoxGeometry(1, 1, 1), 400, 1.5);
   private readonly hipRoofs = new InstancedSignature(
     new ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0),
@@ -120,6 +149,28 @@ export class WorldBuilder {
     for (const w of map.walls) this.addWall(w);
     const propBoxes = map.props.map((p) => this.addProp(p));
     this.addTrees(rng);
+    const pines = map.forests.map((f) => forestTrees(map, f, createRng(seed + 7)));
+    this.forestTreeCount = pines.reduce((n, t) => n + t.length, 0);
+    const forest = (this.forest = new InstancedSignature(
+      new ConeGeometry(2.8, 13, 7).translate(0, 6.5, 0),
+      Math.max(1, this.forestTreeCount),
+      1.6,
+    ));
+    for (const trees of pines) {
+      for (const [x, z] of trees) {
+        const scale = range(rng, 0.8, 1.45);
+        this.q.identity();
+        forest.add(
+          this.m.compose(
+            this.p.set(x, this.ground(x, z) - 0.5, z),
+            this.q,
+            this.s.set(scale, scale * range(rng, 0.85, 1.25), scale),
+          ),
+          signature(HEAT.tree + range(rng, -0.025, 0.015), ALBEDO.tree * range(rng, 0.8, 1.05)),
+        );
+      }
+    }
+    for (const line of map.powerLines) this.addPowerLine(line.points, line.spacing);
 
     // Cover: building and prop corners, both faces of every hedge, wall and rock face.
     const candidates = new CoverSet();
@@ -135,20 +186,12 @@ export class WorldBuilder {
       this.rough.finish(),
       this.hipRoofs.finish(),
       this.trees.finish(),
+      forest.finish(),
+      this.cylinders.finish(),
     );
   }
 
   /** Ground height for people walking: the terrain, or the deck where a bridge spans the stream. */
-  /** Instances every pool had to drop for lack of room (should be 0: a test checks it). */
-  get droppedInstances(): number {
-    return [this.boxes, this.rough, this.hipRoofs, this.trees].reduce((n, p) => n + p.dropped, 0);
-  }
-
-  /** Roofs drawn (one per house). */
-  get roofCount(): number {
-    return this.hipRoofs.count;
-  }
-
   surfaceAt(x: number, z: number): number {
     const h = this.terrain.heightAt(x, z);
     for (const b of this.bridges) if (inRect(b.rect, x, z)) return Math.max(h, b.top);
@@ -359,6 +402,32 @@ export class WorldBuilder {
         this.protectedBoxes.push(this.collision.boxes.length - 1);
         return box;
       }
+      case 'mast': {
+        // A tall steel radio mast with two platforms and a warning light on top.
+        const top = hi + 42;
+        this.box(this.boxes, r.x, (base + top) / 2, r.z, r.rot, 1.2, top - base, 1.2, SIG.steel);
+        for (const y of [hi + 18, hi + 32])
+          this.box(this.boxes, r.x, y, r.z, r.rot, 3.2, 0.3, 3.2, SIG.steel);
+        this.box(this.boxes, r.x, top + 0.4, r.z, r.rot, 0.7, 0.7, 0.7, SIG.beacon);
+        return this.addCollision({ ...r, hw: 0.8, hd: 0.8 }, base, top);
+      }
+      case 'tank': {
+        // A fuel tank: a squat steel cylinder. It explodes when hit (see `explosives`).
+        const radius = (Math.min(w, d) / 2) * 0.95;
+        const top = hi + 7;
+        this.e.set(0, 0, 0);
+        this.q.setFromEuler(this.e);
+        this.cylinders.add(
+          this.m.compose(
+            this.p.set(r.x, (base + top) / 2, r.z),
+            this.q,
+            this.s.set(radius, top - base, radius),
+          ),
+          SIG.tank,
+        );
+        if (b.explosive) this.explosives.push({ id: b.id, x: r.x, y: hi + 3.5, z: r.z, radius });
+        return this.addCollision(r, base, top);
+      }
       case 'canopy': {
         const top = hi + 4.6;
         for (const [sx, sz] of [
@@ -436,6 +505,50 @@ export class WorldBuilder {
         this.box(this.boxes, r.x, g + 0.6, r.z, r.rot, w, 1.2, d, SIG.crates);
         this.box(this.boxes, r.x, g + 1.6, r.z, r.rot + 0.4, w * 0.6, 0.8, d * 0.6, SIG.crates);
         return this.addCollision(r, g - 0.2, g + 2.0);
+      case 'wreck':
+        // A burnt-out car, sagging on one side, roof caved in.
+        this.box(this.boxes, r.x, g + 0.55, r.z, r.rot, w, 0.8, d, SIG.wreck, 0.06);
+        this.box(this.boxes, r.x, g + 1.1, r.z, r.rot, w - 0.3, 0.35, d * 0.45, SIG.wreck);
+        return this.addCollision(r, g - 0.2, g + 1.3);
+      case 'grave':
+        this.box(this.boxes, r.x, g + 0.5, r.z, r.rot, w, 1.0, d, SIG.stone);
+        return this.addCollision(r, g - 0.2, g + 1.0);
+    }
+  }
+
+  /** Poles every `spacing` m (none on roads) and three wires between neighboring pole tops. */
+  private addPowerLine(points: readonly (readonly [number, number])[], spacing: number): void {
+    const tops: Vector3[] = [];
+    for (const [x, z] of samplePolyline(points, spacing)) {
+      if (this.map.roads.some((r) => distanceToPolyline(r.points, x, z) < r.width / 2 + 2))
+        continue;
+      const g = this.ground(x, z);
+      this.box(this.boxes, x, g + 5, z, 0, 0.35, 10.5, 0.35, SIG.pole);
+      this.box(this.boxes, x, g + 9.8, z, 0, 2.8, 0.2, 0.2, SIG.pole); // cross-arm
+      tops.push(new Vector3(x, g + 9.9, z));
+    }
+    for (let i = 1; i < tops.length; i++) {
+      const a = tops[i - 1];
+      const b = tops[i];
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const rot = Math.atan2(b.x - a.x, b.z - a.z);
+      const pitch = -Math.atan2(b.y - a.y, len);
+      for (const off of [-1.2, 0, 1.2]) {
+        const ox = Math.cos(rot) * off;
+        const oz = -Math.sin(rot) * off;
+        this.box(
+          this.boxes,
+          (a.x + b.x) / 2 + ox,
+          (a.y + b.y) / 2 - 0.4, // a little sag
+          (a.z + b.z) / 2 + oz,
+          rot,
+          0.07,
+          0.07,
+          Math.hypot(len, b.y - a.y),
+          SIG.wire,
+          pitch,
+        );
+      }
     }
   }
 

@@ -54,7 +54,14 @@ export function formatPlacement(x: number, z: number): string {
 }
 
 /** Zones in journey order (west → east) for the look-test tour (F3). */
-export const ZONE_TOUR: readonly ZoneId[] = ['op', 'fields', 'village', 'crossroads', 'lz'];
+export const ZONE_TOUR: readonly ZoneId[] = [
+  'op',
+  'fields',
+  'village',
+  'crossroads',
+  'lz',
+  'forest',
+];
 
 /**
  * F3 tour step: the next zone to center the orbit on, or null to go back to following Ridgeback

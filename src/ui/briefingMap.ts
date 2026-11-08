@@ -25,6 +25,8 @@ export interface BriefingMap {
   readonly buildings: readonly string[];
   readonly trees: readonly string[];
   readonly walls: readonly string[];
+  /** Forest outlines (M8+ Phase D). */
+  readonly forests: readonly string[];
 }
 
 export const ZONE_LABELS: Readonly<Record<ZoneId, string>> = {
@@ -33,6 +35,7 @@ export const ZONE_LABELS: Readonly<Record<ZoneId, string>> = {
   village: 'VILLAGE',
   crossroads: 'CROSSROADS',
   lz: 'LZ QUARRY',
+  forest: 'BLACK PINE', // not "LZ SAWMILL": the briefing doesn't give the twist away
 };
 
 const PAD = 70;
@@ -132,6 +135,7 @@ export function briefingMap(map: MapData): BriefingMap {
     buildings: map.buildings.map((b) => footprint(b.pos, b.rot, b.size)),
     trees: map.treeLines.map((t) => path(t.points)),
     walls: map.walls.map((w) => path(w.points)),
+    forests: map.forests.map((f) => polygon(f.polygon)),
   };
 }
 
@@ -155,6 +159,7 @@ export function briefingSvg(m: BriefingMap): string {
   return (
     `<svg class="brief-map" viewBox="${m.viewBox}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of the Varesh Valley">` +
     many('field', m.fields) +
+    many('forest', m.forests) +
     many('trees', m.trees) +
     many('walls', m.walls) +
     `<path class="stream" d="${m.stream}"/>${roads}` +

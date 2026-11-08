@@ -25,7 +25,14 @@ describe('the handcrafted map', () => {
     const houses = MAP.buildings.filter((b) => b.kind === 'house' && b.id.startsWith('v_'));
     expect(houses.length).toBeGreaterThanOrEqual(25);
     expect(MAP.buildings.filter((b) => b.protected).map((b) => b.id)).toEqual(['clinic']);
-    expect(Object.keys(MAP.zones).sort()).toEqual(['crossroads', 'fields', 'lz', 'op', 'village']);
+    expect(Object.keys(MAP.zones).sort()).toEqual([
+      'crossroads',
+      'fields',
+      'forest',
+      'lz',
+      'op',
+      'village',
+    ]);
   });
 
   it('runs Ridgeback from the OP to the LZ', () => {
@@ -45,6 +52,21 @@ describe('the handcrafted map', () => {
 });
 
 describe('validateMap catches mistakes', () => {
+  it('a route outside routeOrder must branch off the journey (the sawmill detour does)', () => {
+    expect(check(MAP)).toEqual([]);
+    const m: MapData = {
+      ...MAP,
+      friendlyRoutes: {
+        ...MAP.friendlyRoutes,
+        stray: [
+          [0, -300],
+          [10, -320],
+        ],
+      },
+    };
+    expect(some(check(m), 'route stray is not in routeOrder')).toBe(true);
+  });
+
   it('points outside the map', () => {
     const m = {
       ...MAP,

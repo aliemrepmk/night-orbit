@@ -10,6 +10,7 @@ describe('mapOverlay', () => {
     expect(zones.map((z) => z.label).sort()).toEqual([
       'CROSSROADS',
       'FIELDS',
+      'FOREST',
       'LZ',
       'OP',
       'VILLAGE',
@@ -56,8 +57,9 @@ describe('zone tour (F3)', () => {
     }
     expect(seen).toEqual([...ZONE_TOUR]);
     expect([...ZONE_TOUR].sort()).toEqual(Object.keys(MAP.zones).sort());
-    // West to east.
-    const xs = ZONE_TOUR.map((z) => MAP.zones[z].center[0]);
+    // Along the journey (west to east), then the forest (the sawmill detour) last.
+    const xs = ZONE_TOUR.slice(0, -1).map((z) => MAP.zones[z].center[0]);
     expect([...xs].sort((a, b) => a - b)).toEqual(xs);
+    expect(ZONE_TOUR[ZONE_TOUR.length - 1]).toBe('forest');
   });
 });

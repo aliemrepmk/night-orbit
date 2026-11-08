@@ -5,6 +5,8 @@ export const PROP_SIZE: Readonly<Record<PropDef['kind'], Vec2>> = {
   car: [1.9, 4.3],
   hay: [2.2, 2.2],
   crates: [2.4, 2.4],
+  wreck: [1.9, 4.2],
+  grave: [0.7, 0.3],
 };
 
 /** A rotated rectangle on the ground (same rotation convention as `Collision`'s boxes). */
@@ -211,8 +213,17 @@ export function validateMap(map: MapData, mapSize: number): string[] {
   // Routes: every id in routeOrder exists, each starts where the previous one ended
   for (const id of map.routeOrder)
     if (!map.friendlyRoutes[id]) errors.push(`routeOrder names unknown route ${id}`);
+  // A route outside routeOrder is a branch (a detour the mission may take, e.g. to LZ SAWMILL):
+  // it must start where a route of the journey ends.
+  const ends = map.routeOrder
+    .map((id) => map.friendlyRoutes[id])
+    .filter(Boolean)
+    .map((r) => r[r.length - 1]);
   for (const id of Object.keys(map.friendlyRoutes)) {
-    if (!map.routeOrder.includes(id)) errors.push(`route ${id} is not in routeOrder`);
+    const start = map.friendlyRoutes[id][0];
+    const branch = ends.some((e) => Math.hypot(e[0] - start[0], e[1] - start[1]) <= 1);
+    if (!map.routeOrder.includes(id) && !branch)
+      errors.push(`route ${id} is not in routeOrder and doesn't branch off its end points`);
     if (map.friendlyRoutes[id].length < 2) errors.push(`route ${id} needs at least two points`);
   }
   for (let i = 1; i < map.routeOrder.length; i++) {
