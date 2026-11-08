@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAP } from '../world/MapData';
 import type { ZoneId } from '../world/mapTypes';
-import { briefingMap, briefingSvg, ZONE_LABELS } from './briefingMap';
+import { briefingMap, briefingSvg, fitViewBox, ZONE_LABELS } from './briefingMap';
 
 describe('briefing map sketch', () => {
   const m = briefingMap(MAP);
@@ -38,5 +38,43 @@ describe('briefing map sketch', () => {
     const clinic = MAP.buildings.find((b) => b.kind === 'clinic')!;
     expect(m.clinic).toEqual({ x: clinic.pos[0], y: clinic.pos[1] });
     expect(svg).toContain('class="clinic"');
+  });
+});
+
+describe('briefing map fills its frame (M8+ Phase A: map and text the same height)', () => {
+  const b = { x: -100, y: -50, w: 400, h: 200 }; // 2:1
+
+  it('matches the frame aspect exactly, keeping the center', () => {
+    for (const aspect of [0.6, 1, 2, 3.5]) {
+      const f = fitViewBox(b, aspect);
+      expect(f.w / f.h).toBeCloseTo(aspect);
+      expect(f.x + f.w / 2).toBeCloseTo(b.x + b.w / 2);
+      expect(f.y + f.h / 2).toBeCloseTo(b.y + b.h / 2);
+    }
+  });
+
+  it('only ever grows, so everything that had to be shown still is', () => {
+    for (const aspect of [0.5, 1.2, 2, 5]) {
+      const f = fitViewBox(b, aspect);
+      expect(f.x).toBeLessThanOrEqual(b.x + 1e-9);
+      expect(f.y).toBeLessThanOrEqual(b.y + 1e-9);
+      expect(f.x + f.w).toBeGreaterThanOrEqual(b.x + b.w - 1e-9);
+      expect(f.y + f.h).toBeGreaterThanOrEqual(b.y + b.h - 1e-9);
+    }
+  });
+
+  it('leaves the box alone for a bad aspect (frame not laid out yet)', () => {
+    expect(fitViewBox(b, 0)).toEqual(b);
+    expect(fitViewBox(b, Number.NaN)).toEqual(b);
+  });
+
+  it('draws terrain detail so the extra space is the valley, not blank', () => {
+    const m = briefingMap(MAP);
+    expect(m.buildings).toHaveLength(MAP.buildings.length);
+    expect(m.fields).toHaveLength(MAP.fields.length);
+    expect(m.trees).toHaveLength(MAP.treeLines.length);
+    const svg = briefingSvg(m);
+    for (const cls of ['building', 'field', 'trees', 'walls'])
+      expect(svg).toContain(`class="${cls}"`);
   });
 });

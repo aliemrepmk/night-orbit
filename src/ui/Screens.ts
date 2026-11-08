@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 import { BRIEFING } from '../mission/briefing';
 import type { Rating } from '../mission/stats';
 import type { MapData } from '../world/mapTypes';
-import { briefingMap, briefingSvg } from './briefingMap';
+import { briefingMap, briefingSvg, fitViewBoxText, type Box } from './briefingMap';
 import { controlsTable } from './controls';
 import type { Screen } from './screenFlow';
 import { stepValue, type Settings } from './settings';
@@ -31,6 +31,8 @@ export class Screens {
     settings: Settings,
   ) {
     this.settings = { ...settings };
+    const sketch = briefingMap(map);
+    this.mapBounds = sketch.bounds;
     const para = (t: readonly string[]) => t.map((p) => `<p>${p}</p>`).join('');
     root.innerHTML = `
       <section class="panel" data-screen="title">
@@ -42,7 +44,7 @@ export class Screens {
       <section class="panel wide" data-screen="briefing">
         <h2>${BRIEFING.title}</h2>
         <div class="brief">
-          ${briefingSvg(briefingMap(map))}
+          <div class="brief-frame">${briefingSvg(sketch)}</div>
           <div class="brief-text">
             <h3>SITUATION</h3>${para(BRIEFING.situation)}
             <h3>RULES OF ENGAGEMENT</h3>${para(BRIEFING.rules)}
@@ -102,11 +104,31 @@ export class Screens {
       input.addEventListener('click', (e) => e.stopPropagation());
     }
     this.showSettings();
+    // The sketch fills its frame (as tall as the briefing text): refit when the frame resizes.
+    const frame = this.root.querySelector<HTMLElement>('.brief-frame')!;
+    if (typeof ResizeObserver !== 'undefined')
+      new ResizeObserver(() => this.fitMap()).observe(frame);
+    window.addEventListener('resize', () => this.fitMap());
   }
+
+  /** What the briefing sketch must show (every zone and the route). */
+  private readonly mapBounds: Box;
 
   show(state: Screen): void {
     this.root.dataset.state = state;
     this.root.classList.toggle('hidden', state === 'playing');
+    if (state === 'briefing') this.fitMap();
+  }
+
+  /** Widens the sketch's view to the frame's shape, so it fills it with more of the valley. */
+  private fitMap(): void {
+    const frame = this.root.querySelector<HTMLElement>('.brief-frame');
+    const svg = frame?.querySelector('svg');
+    if (!frame || !svg || frame.clientWidth === 0 || frame.clientHeight === 0) return;
+    svg.setAttribute(
+      'viewBox',
+      fitViewBoxText(this.mapBounds, frame.clientWidth / frame.clientHeight),
+    );
   }
 
   /** The fail screen: why, and the stats so far. */
