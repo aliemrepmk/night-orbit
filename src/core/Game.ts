@@ -328,8 +328,7 @@ export class Game {
     this.settings = s;
     this.sensor.sensitivityScale = s.sensitivity;
     this.sensor.shakeScale = s.screenShake ? 1 : 0;
-    this.audio.setVolume(s.volume);
-    this.audio.setEngineVolume(s.engineVolume);
+    this.audio.setVolumes(s);
     if (save && !saveSettings(browserStorage, s)) {
       this.screens.setStorageHint(
         'This browser blocks saving: settings last until the page closes.',

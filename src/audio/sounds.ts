@@ -1,10 +1,13 @@
 import type { OrdnanceId, WeaponId } from '../gunship/weaponDefs';
+import type { Bus } from './mix';
 
 /**
  * PLACEHOLDER procedural sounds (M3); M9 replaces them with the full audio design.
  * Each sound = a filtered noise burst (the crack/rumble) + an optional falling sine (the thump).
  */
 export interface SoundDef {
+  /** The mixer bus it plays on (M9); `sfx` when left out. */
+  readonly bus?: Bus;
   /** Seconds. */
   readonly duration: number;
   readonly noiseGain: number;

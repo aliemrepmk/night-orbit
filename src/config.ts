@@ -469,6 +469,21 @@ export const CONFIG = {
     volume: { default: 0.8, min: 0, max: 1, step: 0.05 },
     /** The engine drone's own level (M8+ Phase B), under the master volume. */
     engineVolume: { default: 0.7, min: 0, max: 1, step: 0.05 },
+    /** Guns, impacts, strikes and UI beeps (M9), under the master volume. */
+    sfxVolume: { default: 1, min: 0, max: 1, step: 0.05 },
+    /** Radio squelch and beeps (M9), under the master volume. */
+    radioVolume: { default: 0.8, min: 0, max: 1, step: 0.05 },
+  },
+
+  /**
+   * The mixer (M9, PLAN.md §7.17): `master → { sfx, radio, ambience }`. Each number is that
+   * node's gain at full player volume (the master's is the headroom before the limiter).
+   */
+  mix: {
+    master: 0.6,
+    sfx: 1,
+    radio: 0.7,
+    ambience: 1,
   },
 
   /**

@@ -69,6 +69,8 @@ export class Screens {
           ${slider('sensitivity', 'MOUSE SENSITIVITY')}
           ${toggle('invertY', 'INVERT MOUSE Y')}
           ${slider('volume', 'VOLUME')}
+          ${slider('sfxVolume', 'EFFECTS')}
+          ${slider('radioVolume', 'RADIO')}
           ${slider('engineVolume', 'ENGINE')}
           ${toggle('screenShake', 'SCREEN SHAKE')}
           ${toggle('subtitles', 'RADIO SUBTITLES')}
@@ -160,7 +162,7 @@ export class Screens {
   private readInput(input: HTMLInputElement): void {
     const key = input.dataset.s as keyof Settings;
     const s = this.settings;
-    if (key === 'sensitivity' || key === 'volume' || key === 'engineVolume') {
+    if (isSlider(key)) {
       s[key] = stepValue(Number(input.value), 0, S[key]);
     } else {
       s[key] = input.checked;
@@ -178,8 +180,7 @@ export class Screens {
       else input.value = String(v);
     }
     this.text('sensitivityValue', `${s.sensitivity.toFixed(2)}×`);
-    this.text('volumeValue', `${Math.round(s.volume * 100)}%`);
-    this.text('engineVolumeValue', `${Math.round(s.engineVolume * 100)}%`);
+    for (const k of VOLUME_SLIDERS) this.text(`${k}Value`, `${Math.round(s[k] * 100)}%`);
   }
 
   private el(k: string): HTMLElement {
@@ -192,7 +193,15 @@ export class Screens {
   }
 }
 
-function slider(key: 'sensitivity' | 'volume' | 'engineVolume', label: string): string {
+/** The volume sliders (master, then the mixer's buses, M9). */
+const VOLUME_SLIDERS = ['volume', 'sfxVolume', 'radioVolume', 'engineVolume'] as const;
+type SliderKey = 'sensitivity' | (typeof VOLUME_SLIDERS)[number];
+
+function isSlider(key: keyof Settings): key is SliderKey {
+  return key === 'sensitivity' || (VOLUME_SLIDERS as readonly string[]).includes(key);
+}
+
+function slider(key: SliderKey, label: string): string {
   const r = S[key];
   return `<label class="setting"><span>${label}</span>
     <input type="range" data-s="${key}" min="${r.min}" max="${r.max}" step="${r.step}"/>

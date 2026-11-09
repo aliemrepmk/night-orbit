@@ -1,6 +1,6 @@
 import { CONFIG } from '../config';
 
-/** The player's settings (M8, PLAN.md §7.16). */
+/** The player's settings (M8, PLAN.md §7.16). The volume keys are the mixer's `Volumes` (M9). */
 export interface Settings {
   /** Mouse sensitivity multiplier (on top of `CONFIG.sensor.sensitivity`). */
   sensitivity: number;
@@ -9,6 +9,10 @@ export interface Settings {
   volume: number;
   /** The engine drone's own level 0–1, under the master volume (M8+ Phase B). */
   engineVolume: number;
+  /** Guns, impacts and strikes 0–1, under the master volume (M9). */
+  sfxVolume: number;
+  /** Radio squelch and beeps 0–1, under the master volume (M9). */
+  radioVolume: number;
   /** Camera shake from impacts and 105 mm recoil. */
   screenShake: boolean;
   /** Radio subtitles low in the view. */
@@ -26,6 +30,8 @@ export function defaultSettings(cfg: SettingsConfig = CONFIG.settings): Settings
     invertY: false,
     volume: cfg.volume.default,
     engineVolume: cfg.engineVolume.default,
+    sfxVolume: cfg.sfxVolume.default,
+    radioVolume: cfg.radioVolume.default,
     screenShake: true,
     subtitles: true,
   };
@@ -50,6 +56,8 @@ export function sanitizeSettings(raw: unknown, cfg: SettingsConfig = CONFIG.sett
     invertY: flag(r.invertY, d.invertY),
     volume: number(r.volume, cfg.volume),
     engineVolume: number(r.engineVolume, cfg.engineVolume),
+    sfxVolume: number(r.sfxVolume, cfg.sfxVolume),
+    radioVolume: number(r.radioVolume, cfg.radioVolume),
     screenShake: flag(r.screenShake, d.screenShake),
     subtitles: flag(r.subtitles, d.subtitles),
   };

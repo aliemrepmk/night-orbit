@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../config';
 import { AudioEngine } from './AudioEngine';
 import { STRIKES } from '../gunship/airSupportDefs';
 import { SOUNDS, STRIKE_MIN_VOLUME, WHISTLE, impactVolume } from './sounds';
@@ -93,7 +94,7 @@ describe('AudioEngine engine drone (M8+ Phase B)', () => {
     expect(a.engineState).toBe('off');
     a.setEngineMode('on');
     a.tuneEngine({ pitch: 1.01, pan: 0.1 });
-    a.setEngineVolume(2); // clamped
+    a.setVolumes({ volume: 2, sfxVolume: 1, radioVolume: 1, engineVolume: 2 }); // clamped
     expect(a.engineState).toBe('on');
     a.setEngineMode('muffled');
     expect(a.engineState).toBe('muffled');
@@ -170,6 +171,28 @@ describe('AudioEngine noise (regression)', () => {
       const shot = fake.sources.slice(before);
       expect(shot).toHaveLength(1);
       expect(shot[0].loop).toBe(true);
+    } finally {
+      fake.restore();
+    }
+  });
+});
+
+describe('AudioEngine mixer (M9)', () => {
+  it('builds the buses on unlock and applies the volumes set before it', () => {
+    const fake = installFakeAudio();
+    try {
+      const a = new AudioEngine();
+      expect(a.mixGains).toBeNull();
+      a.setVolumes({ volume: 0.5, sfxVolume: 0.25, radioVolume: 1, engineVolume: 0 });
+      a.unlock();
+      const g = a.mixGains!;
+      expect(g.master).toBeCloseTo(CONFIG.mix.master * 0.5);
+      expect(g.sfx).toBeCloseTo(CONFIG.mix.sfx * 0.25);
+      expect(g.radio).toBeCloseTo(CONFIG.mix.radio);
+      expect(g.ambience).toBe(0);
+      a.setVolumes({ volume: 1, sfxVolume: 1, radioVolume: 0, engineVolume: 1 });
+      expect(a.mixGains!.radio).toBe(0);
+      expect(a.mixGains!.master).toBeCloseTo(CONFIG.mix.master);
     } finally {
       fake.restore();
     }

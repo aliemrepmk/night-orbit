@@ -1,5 +1,6 @@
 import { CONFIG } from '../config';
 import { engineFrequencies, engineMix, type EngineMode, type EngineTune } from './engineDrone';
+import { BUSES, busGains, type Bus, type Volumes } from './mix';
 import { SOUNDS, WHISTLE, type SoundId } from './sounds';
 
 /** The live nodes of the engine drone (M8+ Phase B). */
@@ -10,12 +11,8 @@ interface EngineNodes {
   readonly whine: OscillatorNode;
   readonly muffle: BiquadFilterNode;
   readonly level: GainNode;
-  readonly bus: GainNode;
   readonly pan: StereoPannerNode | null;
 }
-
-/** Master volume for the placeholder sounds. */
-const MASTER = 0.6;
 
 /**
  * Minimal WebAudio player for the placeholder sounds. Browsers only allow audio after a user
@@ -26,19 +23,39 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
-  /** Player volume 0–1 (M8 settings), kept until the context exists. */
-  private volume = 1;
-  /** The engine drone (M8+ Phase B): its nodes, mode and own volume. */
+  /** The player's volumes (settings), kept until the context exists. */
+  private volumes: Volumes = { volume: 1, sfxVolume: 1, radioVolume: 1, engineVolume: 1 };
+  /** The mixer's buses (M9): every sound goes into one of them, they go into the master. */
+  private buses: Record<Bus, GainNode> | null = null;
+  /** The engine drone (M8+ Phase B): its nodes and mode. It plays on the ambience bus. */
   private engine: EngineNodes | null = null;
   private engineMode: EngineMode = 'off';
-  private engineVolume = 1;
 
-  /** The engine drone's own level 0–1 (settings), under the master volume. */
-  setEngineVolume(v: number): void {
-    this.engineVolume = Math.min(1, Math.max(0, v));
-    if (this.engine && this.ctx) {
-      this.engine.bus.gain.setTargetAtTime(this.engineVolume, this.ctx.currentTime, 0.05);
-    }
+  /** The player's master and bus volumes (M9 settings); ramps there quickly. */
+  setVolumes(v: Volumes): void {
+    this.volumes = {
+      volume: v.volume,
+      sfxVolume: v.sfxVolume,
+      radioVolume: v.radioVolume,
+      engineVolume: v.engineVolume,
+    };
+    this.applyVolumes();
+  }
+
+  /** The node gains the mixer is set to (null before audio exists). */
+  get mixGains(): ({ master: number } & Record<Bus, number>) | null {
+    if (!this.master || !this.buses) return null;
+    const out = { master: this.master.gain.value } as { master: number } & Record<Bus, number>;
+    for (const b of BUSES) out[b] = this.buses[b].gain.value;
+    return out;
+  }
+
+  private applyVolumes(): void {
+    const { master, buses } = this;
+    if (!master || !buses) return;
+    const g = busGains(this.volumes);
+    master.gain.value = g.master;
+    for (const b of BUSES) buses[b].gain.value = g[b];
   }
 
   /** Off (title, briefing), on (flying) or muffled (pause, settings, end screens); ramps there. */
@@ -67,15 +84,6 @@ export class AudioEngine {
     engine.pan?.pan.setTargetAtTime(t.pan, now, 0.3);
   }
 
-  setVolume(v: number): void {
-    this.volume = Math.min(1, Math.max(0, v));
-    if (this.master) this.master.gain.value = MASTER * this.volume;
-  }
-
-  get playerVolume(): number {
-    return this.volume;
-  }
-
   unlock(): void {
     if (this.ctx) {
       void this.ctx.resume();
@@ -85,7 +93,6 @@ export class AudioEngine {
     if (!Ctor) return;
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
-    this.master.gain.value = MASTER * this.volume;
     // A limiter, so a bomb on top of a gun run (40 cracks) can't clip.
     const limiter = this.ctx.createDynamicsCompressor();
     limiter.threshold.value = -6;
@@ -94,13 +101,20 @@ export class AudioEngine {
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
     this.master.connect(limiter).connect(this.ctx.destination);
+    const bus = (): GainNode => {
+      const g = this.ctx!.createGain();
+      g.connect(this.master!);
+      return g;
+    };
+    this.buses = { sfx: bus(), radio: bus(), ambience: bus() };
+    this.applyVolumes();
 
     // One second of white noise, reused by every sound.
     const n = this.ctx.sampleRate;
     this.noise = this.ctx.createBuffer(1, n, n);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
-    this.engine = this.buildEngine(this.ctx, this.master, this.noise);
+    this.engine = this.buildEngine(this.ctx, this.buses.ambience, this.noise);
     this.applyEngineMode();
   }
 
@@ -108,7 +122,7 @@ export class AudioEngine {
    * Four detuned saws (one per engine) through a low-pass, a faint gearbox whine and band-passed
    * airflow noise, all throbbing with the propeller beat, then a muffle filter and the level.
    */
-  private buildEngine(ctx: AudioContext, master: GainNode, noise: AudioBuffer): EngineNodes {
+  private buildEngine(ctx: AudioContext, out: GainNode, noise: AudioBuffer): EngineNodes {
     const E = CONFIG.engineSound;
     const beat = ctx.createGain();
     beat.gain.value = 1 - E.beatDepth / 2;
@@ -159,13 +173,11 @@ export class AudioEngine {
     muffle.type = 'lowpass';
     const level = ctx.createGain();
     level.gain.value = 0;
-    const bus = ctx.createGain();
-    bus.gain.value = this.engineVolume;
     const pan = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null;
-    beat.connect(muffle).connect(level).connect(bus);
-    if (pan) bus.connect(pan).connect(master);
-    else bus.connect(master);
-    return { saws, sawGains, whine, muffle, level, bus, pan };
+    beat.connect(muffle).connect(level);
+    if (pan) level.connect(pan).connect(out);
+    else level.connect(out);
+    return { saws, sawGains, whine, muffle, level, pan };
   }
 
   private applyEngineMode(): void {
@@ -187,8 +199,8 @@ export class AudioEngine {
    * from `WHISTLE.startHz` down to `endHz` over `seconds`, getting louder; the boom cuts it off.
    */
   playWhistle(seconds: number, volume = 1): void {
-    const { ctx, master, noise } = this;
-    if (!ctx || !master || !noise || ctx.state !== 'running' || seconds <= 0) return;
+    const { ctx, buses, noise } = this;
+    if (!ctx || !buses || !noise || ctx.state !== 'running' || seconds <= 0) return;
     const W = WHISTLE;
     const t0 = ctx.currentTime;
     const t1 = t0 + seconds;
@@ -196,7 +208,7 @@ export class AudioEngine {
     out.gain.setValueAtTime(W.startGain * volume, t0);
     out.gain.exponentialRampToValueAtTime(W.endGain * volume, t1);
     out.gain.setValueAtTime(0, t1);
-    out.connect(master);
+    out.connect(buses.sfx);
 
     const tone = ctx.createOscillator();
     tone.frequency.setValueAtTime(W.startHz, t0);
@@ -225,8 +237,8 @@ export class AudioEngine {
 
   /** A short square-wave beep (the missile warning tone, M8+ Phase E). */
   beep(hz: number, seconds: number, volume = 0.12): void {
-    const { ctx, master } = this;
-    if (!ctx || !master || ctx.state !== 'running') return;
+    const { ctx, buses } = this;
+    if (!ctx || !buses || ctx.state !== 'running') return;
     const t0 = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = 'square';
@@ -234,7 +246,7 @@ export class AudioEngine {
     const g = ctx.createGain();
     g.gain.setValueAtTime(volume, t0);
     g.gain.setValueAtTime(0, t0 + seconds);
-    osc.connect(g).connect(master);
+    osc.connect(g).connect(buses.sfx);
     osc.start(t0);
     osc.stop(t0 + seconds + 0.01);
   }
@@ -253,9 +265,10 @@ export class AudioEngine {
   enginesRunning = 4;
 
   play(id: SoundId, volume = 1): void {
-    const { ctx, master, noise } = this;
-    if (!ctx || !master || !noise || ctx.state !== 'running') return;
+    const { ctx, buses, noise } = this;
+    if (!ctx || !buses || !noise || ctx.state !== 'running') return;
     const d = SOUNDS[id];
+    const master = buses[d.bus ?? 'sfx'];
     const t0 = ctx.currentTime;
     const t1 = t0 + d.duration;
 

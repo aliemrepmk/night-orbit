@@ -70,6 +70,23 @@ describe('settings save / load', () => {
     expect(s.invertY).toBe(false);
     expect('extra' in s).toBe(false);
     expect(sanitizeSettings(null)).toEqual(defaultSettings());
+  });
+
+  it('M9 volumes: settings saved before the mixer existed get the new bus defaults (regression-proof upgrade)', () => {
+    const m = memory();
+    m.data.set(KEY, JSON.stringify({ volume: 0.4, engineVolume: 0.2 })); // an M8 save
+    const s = loadSettings(m.get);
+    expect(s.volume).toBe(0.4);
+    expect(s.engineVolume).toBe(0.2);
+    expect(s.sfxVolume).toBe(CONFIG.settings.sfxVolume.default);
+    expect(s.radioVolume).toBe(CONFIG.settings.radioVolume.default);
+    expect(sanitizeSettings({ sfxVolume: 7, radioVolume: -2 })).toMatchObject({
+      sfxVolume: 1,
+      radioVolume: 0,
+    });
+  });
+
+  it('rejects NaN', () => {
     expect(sanitizeSettings({ sensitivity: Number.NaN }).sensitivity).toBe(
       CONFIG.settings.sensitivity.default,
     );
