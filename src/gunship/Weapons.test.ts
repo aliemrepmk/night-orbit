@@ -113,3 +113,45 @@ describe('Weapons (all three guns)', () => {
     expect(ws.guns['40'].rounds).toBe(5); // untouched
   });
 });
+
+describe('ready signal (M9: the reload-complete beep)', () => {
+  it('flags exactly one step when a reload finishes, for the background gun too', () => {
+    const ws = new Weapons();
+    ws.update(DT, '105', true, 1); // fire, then switch away
+    let readySteps = 0;
+    let readyAt = -1;
+    for (let i = 0; i < 400; i++) {
+      ws.update(DT, '25', false, 0);
+      if (ws.readied.length > 0) {
+        readySteps++;
+        readyAt = i;
+        expect(ws.readied).toEqual(['105']);
+      }
+    }
+    expect(readySteps).toBe(1);
+    expect((readyAt + 1) * DT).toBeCloseTo(WEAPONS['105'].reload, 1);
+  });
+
+  it('flags the end of a 25 mm overheat and of a jam, never a gun that was never down', () => {
+    const w = new WeaponState(WEAPONS['25']);
+    let ready = 0;
+    for (let i = 0; i < 60 * 10; i++) {
+      w.update(DT, true, i < 60 * 5, 0); // hold past overheat, then let it cool
+      if (w.justReady) ready++;
+    }
+    expect(ready).toBe(1);
+    const j = new WeaponState(WEAPONS['40']);
+    j.jam(1);
+    let jamReady = 0;
+    for (let i = 0; i < 120; i++) {
+      j.update(DT, true, false, 0);
+      if (j.justReady) jamReady++;
+    }
+    expect(jamReady).toBe(1);
+    const idle = new WeaponState(WEAPONS['40']);
+    for (let i = 0; i < 120; i++) {
+      idle.update(DT, true, false, 0);
+      expect(idle.justReady).toBe(false);
+    }
+  });
+});

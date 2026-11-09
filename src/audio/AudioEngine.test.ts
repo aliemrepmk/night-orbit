@@ -9,7 +9,10 @@ describe('sounds', () => {
   it('defines valid envelopes and sweeps for every sound', () => {
     for (const [id, d] of Object.entries(SOUNDS)) {
       expect(d.duration, id).toBeGreaterThan(0);
-      expect(d.noiseGain + d.thumpGain + (d.tones?.length ?? 0), id).toBeGreaterThan(0);
+      expect(
+        d.noiseGain + d.thumpGain + (d.tones?.length ?? 0) + (d.click?.gain ?? 0),
+        id,
+      ).toBeGreaterThan(0);
       expect(d.noiseGain, id).toBeLessThanOrEqual(1);
       expect(d.thumpGain, id).toBeLessThanOrEqual(1);
       if (d.noiseGain > 0) expect(d.cutoffEnd, id).toBeGreaterThan(0); // exponential ramps need > 0
@@ -246,6 +249,40 @@ describe('AudioEngine mixer (M9)', () => {
       a.setVolumes({ volume: 1, sfxVolume: 1, radioVolume: 0, engineVolume: 1 });
       expect(a.mixGains!.radio).toBe(0);
       expect(a.mixGains!.master).toBeCloseTo(CONFIG.mix.master);
+    } finally {
+      fake.restore();
+    }
+  });
+});
+
+describe('AudioEngine radio static (M9)', () => {
+  it('plays only while a line on the outside net is on air and the game is flying', () => {
+    const fake = installFakeAudio();
+    try {
+      const a = new AudioEngine();
+      a.unlock();
+      a.radioHiss(true);
+      expect(a.hissOn).toBe(false); // not flying yet (title)
+      a.radioAllowed = true;
+      expect(a.hissOn).toBe(true);
+      a.radioAllowed = false; // paused: silent, but the line is still on air
+      expect(a.hissOn).toBe(false);
+      a.radioAllowed = true;
+      expect(a.hissOn).toBe(true);
+      a.radioHiss(false);
+      expect(a.hissOn).toBe(false);
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it('plays every sound through the fake context without throwing (all layers)', () => {
+    const fake = installFakeAudio();
+    try {
+      const a = new AudioEngine();
+      a.unlock();
+      for (const id of Object.keys(SOUNDS) as (keyof typeof SOUNDS)[])
+        expect(() => a.play(id), id).not.toThrow();
     } finally {
       fake.restore();
     }

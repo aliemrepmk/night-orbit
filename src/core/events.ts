@@ -1,6 +1,7 @@
 import type { Vector3 } from 'three';
 import type { DamageSource } from '../combat/Damage';
 import type { OrdnanceId, StrikeId, WeaponId } from '../gunship/weaponDefs';
+import type { Speaker } from '../mission/missionTypes';
 
 /** Why the mission ended in failure (PLAN.md §1 lose conditions). */
 export type FailReason =
@@ -56,4 +57,11 @@ export type GameEvents = {
   gunJammed: { seconds: number };
   /** Ground fog rolls in for `seconds`. */
   fog: { seconds: number };
+  // ---- Audio cues (M9) ----
+  /** The player picked another gun. */
+  weaponSelected: { weapon: WeaponId };
+  /** A gun finished reloading, cooling down or clearing a jam: it can fire again. */
+  weaponReady: { weapon: WeaponId };
+  /** A radio line went on air (`on`) or ended / was cut off. */
+  radioKey: { on: boolean; speaker: Speaker };
 };

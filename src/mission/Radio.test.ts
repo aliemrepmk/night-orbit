@@ -77,3 +77,25 @@ describe('Radio between phases', () => {
     expect(r.current).toBeNull();
   });
 });
+
+describe('Radio key (M9 squelch)', () => {
+  it('keys on when a line goes on air and off when it ends, is cut off or cleared', () => {
+    const r = new Radio();
+    const keys: string[] = [];
+    r.onKey = (on, l) => keys.push(`${on ? 'on' : 'off'}:${l.text}`);
+    r.say('NAV', 'chatter', 1);
+    expect(keys).toEqual(['on:chatter']);
+    r.say('FCO', 'story', 3); // cuts the chatter off
+    expect(keys).toEqual(['on:chatter', 'off:chatter', 'on:story']);
+    for (let i = 0; i < 30 * 20; i++) r.update(1 / 30);
+    expect(keys.at(-1)).toBe('off:story');
+    r.say('NAV', 'last', 2);
+    r.clear();
+    expect(keys.slice(-2)).toEqual(['on:last', 'off:last']);
+    r.clear(); // nothing on air: no extra key-up
+    expect(keys.at(-1)).toBe('off:last');
+    expect(keys.filter((k) => k.startsWith('on')).length).toBe(
+      keys.filter((k) => k.startsWith('off')).length,
+    );
+  });
+});

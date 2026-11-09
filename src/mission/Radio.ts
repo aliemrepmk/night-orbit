@@ -34,6 +34,8 @@ export class Radio {
   private silence = 0;
   /** Called when a line goes on air. */
   onLine: (line: RadioLine) => void = () => {};
+  /** The key (M9 squelch): `true` when a line goes on air, `false` when it ends or is cut off. */
+  onKey: (on: boolean, line: RadioLine) => void = () => {};
 
   constructor(private readonly cfg: RadioConfig = CONFIG.radio) {}
 
@@ -52,6 +54,7 @@ export class Radio {
     this.queue.push(line);
     if (this.current && this.current.priority === 1 && priority > 1) {
       // Story and warnings cut off chatter.
+      this.onKey(false, this.current);
       this.current = null;
       this.left = 0;
       this.silence = 0;
@@ -65,6 +68,7 @@ export class Radio {
     if (this.current) {
       this.left -= dt;
       if (this.left > 0) return;
+      this.onKey(false, this.current);
       this.current = null;
       // A short gap of silence between lines, so two subtitles never blur into one.
       this.silence = this.cfg.gapSeconds;
@@ -82,6 +86,7 @@ export class Radio {
   /** Clears everything (restart). */
   clear(): void {
     this.queue.length = 0;
+    if (this.current) this.onKey(false, this.current);
     this.current = null;
     this.left = 0;
     this.silence = 0;
@@ -109,5 +114,6 @@ export class Radio {
     this.current = { speaker: q.speaker, text: q.text, priority: q.priority };
     this.left = this.duration(q.text);
     this.onLine(this.current);
+    this.onKey(true, this.current);
   }
 }

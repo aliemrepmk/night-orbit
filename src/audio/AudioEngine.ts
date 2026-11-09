@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { engineFrequencies, engineMix, type EngineMode, type EngineTune } from './engineDrone';
 import { BUSES, busGains, type Bus, type Volumes } from './mix';
-import { SOUNDS, WHISTLE, type SoundId } from './sounds';
+import { RADIO_HISS, SOUNDS, WHISTLE, type SoundId } from './sounds';
 
 /** The live nodes of the engine drone (M8+ Phase B). */
 interface EngineNodes {
@@ -30,6 +30,37 @@ export class AudioEngine {
   /** The engine drone (M8+ Phase B): its nodes and mode. It plays on the ambience bus. */
   private engine: EngineNodes | null = null;
   private engineMode: EngineMode = 'off';
+  /** The static under outside-net radio lines (M9): wanted by the radio, allowed while flying. */
+  private hiss: GainNode | null = null;
+  private hissWanted = false;
+  private hissAllowed = false;
+
+  /** A line on the outside net is on air (static under it) or not. */
+  radioHiss(on: boolean): void {
+    this.hissWanted = on;
+    this.applyHiss();
+  }
+
+  /** Static only plays while flying: menus and end screens silence it (the line resumes after). */
+  set radioAllowed(on: boolean) {
+    this.hissAllowed = on;
+    this.applyHiss();
+  }
+
+  /** The static's level right now (0 when off); for tests. */
+  get hissOn(): boolean {
+    return this.hissWanted && this.hissAllowed;
+  }
+
+  private applyHiss(): void {
+    const { ctx, hiss } = this;
+    if (!ctx || !hiss) return;
+    hiss.gain.setTargetAtTime(
+      this.hissOn ? RADIO_HISS.gain : 0,
+      ctx.currentTime,
+      RADIO_HISS.fadeSeconds / 3,
+    );
+  }
 
   /** The player's master and bus volumes (M9 settings); ramps there quickly. */
   setVolumes(v: Volumes): void {
@@ -115,6 +146,8 @@ export class AudioEngine {
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
     this.engine = this.buildEngine(this.ctx, this.buses.ambience, this.noise);
+    this.hiss = this.buildHiss(this.ctx, this.buses.radio, this.noise);
+    this.applyHiss();
     this.applyEngineMode();
   }
 
@@ -178,6 +211,22 @@ export class AudioEngine {
     if (pan) level.connect(pan).connect(out);
     else level.connect(out);
     return { saws, sawGains, whine, muffle, level, pan };
+  }
+
+  /** A looping band of static, silent until a line on the outside net keys it. */
+  private buildHiss(ctx: AudioContext, out: GainNode, noise: AudioBuffer): GainNode {
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = RADIO_HISS.hz;
+    band.Q.value = RADIO_HISS.q;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    src.connect(band).connect(g).connect(out);
+    src.start();
+    return g;
   }
 
   private applyEngineMode(): void {

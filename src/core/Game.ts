@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import { AudioEngine } from '../audio/AudioEngine';
 import { engineTune } from '../audio/engineDrone';
 import { impactVolume } from '../audio/sounds';
+import { wireSounds } from '../audio/soundMap';
 import { Explosions } from '../combat/Explosions';
 import { CONFIG } from '../config';
 import { Effects } from '../fx/Effects';
@@ -244,17 +245,16 @@ export class Game {
 
     this.bus.on('dangerClose', () => (this.dangerCloseLeft = CONFIG.hud.dangerCloseSeconds));
     this.bus.on('missionFailed', (e) => this.fail(e.reason));
-    // Placeholder sounds react to events; nobody else needs to know about audio.
-    this.bus.on('shotFired', (e) => this.audio.play(`fire${e.weapon}`));
-    this.bus.on('impact', (e) =>
-      this.audio.play(`impact${e.weapon}`, impactVolume(e.distanceToAim, e.weapon)),
+    // Sounds react to events (M9, `soundMap.ts`); nobody else needs to know about audio.
+    this.audio.radioHiss(false); // a line cut off by the restart
+    wireSounds(this.bus, this.audio, (x, z) =>
+      Math.hypot(x - this.sensor.aim.x, z - this.sensor.aim.z),
     );
     this.bus.on('strikeCalled', () => this.sensorFx.triggerSwitch()); // a radio-call blip
     // Air defense (M8+ Phase E): hits shake the feed and break it up with static.
     this.bus.on('hullHit', (e) => {
       this.sensor.addShake(e.by === 'missile' ? 0.9 : 0.3, e.by === 'missile' ? 0.6 : undefined);
       this.sensorFx.triggerSwitch();
-      this.audio.play('hullHit', e.by === 'missile' ? 1 : 0.6);
     });
     this.bus.on('engineLost', () => {
       this.gunship.speedScale = CONFIG.airDefense.engineOutSpeed;
@@ -266,7 +266,6 @@ export class Game {
       const at = new Vector3(e.x, this.terrain.heightAt(e.x, e.z), e.z);
       this.effects.explosion(at, WEAPONS['40'], true);
       const d = Math.hypot(e.x - this.sensor.aim.x, e.z - this.sensor.aim.z);
-      this.audio.play('impact40', impactVolume(d));
       this.sensor.addShake(shakeFor(WEAPONS['40'], d));
     });
     this.bus.on('gunJammed', (e) => this.weapons.guns['105'].jam(e.seconds));
@@ -275,7 +274,6 @@ export class Game {
     });
     this.bus.on('flares', (e) => {
       if (e.result === 'empty') return;
-      this.audio.play('flare');
       this.effects.flares(this.gunship.position, this.sensor.aim);
     });
 
@@ -298,6 +296,7 @@ export class Game {
   /** What a screen button does. */
   private button(b: ScreenButton): void {
     this.audio.unlock(); // browsers allow audio only after a user gesture
+    this.audio.play('uiClick');
     switch (b) {
       case 'begin':
         this.go('begin');
@@ -387,6 +386,8 @@ export class Game {
     );
     this.fireClicks = 0;
     for (let i = 0; i < shots; i++) this.fire(this.sensor.weapon);
+    if (playing)
+      for (const weapon of this.weapons.readied) this.bus.emit('weaponReady', { weapon });
 
     this.projectiles.update(dt, (s) =>
       this.explosions.detonate(s.to, WEAPONS[s.weapon], s.hitKind === 'ground'),
@@ -606,6 +607,7 @@ export class Game {
     this.host.playerDid(`weapon${this.sensor.weapon}`);
     if (this.sensor.weapon !== weaponBefore) {
       this.sensorFx.triggerSwitch();
+      this.bus.emit('weaponSelected', { weapon: this.sensor.weapon });
       if (this.air.mode !== null) {
         this.air.mode = null; // picking a gun takes the trigger back from air support…
         this.fireHeld = false; // …but not this frame's press: wait for a release
@@ -918,6 +920,7 @@ export class Game {
     this.audio.setEngineMode(
       state === 'playing' ? 'on' : this.deployed && state !== 'title' ? 'muffled' : 'off',
     );
+    this.audio.radioAllowed = state === 'playing';
     this.input.consumeMouse(); // drop movement made while not aiming
     this.input.consumeFireClicks(); // the click that starts / resumes the game isn't a shot
     this.fireClicks = 0;

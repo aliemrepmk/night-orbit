@@ -46,7 +46,20 @@ export interface Tone {
 }
 
 /** Plus the air-defense sounds (M8+ Phase E): AA bursts, hits on the hull, flare pops. */
-export type SoundId = `fire${WeaponId}` | `impact${OrdnanceId}` | 'aaBurst' | 'hullHit' | 'flare';
+export type SoundId =
+  | `fire${WeaponId}`
+  | `impact${OrdnanceId}`
+  | 'aaBurst'
+  | 'hullHit'
+  | 'flare'
+  | UiSoundId
+  | RadioSoundId;
+
+/** Cockpit and menu beeps (M9). */
+export type UiSoundId = 'select' | 'ready' | 'breech' | 'deny' | 'uiClick';
+
+/** The radio (M9): squelch on the outside net, a click on the crew intercom. */
+export type RadioSoundId = 'squelchOpen' | 'squelchClose' | 'intercom';
 
 export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
   // The guns (M9): told apart by ear. The 25 mm is a short bright crack, ten a second (a buzz
@@ -167,7 +180,96 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
     thumpStart: 300,
     thumpEnd: 120,
   },
+  // Cockpit beeps (M9, PLAN.md §7.17): soft and short, so they never mask a gun. (Levels set
+  // by rendering each sound offline in Chrome: a band-pass keeps only a slice of the noise, so
+  // band-passed sounds need a much higher gain than low-passed ones to be heard.)
+  select: { ...silent(0.05), tones: [{ hz: 880, at: 0, seconds: 0.05, gain: 0.08, wave: 'sine' }] },
+  ready: {
+    ...silent(0.14),
+    tones: [
+      { hz: 660, at: 0, seconds: 0.06, gain: 0.05, wave: 'sine' },
+      { hz: 990, at: 0.07, seconds: 0.07, gain: 0.05, wave: 'sine' },
+    ],
+  },
+  // The loader slams a 105 mm round home: a metallic clank, then the ready beep.
+  breech: {
+    duration: 0.22,
+    noiseGain: 0.3,
+    filter: 'bandpass',
+    q: 3,
+    cutoffStart: 2200,
+    cutoffEnd: 900,
+    thumpGain: 0.12,
+    thumpStart: 180,
+    thumpEnd: 90,
+    tones: [
+      { hz: 410, at: 0, seconds: 0.08, gain: 0.05, wave: 'triangle' },
+      { hz: 623, at: 0, seconds: 0.06, gain: 0.035, wave: 'triangle' },
+    ],
+  },
+  /** Can't do that (no flares left). */
+  deny: {
+    ...silent(0.16),
+    tones: [{ hz: 220, at: 0, seconds: 0.16, gain: 0.06, wave: 'square' }],
+  },
+  uiClick: {
+    ...silent(0.03),
+    click: { gain: 0.12, hz: 2400 },
+    tones: [{ hz: 1320, at: 0, seconds: 0.025, gain: 0.07, wave: 'sine' }],
+  },
+  // Radio (M9): the outside net opens with a short burst of static and a key click, and
+  // closes with the longer "kssht" tail; the crew intercom is just a soft click.
+  squelchOpen: {
+    bus: 'radio',
+    duration: 0.09,
+    noiseGain: 0.7,
+    filter: 'bandpass',
+    q: 0.6,
+    cutoffStart: 2600,
+    cutoffEnd: 2000,
+    thumpGain: 0,
+    thumpStart: 0,
+    thumpEnd: 0,
+    click: { gain: 0.15, hz: 1200 },
+  },
+  squelchClose: {
+    bus: 'radio',
+    duration: 0.2,
+    noiseGain: 0.8,
+    filter: 'bandpass',
+    q: 0.5,
+    cutoffStart: 3400,
+    cutoffEnd: 1600,
+    thumpGain: 0,
+    thumpStart: 0,
+    thumpEnd: 0,
+    click: { gain: 0.06, hz: 900 },
+  },
+  intercom: {
+    bus: 'radio',
+    ...silent(0.02),
+    click: { gain: 0.18, hz: 1500 },
+  },
 };
+
+/** A sound with no noise or thump (beeps and clicks only). */
+function silent(duration: number) {
+  return {
+    duration,
+    noiseGain: 0,
+    cutoffStart: 0,
+    cutoffEnd: 0,
+    thumpGain: 0,
+    thumpStart: 0,
+    thumpEnd: 0,
+  };
+}
+
+/**
+ * While a line on the outside net is on air, a faint band of static sits under it (M9), so the
+ * radio is heard as well as read.
+ */
+export const RADIO_HISS = { hz: 2200, q: 0.6, gain: 0.025, fadeSeconds: 0.05 } as const;
 
 /**
  * The falling bomb's whistle (M8+ play test: "a dropping whistle on bomb like real life"): a

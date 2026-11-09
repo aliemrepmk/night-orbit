@@ -91,6 +91,8 @@ export class MissionHost implements MissionWorld {
       this.chatter.sayPlace('contact', describePlace(marks, x, z, d.units.teamPosition));
 
     const bus = d.bus;
+    // The radio's key drives the squelch (M9).
+    this.radio.onKey = (on, line) => bus.emit('radioKey', { on, speaker: line.speaker });
     bus.on('unitKilled', (e) => {
       if (e.by === 'team') return;
       if (e.aa) return; // the "Triple-A destroyed" call comes from `aaDestroyed`

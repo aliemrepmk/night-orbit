@@ -21,6 +21,8 @@ export class WeaponState {
   private cycle = 0;
   /** Seconds left on the current reload / overheat cooldown (0 = none). */
   reloadLeft = 0;
+  /** True for the one step in which a reload, cooldown or jam finished (M9: the ready beep). */
+  justReady = false;
 
   constructor(readonly def: WeaponDef) {
     this.rounds = def.capacity;
@@ -49,10 +51,12 @@ export class WeaponState {
   update(dt: number, selected: boolean, held: boolean, clicks: number): number {
     const d = this.def;
     let shots = 0;
+    this.justReady = false;
 
     if (this.reloadLeft > 0) {
       this.reloadLeft = Math.max(0, this.reloadLeft - dt);
       if (this.reloadLeft === 0) {
+        this.justReady = true;
         this.rounds = d.capacity;
         this.heat = 0;
       }
@@ -107,5 +111,10 @@ export class Weapons {
       if (id === selected) shots = n;
     }
     return shots;
+  }
+
+  /** Guns that became ready to fire this step (M9: the ready beep). */
+  get readied(): WeaponId[] {
+    return WEAPON_ORDER.filter((id) => this.guns[id].justReady);
   }
 }
