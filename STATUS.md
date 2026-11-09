@@ -24,12 +24,13 @@ every session.
 | **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                        |
 | **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
 | **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
-| M9 – M10                                | ⬜ Not started                                                            |
+| **M9** Audio                            | 🟨 Code-complete (2026-11-09); **user listen test pending (§3.0)**        |
+| M10                                     | ⬜ Not started                                                            |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **612 tests in 71 files**).
-`npm run build` works (≈776 kB JS, 215 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **640 tests in 73 files**).
+`npm run build` works (≈780 kB JS, 216 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–F are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F and M9 are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -174,8 +175,10 @@ src/
     SensorFX.ts (+test)    weapon-switch static burst + refocus blur envelopes
     GpuTimer.ts (+test)    GPU ms per frame via WebGL timer query (F1 stats)
   audio/
-    sounds.ts              PLACEHOLDER synth sound definitions (M9 replaces)
-    AudioEngine.ts (+test) WebAudio player; silent no-op without WebAudio; engine drone graph (M8+)
+    sounds.ts              synth sound definitions: noise + thump + click / rattle / tone layers (M9)
+    mix.ts (+test)         M9: the buses (master → sfx, radio, ambience) and their gain math
+    soundMap.ts (+test)    M9: which event plays which sound (pure), and the bus wiring
+    AudioEngine.ts (+test) WebAudio player on the buses; silent no-op without WebAudio; engine drone, radio static
     engineDrone.ts (+test) M8+: drone mix per mode (off / on / muffled) and pitch + pan from the orbit
   ui/
     HUD.ts                 telemetry, reticles, gun status, team health, DANGER CLOSE, clock,
@@ -218,7 +221,23 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M8+ Phases C–F play test (passed 2026-11-09, one full run): "no stretch feels empty; two runs feel different; AA and missiles are a threat you manage"
+### 3.0 M9 listen test (pending): "playing with eyes closed, you can tell which weapon is firing and when shells land"
+
+Run `npm run dev`, use headphones or decent speakers, and check:
+
+- [ ] Eyes closed, someone else (or you, at random) fires: the 25 mm (fast bright crackle), the
+      40 mm (round thump with a click) and the 105 mm (deep boom, cabin rattle) are easy to tell apart.
+- [ ] Each shell's impact is heard when it lands, after the flight time; 25 mm hits are audible.
+- [ ] Radio: Ridgeback, Kestrel 6 and the strike pilot open with a squelch, have faint static under
+      the line and close with a "kssht"; FCO and NAV lines are only a soft intercom click.
+- [ ] Cockpit beeps: a short beep when you pick a gun; a two-note beep when a gun is ready again
+      (the 105 mm with a metal clank first); a low buzz when you press X with no flares left.
+- [ ] Menu buttons click. Pause and settings silence the radio static; it comes back on resume.
+- [ ] SETTINGS has VOLUME, EFFECTS, RADIO and ENGINE: each one changes only its own sounds, and
+      VOLUME changes all of them.
+- [ ] Nothing is annoying after 15 minutes (beeps too loud or too frequent, static too strong).
+
+### 3.0a M8+ Phases C–F play test (passed 2026-11-09, one full run): "no stretch feels empty; two runs feel different; AA and missiles are a threat you manage"
 
 Run `npm run dev` and play two or three whole missions (each gets new random events; the end
 screen lists them with the seed). Dev flags to force things: `?seed=1234`, `?twist=mortar,bus`,
@@ -492,11 +511,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M9: audio** (PLAN.md §10 M9, §7.17). Already in place: the engine drone, strike sounds,
-   AA bursts, hull hits, flares and the missile beep. Still to do: distinct per-weapon fire
-   sounds, delayed impact sounds by distance, radio squelch, UI sounds, and master/SFX/radio
-   volume buses wired to the settings screen, with tests for the bus math and the
-   event → sound-id mapping.
+1. **M9 listen test by the user** (§3.0): M9 is code-complete and committed (2026-11-09, not
+   pushed). Tune levels from the feedback (all in `src/audio/sounds.ts` and `CONFIG.mix`),
+   then sign off M9.
 2. Then **M10** (polish, balance, performance, deploy). Carry over from M8+: the air-defense
    numbers in `CONFIG.airDefense` and the twist mix were only played once; tune them in M10
    play sessions.
@@ -835,6 +852,17 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     70 s, 15–20 min. Chatter uses a shuffle bag (no repeats until a pool is used up), pools are ~3×
     longer, background groups get landmark callouts (`landmarks.ts`), and the crew banters after
     30 s of calm radio silence; callouts and banter are low-priority chatter.
+78. **Audio design (M9).** The mixer is `master → { sfx, radio, ambience }` (`mix.ts`, trims in
+    `CONFIG.mix`); the old ENGINE slider became the ambience bus and two sliders were added
+    (EFFECTS, RADIO). Saves from before M9 load with the new defaults. What plays for which event
+    lives in one pure table (`soundMap.ts EVENT_SOUNDS`); Game only adds sounds that are not
+    events (AA bursts, the bomb whistle, the missile beep, menu clicks). Impacts play when the
+    shell lands (the flight time is the delay), not after an extra speed-of-sound delay: that
+    would make "when shells land" harder to hear. The radio is text only, so its sound is the
+    key: outside-net speakers (Ridgeback, Kestrel, the strike pilot) get squelch and static,
+    the crew (FCO, NAV) an intercom click. Levels were set by rendering every sound offline in
+    Chrome (`OfflineAudioContext`) and comparing peaks: band-passed sounds need about 3× the
+    gain of low-passed ones (a 25 mm hit used to peak at 0.002 and was inaudible).
 
 ---
 
@@ -897,6 +925,7 @@ _(Fill in after testing.)_
 ---
 
 | 2026-11-09 | M8+ C–F play test (user) | One full run played; it went well | None; M8+ signed off. AA/missile numbers and twist mix to be revisited in M10 play sessions |
+| 2026-11-09 | M9 audio check (Claude, Chrome) | Every sound rendered offline and measured: 25 mm shot peaked at 0.025 and its hit at 0.007 (too quiet), squelch and clicks also faint. In game: firing, landing, the 105 mm breech and ready beep, the select beep, flares, intercom clicks, outside-net squelch and static all played; pause and settings muted the static and resume restored it; the RADIO slider set the radio bus to 0 and saved | Raised the band-passed sounds about 3× (`fix(audio)` commit); listening is left to the user (§3.0) |
 
 ## 7. How to resume in a new session
 

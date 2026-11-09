@@ -708,18 +708,21 @@ HTML/CSS overlay, monospace font, pure white/black to match the feed.
 
 All synthesized with the Web Audio API (no files needed initially):
 
-| Sound         | Recipe                                                                              |
-| ------------- | ----------------------------------------------------------------------------------- |
-| Engine drone  | Two detuned low sawtooth oscillators + low-pass filter + slow LFO; always on        |
-| 25 mm         | Short noise bursts through a band-pass, rapid repeat                                |
-| 40 mm         | Thump: sine pitch drop 120 → 40 Hz + noise click                                    |
-| 105 mm        | Deep boom: sine 60 → 25 Hz with long decay + low-passed noise; a cabin rattle layer |
-| Impacts       | Muffled distant boom, played when the shell lands (so you _hear_ the delay)         |
-| Radio squelch | Short filtered white-noise burst + click                                            |
-| UI            | Soft beeps for weapon switch, reload complete                                       |
+| Sound        | Recipe (as built, M8+ and M9)                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Engine drone | Four detuned saws (one per engine) + low-pass, propeller-beat LFO, airflow noise; muffled in menus                           |
+| 25 mm        | Short band-passed noise crack + click, 10 a second                                                                           |
+| 40 mm        | Thump: sine 120 → 40 Hz + noise + click                                                                                      |
+| 105 mm       | Deep boom: sine 60 → 25 Hz with long decay + low-passed noise + a cabin rattle layer                                         |
+| Impacts      | Muffled boom per weapon, played when the shell lands (so you _hear_ the delay); quieter far from the aim                     |
+| Air strikes  | Gun-run cracks, the bomb's whistle and a long blast (M5+, M8+)                                                               |
+| Air defense  | AA thumps, hull hits, flare pops, the missile warning beep (M8+ Phase E)                                                     |
+| Radio        | Outside net (Ridgeback, Kestrel, strike pilot): squelch open, faint static, "kssht" close; crew intercom (FCO, NAV): a click |
+| UI           | Beeps for weapon switch and gun ready (the 105 mm with a breech clank), a deny buzz, menu clicks                             |
 
-Buses: `master → { sfx, radio, ambience }` with separate volume controls. The `AudioContext`
-starts on the first click (browser autoplay rules).
+Buses: `master → { sfx, radio, ambience }` with separate volume controls (VOLUME, EFFECTS, RADIO,
+ENGINE). Which event plays which sound is one pure table (`audio/soundMap.ts`). The
+`AudioContext` starts on the first click (browser autoplay rules).
 
 ### 7.18 Debug Tools
 
@@ -1096,7 +1099,7 @@ _F3. Radio (more varied lines; commands are in the backlog, §14):_
 different; AA and missiles are a threat you manage (and can lose to); the soldiers, jets and
 the forest read clearly in every sensor at 60 FPS.
 
-### M9 — Audio (1–2 days)
+### M9 — Audio (1–2 days) — code-complete 2026-11-09; awaits the user's listen test
 
 - Synth engine drone, weapons, delayed impacts, squelch, UI sounds; volume buses wired to settings.
 - 🧪 **Tests:** volume bus math; sound-event mapping (each event triggers the right sound id). Audio output itself is checked manually.
