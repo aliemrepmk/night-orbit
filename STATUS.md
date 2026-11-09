@@ -23,13 +23,13 @@ every session.
 | **M6** The handcrafted map              | ✅ Signed off (look test passed, user, 2026-11-05)                        |
 | **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                        |
 | **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
-| **M8+** Content & threat expansion      | 🟨 A–F committed (2026-11-09); **user play test of C–F pending (§3.0)**   |
+| **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
 | M9 – M10                                | ⬜ Not started                                                            |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **612 tests in 71 files**).
 `npm run build` works (≈776 kB JS, 215 kB gzipped).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–C are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8 and M8+ Phases A–F are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -218,7 +218,7 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M8+ Phases C–F play test (pending): "no stretch feels empty; two runs feel different; AA and missiles are a threat you manage"
+### 3.0 M8+ Phases C–F play test (passed 2026-11-09, one full run): "no stretch feels empty; two runs feel different; AA and missiles are a threat you manage"
 
 Run `npm run dev` and play two or three whole missions (each gets new random events; the end
 screen lists them with the seed). Dev flags to force things: `?seed=1234`, `?twist=mortar,bus`,
@@ -492,20 +492,16 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M8+ Content & threat expansion** (PLAN.md §10, approved 2026-11-09), from the user's M8
-   play test. **Phases A and B are done, play-tested and committed (2026-11-09). Phase C (soldier
-   models) is committed. The user handed over D, E and F: implement each, test it in the browser,
-   commit it in logical pieces, never push.**
-   Order: A quick fixes (strike
-   aiming must not fire the guns; green CLICK TO BEGIN, SETTINGS lower; briefing map and text of
-   equal height) → B engine sound → C soldier models → D forest and fuller map → E AA, strike
-   jets, gunship hull, MANPADS + flares → F mission rewrite with seeded random twists and more
-   radio lines. User play tests after A+B, C+D, E and F.
-2. **M8+ play test (C–F) by the user** (§3.0), then tune and sign off M8+; then **M9: audio**
-   (PLAN.md §7.17; the engine drone, strike sounds and AA/missile sounds already exist).
-3. M8 is signed off and committed with M8+ A–B (2026-11-09); push when asked. Commit each later phase only when asked.
-4. Then M9 (audio) and M10 (polish, balance, performance).
-5. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+1. **M9: audio** (PLAN.md §10 M9, §7.17). Already in place: the engine drone, strike sounds,
+   AA bursts, hull hits, flares and the missile beep. Still to do: distinct per-weapon fire
+   sounds, delayed impact sounds by distance, radio squelch, UI sounds, and master/SFX/radio
+   volume buses wired to the settings screen, with tests for the bus math and the
+   event → sound-id mapping.
+2. Then **M10** (polish, balance, performance, deploy). Carry over from M8+: the air-defense
+   numbers in `CONFIG.airDefense` and the twist mix were only played once; tune them in M10
+   play sessions.
+3. M8+ A–F are committed locally (2026-11-09), not pushed; the user pushes manually.
+4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -899,6 +895,8 @@ _(Fill in after testing.)_
 | 2026-11-06 | M7 fixes (Claude, Chrome)                      | Convoy at ×4, lead truck destroyed at s≈508: the truck, technical and APC behind swerved past (lateral up to 3 m) and stopped 51–59 m from Ridgeback. Village phase with no player fire: team 100 → 48% in 2 min. Bigger village: 60 FPS, GPU 3.3–3.6 ms, 36–38 calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Works; auto-play bot still completes with no timeouts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ---
+
+| 2026-11-09 | M8+ C–F play test (user) | One full run played; it went well | None; M8+ signed off. AA/missile numbers and twist mix to be revisited in M10 play sessions |
 
 ## 7. How to resume in a new session
 

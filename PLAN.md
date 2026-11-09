@@ -957,7 +957,7 @@ focused part-time work. Live progress (what is done, tested and next) is tracked
   - Off-screen arrows for Ridgeback and Kestrel 6 (with distance from the aim point); `H` shows the controls over the feed.
   - A real restart: the static world stays, everything that changes during a run is rebuilt (`mission/battle.ts`), so a retry plays exactly like a first attempt.
 
-### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — approved 2026-11-09; all phases done (A–B play-tested; C–F await the user's play test)
+### M8+ — Content & Threat Expansion (added after the M8 play test, ~10–11 days) — ✅ signed off (2026-11-09)
 
 The M8 play test (2026-11-08) asked for ten changes that go well beyond M8's screens. They are
 grouped here as their own milestone, between M8 and M9. The order is A → B → C → D → E → F.
