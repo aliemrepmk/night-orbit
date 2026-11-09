@@ -280,7 +280,8 @@ export class AudioEngine {
       src.loop = true;
       src.playbackRate.value = 0.8 + Math.random() * 0.4; // no two shots identical
       const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
+      lp.type = d.filter ?? 'lowpass';
+      if (d.q !== undefined) lp.Q.value = d.q;
       lp.frequency.setValueAtTime(d.cutoffStart, t0);
       lp.frequency.exponentialRampToValueAtTime(d.cutoffEnd, t1);
       const g = envelope(ctx, d.noiseGain * volume, t0, t1);
@@ -297,6 +298,60 @@ export class AudioEngine {
       osc.connect(g).connect(master);
       osc.start(t0);
       osc.stop(t1);
+    }
+
+    if (d.click) {
+      // A 4 ms tick: the transient that makes a shot (or a radio key) snap.
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = d.click.hz;
+      const g = envelope(ctx, d.click.gain * volume, t0, t0 + 0.004);
+      osc.connect(g).connect(master);
+      osc.start(t0);
+      osc.stop(t0 + 0.005);
+    }
+
+    if (d.rattle) {
+      // Loose kit shaking: band-passed noise, its level throbbing at `rateHz`, dying away.
+      const r = d.rattle;
+      const r0 = t0 + r.delay;
+      const r1 = r0 + r.seconds;
+      const src = ctx.createBufferSource();
+      src.buffer = noise;
+      src.loop = true;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = r.hz;
+      band.Q.value = 2;
+      const shake = ctx.createGain();
+      shake.gain.value = 0.5;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = r.rateHz;
+      const depth = ctx.createGain();
+      depth.gain.value = 0.5;
+      lfo.connect(depth).connect(shake.gain);
+      const g = envelope(ctx, r.gain * volume, r0, r1);
+      src.connect(band).connect(shake).connect(g).connect(master);
+      for (const n of [src, lfo]) {
+        n.start(r0);
+        n.stop(r1);
+      }
+    }
+
+    for (const t of d.tones ?? []) {
+      const a = t0 + t.at;
+      const osc = ctx.createOscillator();
+      osc.type = t.wave;
+      osc.frequency.value = t.hz;
+      const g = ctx.createGain();
+      // A 5 ms fade at each end, so beeps don't click.
+      g.gain.setValueAtTime(0, a);
+      g.gain.linearRampToValueAtTime(t.gain * volume, a + 0.005);
+      g.gain.setValueAtTime(t.gain * volume, a + t.seconds - 0.005);
+      g.gain.linearRampToValueAtTime(0, a + t.seconds);
+      osc.connect(g).connect(master);
+      osc.start(a);
+      osc.stop(a + t.seconds + 0.01);
     }
   }
 }

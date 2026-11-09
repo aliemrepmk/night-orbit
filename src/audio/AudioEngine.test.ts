@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../config';
 import { AudioEngine } from './AudioEngine';
 import { STRIKES } from '../gunship/airSupportDefs';
+import { WEAPONS } from '../gunship/weaponDefs';
 import { SOUNDS, STRIKE_MIN_VOLUME, WHISTLE, impactVolume } from './sounds';
 
-describe('placeholder sounds', () => {
+describe('sounds', () => {
   it('defines valid envelopes and sweeps for every sound', () => {
     for (const [id, d] of Object.entries(SOUNDS)) {
       expect(d.duration, id).toBeGreaterThan(0);
-      expect(d.noiseGain + d.thumpGain, id).toBeGreaterThan(0);
+      expect(d.noiseGain + d.thumpGain + (d.tones?.length ?? 0), id).toBeGreaterThan(0);
       expect(d.noiseGain, id).toBeLessThanOrEqual(1);
       expect(d.thumpGain, id).toBeLessThanOrEqual(1);
       if (d.noiseGain > 0) expect(d.cutoffEnd, id).toBeGreaterThan(0); // exponential ramps need > 0
@@ -78,6 +79,57 @@ describe('placeholder sounds', () => {
   });
 });
 
+describe('gun voices (M9: "with eyes closed, you can tell which weapon is firing")', () => {
+  it('the 25 mm is a short, bright, band-passed crack (fast enough to buzz at 10 shots/s)', () => {
+    const d = SOUNDS.fire25;
+    expect(d.filter).toBe('bandpass');
+    expect(d.cutoffEnd).toBeGreaterThan(1000);
+    expect(d.duration).toBeLessThan(WEAPONS['25'].interval);
+    expect(d.noiseGain).toBeGreaterThan(d.thumpGain * 3); // a crack, not a thump
+  });
+
+  it('the 40 mm is a thump that drops about 120 → 40 Hz, with a click on top', () => {
+    const d = SOUNDS.fire40;
+    expect(d.thumpGain).toBeGreaterThan(d.noiseGain);
+    expect(d.thumpStart).toBeGreaterThanOrEqual(100);
+    expect(d.thumpEnd).toBeLessThanOrEqual(45);
+    expect(d.click?.gain).toBeGreaterThan(0);
+  });
+
+  it('only the 105 mm rattles the cabin, and it has the deepest, longest boom', () => {
+    expect(SOUNDS.fire105.rattle?.gain).toBeGreaterThan(0);
+    expect(SOUNDS.fire40.rattle).toBeUndefined();
+    expect(SOUNDS.fire25.rattle).toBeUndefined();
+    expect(SOUNDS.fire105.thumpEnd).toBeLessThan(SOUNDS.fire40.thumpEnd);
+    expect(SOUNDS.fire105.duration).toBeGreaterThan(SOUNDS.fire40.duration * 2);
+  });
+
+  it('every impact is loud enough to hear land (a 25 mm hit used to be nearly silent)', () => {
+    const loud = (d: (typeof SOUNDS)[keyof typeof SOUNDS]) => d.noiseGain + d.thumpGain;
+    expect(loud(SOUNDS.impact25)).toBeGreaterThanOrEqual(0.12);
+    expect(loud(SOUNDS.impact40)).toBeGreaterThan(loud(SOUNDS.impact25));
+    expect(loud(SOUNDS.impact105)).toBeGreaterThan(loud(SOUNDS.impact40));
+    // …but quieter than firing the gun (you hear them through the airframe).
+    for (const w of ['25', '40', '105'] as const)
+      expect(loud(SOUNDS[`impact${w}`]), w).toBeLessThan(loud(SOUNDS[`fire${w}`]));
+  });
+
+  it('layers are valid: clicks are short ticks, rattles fit inside their sound, tones are audible', () => {
+    for (const [id, d] of Object.entries(SOUNDS)) {
+      if (d.click) expect(d.click.hz, id).toBeGreaterThan(200);
+      if (d.rattle) {
+        expect(d.rattle.delay + d.rattle.seconds, id).toBeLessThanOrEqual(d.duration);
+        expect(d.rattle.rateHz, id).toBeGreaterThan(5);
+      }
+      for (const t of d.tones ?? []) {
+        expect(t.seconds, id).toBeGreaterThan(0.01); // longer than its two 5 ms fades
+        expect(t.at + t.seconds, id).toBeLessThanOrEqual(d.duration + 1e-9);
+        expect(t.hz, id).toBeGreaterThan(100);
+      }
+    }
+  });
+});
+
 describe('AudioEngine', () => {
   it('is a silent no-op without WebAudio (tests, old browsers) or before unlocking', () => {
     const a = new AudioEngine();
@@ -108,6 +160,7 @@ function installFakeAudio() {
     value: 0,
     setValueAtTime: () => {},
     exponentialRampToValueAtTime: () => {},
+    linearRampToValueAtTime: () => {},
     setTargetAtTime: () => {},
   });
   const node = (kind: string) => {

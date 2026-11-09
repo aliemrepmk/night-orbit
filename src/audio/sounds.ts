@@ -2,8 +2,10 @@ import type { OrdnanceId, WeaponId } from '../gunship/weaponDefs';
 import type { Bus } from './mix';
 
 /**
- * PLACEHOLDER procedural sounds (M3); M9 replaces them with the full audio design.
- * Each sound = a filtered noise burst (the crack/rumble) + an optional falling sine (the thump).
+ * Procedural sounds (M3 placeholders, redesigned in M9, PLAN.md §7.17). Each sound = a filtered
+ * noise burst (the crack or rumble) + an optional falling sine (the thump), plus optional layers:
+ * a click (the transient that makes a shot snap), a cabin rattle (the 105 mm shaking the
+ * airframe) and short tones (radio and UI beeps).
  */
 export interface SoundDef {
   /** The mixer bus it plays on (M9); `sfx` when left out. */
@@ -18,64 +20,98 @@ export interface SoundDef {
   /** Pitch sweep of the thump (Hz). */
   readonly thumpStart: number;
   readonly thumpEnd: number;
+  /** The noise filter (default low-pass); a band-pass gives the 25 mm its bright crack. */
+  readonly filter?: 'lowpass' | 'bandpass' | 'highpass';
+  readonly q?: number;
+  /** A few-millisecond tick at the start (the snap of a gun, a radio key-up). */
+  readonly click?: { readonly gain: number; readonly hz: number };
+  /** Band-passed noise shaking at `rateHz`, starting `delay` s in: loose kit rattling in the cabin. */
+  readonly rattle?: {
+    readonly gain: number;
+    readonly hz: number;
+    readonly rateHz: number;
+    readonly delay: number;
+    readonly seconds: number;
+  };
+  /** Short tones (beeps), each starting `at` s in. */
+  readonly tones?: readonly Tone[];
+}
+
+export interface Tone {
+  readonly hz: number;
+  readonly at: number;
+  readonly seconds: number;
+  readonly gain: number;
+  readonly wave: 'sine' | 'square' | 'triangle';
 }
 
 /** Plus the air-defense sounds (M8+ Phase E): AA bursts, hits on the hull, flare pops. */
 export type SoundId = `fire${WeaponId}` | `impact${OrdnanceId}` | 'aaBurst' | 'hullHit' | 'flare';
 
 export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
+  // The guns (M9): told apart by ear. The 25 mm is a short bright crack, ten a second (a buzz
+  // when held); the 40 mm a round "thoomp" with a click; the 105 mm a deep boom that rattles
+  // the cabin for half a second.
   fire25: {
-    duration: 0.07,
-    noiseGain: 0.25,
-    cutoffStart: 3000,
-    cutoffEnd: 900,
-    thumpGain: 0.1,
-    thumpStart: 180,
-    thumpEnd: 90,
+    duration: 0.06,
+    noiseGain: 0.34,
+    filter: 'bandpass',
+    q: 1.1,
+    cutoffStart: 2600,
+    cutoffEnd: 1300,
+    thumpGain: 0.07,
+    thumpStart: 230,
+    thumpEnd: 120,
+    click: { gain: 0.07, hz: 3200 },
   },
   fire40: {
-    duration: 0.22,
-    noiseGain: 0.35,
-    cutoffStart: 1600,
-    cutoffEnd: 300,
-    thumpGain: 0.45,
-    thumpStart: 130,
-    thumpEnd: 45,
+    duration: 0.32,
+    noiseGain: 0.26,
+    cutoffStart: 1400,
+    cutoffEnd: 240,
+    thumpGain: 0.6,
+    thumpStart: 120,
+    thumpEnd: 40,
+    click: { gain: 0.16, hz: 1700 },
   },
   fire105: {
-    duration: 0.7,
+    duration: 1.1,
     noiseGain: 0.55,
-    cutoffStart: 900,
-    cutoffEnd: 120,
-    thumpGain: 0.8,
-    thumpStart: 75,
-    thumpEnd: 24,
+    cutoffStart: 800,
+    cutoffEnd: 90,
+    thumpGain: 0.85,
+    thumpStart: 60,
+    thumpEnd: 25,
+    rattle: { gain: 0.14, hz: 1900, rateHz: 26, delay: 0.04, seconds: 0.6 },
   },
-  // Impacts are heard faintly through the airframe: muffled and low.
+  // Impacts are heard faintly through the airframe, when the shell lands (the flight time is
+  // the delay you hear). Each has its own shape: 25 mm pops, a 40 mm crump, a 105 mm rumble.
   impact25: {
-    duration: 0.15,
-    noiseGain: 0.06,
-    cutoffStart: 700,
-    cutoffEnd: 200,
+    duration: 0.18,
+    noiseGain: 0.12,
+    filter: 'bandpass',
+    q: 0.9,
+    cutoffStart: 1200,
+    cutoffEnd: 420,
     thumpGain: 0,
     thumpStart: 0,
     thumpEnd: 0,
   },
   impact40: {
-    duration: 0.5,
-    noiseGain: 0.14,
-    cutoffStart: 500,
+    duration: 0.6,
+    noiseGain: 0.18,
+    cutoffStart: 600,
     cutoffEnd: 120,
-    thumpGain: 0.2,
-    thumpStart: 60,
-    thumpEnd: 30,
+    thumpGain: 0.26,
+    thumpStart: 70,
+    thumpEnd: 32,
   },
   impact105: {
-    duration: 1.6,
-    noiseGain: 0.3,
-    cutoffStart: 400,
+    duration: 1.8,
+    noiseGain: 0.32,
+    cutoffStart: 420,
     cutoffEnd: 60,
-    thumpGain: 0.5,
+    thumpGain: 0.55,
     thumpStart: 45,
     thumpEnd: 18,
   },
