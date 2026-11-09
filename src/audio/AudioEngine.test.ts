@@ -28,7 +28,9 @@ describe('sounds', () => {
 
   it('makes air strikes louder than the guns: a gun-run hit above a 25 mm hit, the bomb the loudest', () => {
     const loud = (d: (typeof SOUNDS)[keyof typeof SOUNDS]) => d.noiseGain + d.thumpGain;
-    expect(loud(SOUNDS.impactgunrun)).toBeGreaterThan(loud(SOUNDS.impact25) * 3);
+    // (Compared with the 40 mm hit: the 25 mm hit is band-passed since M9, so its gain number
+    // reads high for its level; in a Chrome render a gun-run hit peaks at about 2× a 25 mm hit.)
+    expect(loud(SOUNDS.impactgunrun)).toBeGreaterThan(loud(SOUNDS.impact40));
     expect(loud(SOUNDS.impactbomb)).toBeGreaterThan(loud(SOUNDS.impact105));
     expect(SOUNDS.impactbomb.duration).toBeGreaterThan(SOUNDS.impact105.duration);
   });
@@ -115,6 +117,14 @@ describe('gun voices (M9: "with eyes closed, you can tell which weapon is firing
     // …but quieter than firing the gun (you hear them through the airframe).
     for (const w of ['25', '40', '105'] as const)
       expect(loud(SOUNDS[`impact${w}`]), w).toBeLessThan(loud(SOUNDS[`fire${w}`]));
+  });
+
+  it('band-passed sounds carry enough gain to be heard (regression: Chrome render, a 25 mm hit peaked at 0.007)', () => {
+    // A band-pass keeps only a slice of white noise: about a third of the level of a low-pass.
+    for (const [id, d] of Object.entries(SOUNDS)) {
+      if (d.filter === 'bandpass' && d.noiseGain > 0)
+        expect(d.noiseGain + d.thumpGain, id).toBeGreaterThanOrEqual(0.4);
+    }
   });
 
   it('layers are valid: clicks are short ticks, rattles fit inside their sound, tones are audible', () => {

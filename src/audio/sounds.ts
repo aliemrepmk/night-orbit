@@ -67,9 +67,9 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
   // the cabin for half a second.
   fire25: {
     duration: 0.06,
-    noiseGain: 0.34,
+    noiseGain: 0.6,
     filter: 'bandpass',
-    q: 1.1,
+    q: 0.8,
     cutoffStart: 2600,
     cutoffEnd: 1300,
     thumpGain: 0.07,
@@ -101,9 +101,9 @@ export const SOUNDS: Readonly<Record<SoundId, SoundDef>> = {
   // the delay you hear). Each has its own shape: 25 mm pops, a 40 mm crump, a 105 mm rumble.
   impact25: {
     duration: 0.18,
-    noiseGain: 0.12,
+    noiseGain: 0.4,
     filter: 'bandpass',
-    q: 0.9,
+    q: 0.6,
     cutoffStart: 1200,
     cutoffEnd: 420,
     thumpGain: 0,
