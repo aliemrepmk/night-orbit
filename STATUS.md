@@ -1,6 +1,6 @@
 # NIGHT ORBIT — Project Status & Handoff
 
-_Last updated: 2026-11-09_
+_Last updated: 2026-11-14_
 
 This file says **where the project is right now**, **what needs testing**, and **what comes next**.
 The full design and milestone list are in [`PLAN.md`](PLAN.md). Update this file at the end of
@@ -931,6 +931,6 @@ _(Fill in after testing.)_
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M8+ play test, then M9)."
+> "Read STATUS.md and PLAN.md. Let's continue (M9 listen test feedback, then M10)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
