@@ -33,7 +33,7 @@ tests skipped unless `npm run balance`). `npm run build` works (≈813 kB JS, 22
 per page load, latin only). A GitHub Actions
 workflow (`.github/workflows/ci.yml`) runs check + build on every push to `main` (checked in a clean clone).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). Everything through the GitHub Pages setup was pushed by the user on 2026-11-27 (Pages turned on, first deploy run). The README with screenshots, the grade-label fix and the edge-arrow fix are committed locally, **not pushed yet** (the user pushes manually; each push to `main` redeploys). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). Everything through the MIT licence is pushed (2026-11-27) and deployed. Only this status update is local. Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -577,9 +577,12 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **Deploy to GitHub Pages** (M10 Phase E): set up 2026-11-27; the user turned Pages on (Source:
-   **GitHub Actions**) and pushed, and the first deploy was running at the time of writing; the `deploy` job in `ci.yml` publishes every green push to
-   https://aliemrepmk.github.io/night-orbit/ (§5, "Deploy (M10)").
+2. **Deploy to GitHub Pages** (M10 Phase E): **live** at https://aliemrepmk.github.io/night-orbit/
+   since 2026-11-27. The first two CI runs never started (the GitHub account was locked for a billing
+   issue); after the user fixed billing, a re-run passed check (695 tests, 1 m 17 s) and deploy (11 s),
+   and the live site plays from boot to flight with no console errors. Every green push to `main`
+   redeploys (§5, "Deploy (M10)"). CI warns that its actions still target Node 20 (deprecated):
+   bump `actions/*` when newer majors are out.
 3. The README commit is local; the user pushes manually (each green push to `main` redeploys).
 
 ---
@@ -1033,6 +1036,7 @@ _(Fill in after testing.)_
 | 2026-11-27 | Pages build (Claude, Chrome) | `dist/` served from a `/night-orbit/` subfolder: boot → title → briefing → flight, fonts and the OFL texts load, no console errors, dev hook stripped | Ready to deploy once Pages is on |
 | 2026-11-27 | README screenshots (Claude, Chrome) | Captured boot, title, briefing, white-hot village, black-hot convoy, NV gun-run preview, HOLD and the after-action report | Fixed: the grade label OUTSTANDING ran into the rating panel's border. Seen, not fixed: an off-screen friendly arrow at the top edge ("RIDGEBACK 294 M") overlaps the top-right telemetry |
 | 2026-11-27 | Edge-arrow overlap fix (Claude, Chrome) | Village, Ridgeback off-screen to the top-right: the arrow now sits on the right edge below the telemetry, label clear; a climbing missile's arrow runs along the bottom edge (y 746) pointing down, label above the coordinates line | `edgeArrow` takes per-edge insets (`CONFIG.hud.arrowInsets`: top 108, bottom 56) and corner keep-out boxes (`arrowKeepOut`); regression tests |
+| 2026-11-27 | First deploy (Claude, Chrome) | CI runs 1–2: "job was not started because your account is locked due to a billing issue". After the user fixed billing, run 2 re-run: check ✅ (82 files, 695 tests), deploy ✅; https://aliemrepmk.github.io/night-orbit/ boots, briefs and flies, no console errors | Live. Node 20 deprecation warning on the actions noted |
 
 ## 7. How to resume in a new session
 
