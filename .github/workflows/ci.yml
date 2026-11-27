@@ -1,0 +1,21 @@
+# PLAN.md §12.1: typecheck, lint, tests and a production build on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # .npmrc sets legacy-peer-deps (STATUS.md §5, decision 1); npm ci honors it.
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
