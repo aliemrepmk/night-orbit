@@ -25,12 +25,13 @@ every session.
 | **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
 | **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
 | **M9** Audio                            | ✅ Signed off (listen test passed, user, 2026-11-27)                      |
-| **M10** Polish, balance & performance   | 🟨 Started 2026-11-27                                                     |
+| **M10** Polish, balance & performance   | 🟨 Phases A–D done (2026-11-27); **user play test pending (§3.0)**        |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **640 tests in 73 files**).
-`npm run build` works (≈780 kB JS, 216 kB gzipped).
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **655 tests in 77 files**, 3 balance
+tests skipped unless `npm run balance`). `npm run build` works (≈782 kB JS, 216 kB gzipped). A GitHub Actions
+workflow (`.github/workflows/ci.yml`) runs check + build on every push to `main` (checked in a clean clone).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F and M9 are committed locally (2026-11-09), **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F, M9 (2026-11-09) and M10 Phases A–D (2026-11-27) are committed locally, **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -52,6 +53,7 @@ PLAN.md                    full implementation plan (design, milestones, tests p
 STATUS.md                  this file
 CLAUDE.md                  short instructions auto-loaded by Claude Code sessions
 index.html                 canvas, HUD root, title/pause screen with controls table
+.github/workflows/ci.yml   M10: CI on every push / PR: npm ci, npm run check, npm run build
 .npmrc                     legacy-peer-deps=true (see §5, decision 1)
 src/
   main.ts                  entry point (dev builds expose `window.nightOrbit` for debugging)
@@ -63,7 +65,8 @@ src/
   core/
     Game.ts                owns systems; frame → input → fixed steps → camera sync → render → HUD
     FixedStepper.ts (+test) 60 Hz fixed timestep, clamps long frames
-    Input.ts               pointer lock, mouse deltas, keys, wheel, trigger; right-drag aim fallback
+    Input.ts (+test)       pointer lock, mouse deltas, keys, wheel, trigger; right-drag aim fallback;
+                           focus loss / hidden tab → pause (M10)
     EventBus.ts (+test)    typed pub/sub; events.ts = GameEvents (shotFired, impact, unitKilled)
     rng.ts (+test)         seeded PRNG (mulberry32)
   gunship/
@@ -78,6 +81,8 @@ src/
     triggerGate.ts (+test) M8+: who owns the trigger: guns or the strike being aimed
     ballistics.ts (+test)  flight time, spread disc, spread across view, muzzle position
     Projectiles.ts (+test) pooled shells in flight; impact on exactly the right tick
+    shot.ts (+test)        M10: `ShotPlanner`: one shell's aim, spread, landing point and flight time
+                           (shared by Game and the gunner bot)
   combat/
     Damage.ts (+test)      falloff, armor table, applyRadial
     AirDefense.ts (+test)  M8+: AA guns (targets) and trucks firing at the gunship, the hull
@@ -160,6 +165,9 @@ src/
     stats.ts (+test)       M8: kills, gun accuracy, damage taken, danger close, time; rating + grade
     briefing.ts            M8: the briefing screen's text
     autoplay.test.ts       a cheat-kill bot plays the whole mission to MISSION COMPLETE
+    gunnerBot.ts (+test)   M10: a headless player with human limits (reaction, aim error, slew, lead,
+                           flares, strikes; skills sharp / average / rookie) on the real guns
+    balance.test.ts        M10: `npm run balance`: the gunner bot over many seeds → length, damage
   debug/
     cheats.ts (+test)      dev cheats: G god, N skip phase, K kill all, [ ] time scale; ?phase=
     mapOverlay.ts (+test)  overlay shapes from MapData; placer format; F3 zone-tour order
@@ -174,6 +182,7 @@ src/
     thermalMath.ts (+test) pure sensor modes, polarity, curves, NV lighting, grain (spec for shaders)
     SensorFX.ts (+test)    weapon-switch static burst + refocus blur envelopes
     GpuTimer.ts (+test)    GPU ms per frame via WebGL timer query (F1 stats)
+    pixelRatio.ts (+test)  M10: render pixel ratio = min(screen, cap) × RENDER RESOLUTION setting
   audio/
     sounds.ts              synth sound definitions: noise + thump + click / rattle / tone layers (M9)
     mix.ts (+test)         M9: the buses (master → sfx, radio, ambience) and their gain math
@@ -188,7 +197,8 @@ src/
     hud.css                HUD + every screen's styles (title, briefing, pause, settings, end)
     screenFlow.ts (+test)  M8: the screen state machine (title → briefing → playing ⇄ paused …)
     Screens.ts             M8: the full-screen panels (DOM); buttons → Game
-    settings.ts (+test)    M8: sensitivity, invert Y, volume, shake, subtitles; safe save/load
+    settings.ts (+test)    M8: sensitivity, invert Y, volume, shake, subtitles; safe save/load;
+                           M10: render resolution (100 / 75 / 50 %)
     edgeArrow.ts (+test)   M8: off-screen friendly arrow position on the screen edge
     briefingMap.ts (+test) M8: the briefing's map sketch from MapData (SVG)
     controls.ts            M8: the controls list (pause screen + H overlay)
@@ -196,20 +206,21 @@ src/
 
 ### Commands
 
-| Command              | What it does                                                          |
-| -------------------- | --------------------------------------------------------------------- |
-| `npm run dev`        | dev server (default http://localhost:5173)                            |
-| `npm run test:watch` | re-run tests on every save (use while coding)                         |
-| `npm run check`      | typecheck + lint + tests; **must be green before finishing any task** |
-| `npm run build`      | production build into `dist/`                                         |
-| `npm run format`     | Prettier on the whole repo                                            |
+| Command              | What it does                                                               |
+| -------------------- | -------------------------------------------------------------------------- |
+| `npm run dev`        | dev server (default http://localhost:5173)                                 |
+| `npm run test:watch` | re-run tests on every save (use while coding)                              |
+| `npm run check`      | typecheck + lint + tests; **must be green before finishing any task**      |
+| `npm run build`      | production build into `dist/`                                              |
+| `npm run format`     | Prettier on the whole repo                                                 |
+| `npm run balance`    | M10 balance report: gunner bot over many seeds (`SEEDS=30 SKILLS=average`) |
 
 ### Controls (current)
 
 Mouse = slew sensor · **left click = fire (hold for 25 mm)** · `1`/`2`/`3` = 25/40/105 mm ·
 `Q` or wheel = cycle weapon · `T` = air support: gun run → bomb → off (wheel turns the run, click calls it) ·
 `F` = sensor: white-hot → black-hot → night vision · `H` = controls overlay · `Esc` = pause (resume, restart, settings) ·
-`F1` = FPS / GPU ms / draw calls / triangles / kills / live enemies / live vehicles. If pointer lock is unavailable, **hold the
+`F1` = FPS / CPU ms / GPU ms / draw calls / triangles / kills / live enemies / live vehicles. If pointer lock is unavailable, **hold the
 right button and drag** to aim. Add `?debug=1` to the URL to start with stats on.
 Map authoring (dev builds, or `?debug=1`): `F2` = map overlay · `P` = log the crosshair point as
 `[x, z]` (console + clipboard) · `F3` = tour the orbit over each zone, then back to the team.
@@ -221,7 +232,25 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M9 listen test (passed 2026-11-27): "playing with eyes closed, you can tell which weapon is firing and when shells land"
+### 3.0 M10 play test (pending): "the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun"
+
+Run `npm run dev` (add `?debug=1` for F1 stats) and play one or two full runs:
+
+- [ ] Length: the run takes about 15–18 min (the gunner bot averages 17; it skips the ~1 min of
+      calibration reading). Does the walking still feel slow anywhere, or now too rushed?
+- [ ] Ridgeback walks faster (3.0 m/s, was 2.65): do they still look like soldiers, not runners?
+- [ ] Extraction: Kestrel 6 says "two and a half minutes out"; "hold the line" delays it "one more
+      minute"; the sawmill wait is "sixty seconds". Do the endings still feel tense enough?
+- [ ] SETTINGS → RENDER RESOLUTION 100 / 75 / 50 %: the image gets softer, F1 GPU ms drops
+      (MacBook: 7.7 → 5.0 → 2.9 ms). Is 75 % still good-looking enough as a fallback?
+- [ ] Alt-tab or switch tabs mid-fight: the game pauses and all sound stops; RESUME picks up
+      where it was. Resize the window mid-mission: the view fills it, aiming is unchanged.
+- [ ] F1 shows `CPU … MS` next to GPU, under the top-right telemetry (no longer over the reticle).
+- [ ] Difficulty: is it about right for you? (The bot: sharp always wins with an A, average wins
+      29/30 with a B, rookie only 4/30; see §5 decision 79.)
+- [ ] Not tested by Claude: Firefox, Safari, a trackpad; a real mid-range laptop's FPS.
+
+### 3.0a M9 listen test (passed 2026-11-27): "playing with eyes closed, you can tell which weapon is firing and when shells land"
 
 Run `npm run dev`, use headphones or decent speakers, and check:
 
@@ -511,12 +540,14 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M10** (polish, balance, performance, deploy). Carry over from M8+: the air-defense
-   numbers in `CONFIG.airDefense` and the twist mix were only played once; tune them in M10
-   play sessions.
-2. M8+ A–F and M9 are committed locally (2026-11-09), not pushed; the user pushes manually.
-3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
-   `npm run build` on every push) now that the repo is on GitHub.
+1. **M10 play test by the user** (§3.0), then tune from the feedback (`npm run balance` after
+   any balance change). Open questions for the user: shorten the sawmill ending (it comes up
+   80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
+   optional EASY difficulty for weaker players (the rookie bot rarely wins).
+2. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
+   user's choice of host.
+3. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
+   runs on the first push).
 
 ---
 
@@ -860,6 +891,29 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     the crew (FCO, NAV) an intercom click. Levels were set by rendering every sound offline in
     Chrome (`OfflineAudioContext`) and comparing peaks: band-passed sounds need about 3× the
     gain of low-passed ones (a 25 mm hit used to peak at 0.002 and was inaudible).
+79. **Balance by gunner bot (M10).** `gunnerBot.ts` flies the real gunship and fires the real guns
+    (the shared `ShotPlanner`), with human limits per skill: decision every 0.5 / 0.9 / 1.4 s,
+    notices contacts after 1.5 / 3 / 5 s, aim error 4 / 8 / 14 m (σ, at the 105 mm view), slew
+    1.2 / 0.8 / 0.5 view-heights per second, lead 0.8 / 0.5 / 0.2, flares 95 / 75 / 50 %. It calls
+    strikes on groups of 4+ (gun run) / 6+ (bomb) clear of friendlies and the clinic, and never
+    fires knowingly danger close (it leaves 2.5 σ of its own error). It sees through fog. It is a
+    measuring tool, not ground truth: it beats calibration in 4 s. 30 seeds after the M10 tuning:
+    sharp 30/30, A, 17.0 min; average 29/30 (one gunship lost), B, 17.3 min (13.9–20.2), team
+    never below 78 % on average, hull 73 %; rookie 4/30 (team overrun or gunship lost, mostly in
+    the vehicles phase, from infantry, not vehicles). Difficulty was left as it is.
+80. **Mission length (M10).** Before: 17–22 min (bot), mostly Ridgeback walking (the routes are
+    ~13 min of walking on the sawmill ending) and the Kestrel timers, not killing. Ridgeback now
+    walks 3.0 m/s (was 2.65); Kestrel 6 is 150 s out (was 180); hold-the-line adds 105 s (was 135,
+    "one more minute"); the sawmill wait is 60 s (was 75). The 45/35/20 extraction mix (sawmill
+    ending 80 %) is unchanged: it is the main reason runs pass 17 min.
+81. **Performance (M10).** Busiest moments measured in Chrome (MacBook, 1.5× ratio): village
+    46 enemies, extraction 56 enemies + 2 vehicles with all three guns firing: 60 FPS, CPU ≤ 2.1 ms,
+    GPU ≤ 9 ms, ≤ 58 draw calls (budget §11: 16.6 ms, 150 calls). One 133 ms frame was seen once
+    and never reproduced (fresh loads, every gun, every sensor): likely a GC or the measuring
+    script. For slower GPUs: SETTINGS → RENDER RESOLUTION (GPU 7.7 → 5.0 → 2.9 ms). The bundle
+    stays one chunk (decided earlier; ~216 kB gzipped).
+82. **Focus loss (M10).** The window losing focus or the tab hiding now pauses (pointer lock already
+    did; drag-to-aim mode kept playing), and the AudioContext is suspended while the tab is hidden.
 
 ---
 
@@ -924,11 +978,14 @@ _(Fill in after testing.)_
 | 2026-11-09 | M8+ C–F play test (user) | One full run played; it went well | None; M8+ signed off. AA/missile numbers and twist mix to be revisited in M10 play sessions |
 | 2026-11-09 | M9 audio check (Claude, Chrome) | Every sound rendered offline and measured: 25 mm shot peaked at 0.025 and its hit at 0.007 (too quiet), squelch and clicks also faint. In game: firing, landing, the 105 mm breech and ready beep, the select beep, flares, intercom clicks, outside-net squelch and static all played; pause and settings muted the static and resume restored it; the RADIO slider set the radio bus to 0 and saved | Raised the band-passed sounds about 3× (`fix(audio)` commit); listening is left to the user (§3.0) |
 | 2026-11-27 | M9 listen test (user) | "Listen test seems ok for now" | None; M9 signed off. Levels can be revisited in M10 play sessions |
+| 2026-11-27 | M10 performance (Claude, Chrome) | Village and extraction under fire: 60 FPS, CPU ≤ 2.1 ms, GPU ≤ 9 ms, ≤ 58 calls; render resolution 100/75/50 % → GPU 7.7/5.0/2.9 ms; 50 % still readable; one unreproduced 133 ms frame | F1 line moved off the reticle; render resolution setting added |
+| 2026-11-27 | M10 focus / browser (Claude, Chrome) | Drag-to-aim kept playing after the window lost focus; after the fix: blur → paused, clock frozen, resume works; no console errors in a vehicles run. Window resize could not be driven from the extension (window stayed maximized) | Fix + regression test (`Input.test.ts`); resize left to the user's play test |
+| 2026-11-27 | M10 balance (Claude, headless bot) | Before: 17–22 min; average bot hit the clinic twice (bot margin bug, fixed in the bot); rookie mostly overrun in the vehicles phase. After the pace changes: see §5 decision 79–80 | Walk 3.0 m/s, shorter Kestrel timers; difficulty unchanged |
 
 ## 7. How to resume in a new session
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M10: polish, balance, performance)."
+> "Read STATUS.md and PLAN.md. Let's continue (M10 play-test feedback, then deploy)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.

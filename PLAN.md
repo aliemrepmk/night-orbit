@@ -815,7 +815,7 @@ Target total duration: **12–15 minutes**. Enemy counts below are starting valu
 
 - **Terrain:** an open quarry with rock walls and three approach paths.
 - **Beats:**
-  1. The team takes positions at the LZ. NAV: _"Kestrel 6 is three minutes out."_ A **countdown timer** appears in the HUD (180 s).
+  1. The team takes positions at the LZ. NAV: _"Kestrel 6 is two and a half minutes out."_ A **countdown timer** appears in the HUD (150 s; was 180 until M10).
   2. Escalating waves from all three approaches; 1–2 technicals; the final minute is the most intense.
   3. At 30 s left, Kestrel 6 appears (a very hot helicopter crossing the map). Enemies try to rush the LZ.
   4. The helicopter lands, the team boards (they walk to it), the helicopter lifts off. While it is low, enemies shoot at it (HUD health line, Kestrel's calls for help); if it is shot down, or hit by the player's own fire, the mission fails.
@@ -1105,9 +1105,17 @@ the forest read clearly in every sensor at 60 FPS.
 - 🧪 **Tests:** volume bus math; sound-event mapping (each event triggers the right sound id). Audio output itself is checked manually.
 - ✅ **Done when:** playing with eyes closed, you can tell which weapon is firing and when shells land.
 
-### M10 — Polish, Balance & Performance (2–3 days)
+### M10 — Polish, Balance & Performance (2–3 days) — Phases A–D done 2026-11-27; awaits the user's play test
 
 - Playtest sessions → tune numbers; performance pass (see §11); browser testing; deploy (GitHub Pages / Netlify / Vercel).
+- **A. Performance & robustness:** CPU ms in F1; measure the busiest moments; RENDER RESOLUTION
+  setting (100 / 75 / 50 %, §11's slow-machine option); pause on focus loss / hidden tab.
+- **B. Balance:** a headless **gunner bot** with human limits (three skills) plays the real mission
+  over many seeds (`npm run balance`); targets: 12–17 min, a sharp player always wins (A), an
+  average one ≥ 90 % (B–C). Tuned: Ridgeback walks faster, shorter Kestrel timers.
+- **C. Polish:** browser checks (§12.3), fix what they find.
+- **D. CI:** GitHub Actions runs check + build on every push.
+- **E. Deploy:** after the play test (host to be chosen).
 - 🧪 **Tests:** add regression tests for every bug found in playtesting; CI workflow green.
 - ✅ **Done when:** the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun.
 
