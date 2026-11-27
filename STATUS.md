@@ -51,6 +51,7 @@ M6 and its feedback fixes checked by Claude in Chrome (zone tour in all sensors,
 ## 2. What exists (file map)
 
 ```
+LICENSE                    MIT (Ali Emre Pamuk, 2026); package.json says "license": "MIT"
 README.md                  the repo's front page: the game, screenshots, controls, how it is built
 docs/screenshots/          README screenshots (captured in Chrome, 2026-11-27)
 PLAN.md                    full implementation plan (design, milestones, tests per milestone)

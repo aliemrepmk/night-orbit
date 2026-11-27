@@ -29,6 +29,7 @@ code: no models, textures or audio files are loaded.
 - [Deployment](#deployment)
 - [Project documents](#project-documents)
 - [Credits](#credits)
+- [License](#license)
 
 ---
 
@@ -250,4 +251,7 @@ any URL path.
   via [Fontsource](https://fontsource.org/). Their licence texts ship with the build in
   `public/licenses/`.
 
-The game's own code has no licence file yet: until one is added, all rights are reserved by the author.
+## License
+
+NIGHT ORBIT is released under the [MIT License](LICENSE). Copyright (c) 2026 Ali Emre Pamuk.
+The bundled fonts keep their own SIL Open Font License (see above).
