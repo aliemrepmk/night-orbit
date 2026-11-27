@@ -26,12 +26,14 @@ every session.
 | **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
 | **M9** Audio                            | ✅ Signed off (listen test passed, user, 2026-11-27)                      |
 | **M10** Polish, balance & performance   | 🟨 Phases A–D done (2026-11-27); **user play test pending (§3.0)**        |
+| **M10+** Mission-systems UI             | 🟨 Built (2026-11-27); **user look-and-use test pending (§3.0)**          |
 
-**Automated checks (last run):** `npm run check` all green (typecheck, lint, **655 tests in 77 files**, 3 balance
-tests skipped unless `npm run balance`). `npm run build` works (≈782 kB JS, 216 kB gzipped). A GitHub Actions
+**Automated checks (last run):** `npm run check` all green (typecheck, lint, **690 tests in 83 files**, 3 balance
+tests skipped unless `npm run balance`). `npm run build` works (≈813 kB JS, 227 kB gzipped; fonts ≈30 kB woff2
+per page load, latin only). A GitHub Actions
 workflow (`.github/workflows/ci.yml`) runs check + build on every push to `main` (checked in a clean clone).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F, M9 (2026-11-09) and M10 Phases A–D (2026-11-27) are committed locally, **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F, M9 (2026-11-09) and M10 Phases A–D and the M10+ UI (2026-11-27) are committed locally, **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -52,7 +54,8 @@ M6 and its feedback fixes checked by Claude in Chrome (zone tour in all sensors,
 PLAN.md                    full implementation plan (design, milestones, tests per milestone)
 STATUS.md                  this file
 CLAUDE.md                  short instructions auto-loaded by Claude Code sessions
-index.html                 canvas, HUD root, title/pause screen with controls table
+index.html                 canvas, HUD root, screen root (starts on the boot screen)
+public/licenses/           M10+: the bundled fonts' SIL OFL licence texts (shipped in dist/)
 .github/workflows/ci.yml   M10: CI on every push / PR: npm ci, npm run check, npm run build
 .npmrc                     legacy-peer-deps=true (see §5, decision 1)
 src/
@@ -163,7 +166,8 @@ src/
                            bus, units, vehicles, spawner, mission, stats); a restart = new battle
     headlessGame.ts        the whole game without a screen (auto-play, host tests, tuning runs)
     stats.ts (+test)       M8: kills, gun accuracy, damage taken, danger close, time; rating + grade
-    briefing.ts            M8: the briefing screen's text
+    briefing.ts (+test)    M10+: the briefing as a five-paragraph order + ROE, grid refs and numbers
+                           taken from the map and the configs (never names the twists)
     autoplay.test.ts       a cheat-kill bot plays the whole mission to MISSION COMPLETE
     gunnerBot.ts (+test)   M10: a headless player with human limits (reaction, aim error, slew, lead,
                            flares, strikes; skills sharp / average / rookie) on the real guns
@@ -195,13 +199,21 @@ src/
     hudFormat.ts (+test)   pure HUD text: gun status, team health, fail reasons, subtitles,
                            objective, countdowns
     hud.css                HUD + every screen's styles (title, briefing, pause, settings, end)
-    screenFlow.ts (+test)  M8: the screen state machine (title → briefing → playing ⇄ paused …)
-    Screens.ts             M8: the full-screen panels (DOM); buttons → Game
+    screenFlow.ts (+test)  M8: the screen state machine (boot → title → briefing → playing ⇄ paused …;
+                           M10+ adds boot, controls and quit)
+    Screens.ts             M8, rewritten M10+: boot, title, briefing, HOLD, settings, controls,
+                           aborted, after-action report in one console frame; keyboard + mouse
     settings.ts (+test)    M8: sensitivity, invert Y, volume, shake, subtitles; safe save/load;
                            M10: render resolution (100 / 75 / 50 %)
     edgeArrow.ts (+test)   M8: off-screen friendly arrow position on the screen edge
-    briefingMap.ts (+test) M8: the briefing's map sketch from MapData (SVG)
-    controls.ts            M8: the controls list (pause screen + H overlay)
+    briefingMap.ts (+test) M8: the briefing's map sketch from MapData (SVG); M10+: the lettered grid
+                           (A–K, no I/O; 1–6) and SP / PL / LZ tags
+    controls.ts            M8/M10+: the controls, grouped (controls page) and flat (H overlay)
+    screens.css            M10+: the mission-systems frame, panels, soft keys and every screen
+    softKeys.ts (+test)    M10+: key caps → actions (digits, Enter, Esc, letters), focus wrapping
+    bootSequence.ts (+test) M10+: the start-up self test lines and bars over time
+    reports.ts (+test)     M10+: HOLD status card, incident report, after-action report, timeline
+    settingsPages.ts (+test) M10+: the settings tabs and how each row is changed and shown
 ```
 
 ### Commands
@@ -232,7 +244,25 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M10 play test (pending): "the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun"
+### 3.0 M10+ UI test (pending): "each screen looks like part of the aircraft's systems; the whole game can be started, paused, set up and restarted from the keyboard alone"
+
+Run `npm run dev`:
+
+- [ ] First load: the self test types in (~2.4 s), any key skips; CONTINUE appears at the end.
+- [ ] Title: `1` / `2` / `3` or arrows + Enter; a click anywhere off the menu also begins.
+- [ ] Briefing: the tabs `1`–`5` and `ROE` (← / → page, each marks READ); the map's grid refs match
+      the text (OP B5, clinic E4, LZ H5); Enter deploys, Esc goes back to the title.
+- [ ] In flight, Esc → HOLD: the status card (team, hull, guns, flares, strikes) and the last radio
+      lines are right; `1` resumes without changing your gun; `2` restart and `5` quit ask first.
+- [ ] Settings: `1`–`3` tabs, ↑↓ rows, ←→ values; every change applies at once and is saved.
+- [ ] Controls page from the title, briefing and HOLD; Esc returns to where you came from.
+- [ ] Fail on purpose: MISSION ABORTED names the cause, place (grid), time, last call and a tip;
+      Enter retries the same run, `2` a new run, Esc the title.
+- [ ] Finish a run: the AFTER-ACTION REPORT grade, score breakdown, kills per weapon and timeline.
+- [ ] The fonts (Chakra Petch headings, IBM Plex Mono everywhere else, the HUD too) read well.
+- [ ] Not tested by Claude: a narrow window (the columns should stack), Firefox / Safari.
+
+### 3.0a M10 play test (pending): "the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun"
 
 Run `npm run dev` (add `?debug=1` for F1 stats) and play one or two full runs:
 
@@ -544,10 +574,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **M10+ mission-systems UI** (PLAN.md §10, M10+): plan written and its four questions answered
-   (2026-11-27); a clickable mockup of all eight screens is made, waiting for the user's review
-   before the build. Known bug it fixes: on MISSION FAILED
-   the two-line EVENTS text overlaps the RETRY button.
+2. **M10+ mission-systems UI** (PLAN.md §10, M10+): built 2026-11-27 from the approved mockup;
+   waiting for the user's test (§3.0). It also fixed the old MISSION FAILED overlap of the EVENTS
+   line and RETRY.
 3. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
    user's choice of host.
 4. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
@@ -916,7 +945,16 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     and never reproduced (fresh loads, every gun, every sensor): likely a GC or the measuring
     script. For slower GPUs: SETTINGS → RENDER RESOLUTION (GPU 7.7 → 5.0 → 2.9 ms). The bundle
     stays one chunk (decided earlier; ~216 kB gzipped).
-82. **Focus loss (M10).** The window losing focus or the tab hiding now pauses (pointer lock already
+82. **Mission-systems UI (M10+).** Every screen is DOM in one frame (`Screens.ts` + `screens.css`); the
+    words come from pure builders (`reports.ts`, `briefing.ts`, `bootSequence.ts`, `settingsPages.ts`,
+    `softKeys.ts`). Fonts are bundled from `@fontsource` (pinned 5.3.0, latin subsets, OFL texts in
+    `public/licenses/`); the HUD now uses IBM Plex Mono too. The HUD is hidden behind every screen
+    (HOLD has its own status card); the old `behind-screen` mode was removed. Screen key presses are
+    dropped when play starts (`Input.dropPresses`), or `[1] RESUME` also selected the 25 mm. Grid
+    letters skip I and O, so 10 columns are A–K. The briefing's ← → pages paragraphs; the title still
+    begins on a click anywhere. New: QUIT TO TITLE on HOLD and the end screens (throws the run away),
+    NEW RUN on the fail screen, kills per weapon and the score breakdown on the report.
+83. **Focus loss (M10).** The window losing focus or the tab hiding now pauses (pointer lock already
     did; drag-to-aim mode kept playing), and the AudioContext is suspended while the tab is hidden.
 
 ---
@@ -985,11 +1023,12 @@ _(Fill in after testing.)_
 | 2026-11-27 | M10 performance (Claude, Chrome) | Village and extraction under fire: 60 FPS, CPU ≤ 2.1 ms, GPU ≤ 9 ms, ≤ 58 calls; render resolution 100/75/50 % → GPU 7.7/5.0/2.9 ms; 50 % still readable; one unreproduced 133 ms frame | F1 line moved off the reticle; render resolution setting added |
 | 2026-11-27 | M10 focus / browser (Claude, Chrome) | Drag-to-aim kept playing after the window lost focus; after the fix: blur → paused, clock frozen, resume works; no console errors in a vehicles run. Window resize could not be driven from the extension (window stayed maximized) | Fix + regression test (`Input.test.ts`); resize left to the user's play test |
 | 2026-11-27 | M10 balance (Claude, headless bot) | Before: 17–22 min; average bot hit the clinic twice (bot margin bug, fixed in the bot); rookie mostly overrun in the vehicles phase. After the pace changes: see §5 decision 79–80 | Walk 3.0 m/s, shorter Kestrel timers; difficulty unchanged |
+| 2026-11-27 | M10+ UI (Claude, Chrome) | Boot → title → settings (keyboard: tabs, rows, values) → briefing (all six tabs, grid A–K × 1–6 fully visible after a fit fix) → deploy (drag mode under automation) → Esc → HOLD (live status, radio log) → controls → quit with confirm → title → new run; MISSION ABORTED from a real clinic hit and a friendly-fire hit; AFTER-ACTION REPORT from counted events | Fixed: map cut off the outer grid columns; `[1] RESUME` also selected the 25 mm (regression test); HUD showing through HOLD (now hidden behind screens); SHOTS row reworded |
 
 ## 7. How to resume in a new session
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M10 play-test feedback, then deploy)."
+> "Read STATUS.md and PLAN.md. Let's continue (M10 / M10+ test feedback, then deploy)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.

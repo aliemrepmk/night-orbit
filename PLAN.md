@@ -703,7 +703,7 @@ HTML/CSS overlay, monospace font, pure white/black to match the feed.
 - **Telemetry** (heading, altitude, range, sensor angles) uses real values from the simulation, making the feed look alive.
 - **Friendly indicators:** when Ridgeback is off-screen, a small arrow on the screen edge points toward them.
 - **Screens:** Title (game name, "Click to start" which requests pointer lock and starts audio), Briefing (map sketch + text), Pause (resume, settings, restart), Failed (reason + retry), Complete (stats + rating: kills, accuracy, friendly damage taken, danger-close count, time).
-- **Planned restyle (M10+, §10):** the screens become mission-computer pages: console frame, soft-key menus, a five-paragraph briefing, a HOLD status card and an after-action report.
+- **M10+ restyle (§10):** the screens are mission-computer pages: a boot self test, a console frame with soft keys (every screen works from the keyboard), a five-paragraph briefing on a lettered map grid, a HOLD status card with the radio log, tabbed settings, a controls page, a MISSION ABORTED incident report and an AFTER-ACTION REPORT. The HUD shows only in flight.
 
 ### 7.17 Audio
 
@@ -1120,7 +1120,7 @@ the forest read clearly in every sensor at 60 FPS.
 - 🧪 **Tests:** add regression tests for every bug found in playtesting; CI workflow green.
 - ✅ **Done when:** the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun.
 
-### M10+ — Mission-systems UI (planned 2026-11-27; mockup made, awaits the user's review)
+### M10+ — Mission-systems UI (built 2026-11-27; awaits the user's test)
 
 **Goal:** the menus and screens should read like the gunship's own mission computer and the
 crew's paperwork, not like a web page: framed console panels, soft-key menus, a
