@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { edgeArrow } from './edgeArrow';
+import { CONFIG } from '../config';
+import { edgeArrow, type EdgeInsets } from './edgeArrow';
 
 const W = 1600;
 const H = 900;
@@ -45,5 +46,51 @@ describe('edgeArrow (off-screen friendly marker)', () => {
       expect(a.y).toBeGreaterThanOrEqual(M - 1e-6);
       expect(a.y).toBeLessThanOrEqual(H - M + 1e-6);
     }
+  });
+
+  describe('clear of the HUD text (M10 regression: labels sat on the top-right telemetry)', () => {
+    const I: EdgeInsets = { top: 108, right: 36, bottom: 56, left: 36 };
+    const K = {
+      topRight: [200, 0] as const,
+      bottomLeft: [440, 250] as const,
+      bottomRight: [190, 84] as const,
+    };
+
+    it('runs below the top text row and above the bottom one', () => {
+      const up = edgeArrow(0, 3, false, W, H, I, K)!;
+      expect(up.y).toBeCloseTo(108);
+      const down = edgeArrow(0, -3, false, W, H, I, K)!;
+      expect(down.y).toBeCloseTo(H - 56);
+    });
+
+    it('slides a top-right arrow away from the corner, so its label fits on screen', () => {
+      // A friendly up and a little right: before, the arrow sat in the top-right corner text.
+      const a = edgeArrow(1.2, 3, false, W, H, I, K)!;
+      expect(a.y).toBeCloseTo(108);
+      expect(a.x).toBeLessThanOrEqual(W - 200 + 1e-6);
+    });
+
+    it('never lands in the bottom corner blocks (gun status, clock)', () => {
+      for (let k = 0; k < 360; k += 3) {
+        const t = (k * Math.PI) / 180;
+        const a = edgeArrow(4 * Math.cos(t), 4 * Math.sin(t), false, W, H, I, K)!;
+        const inBL = a.x < 440 - 1e-6 && a.y > H - 250 + 1e-6;
+        const inBR = a.x > W - 190 + 1e-6 && a.y > H - 84 + 1e-6;
+        expect(inBL || inBR, `angle ${k}`).toBe(false);
+        expect(a.y).toBeGreaterThanOrEqual(108 - 1e-6);
+      }
+    });
+
+    it('still points straight at the friendly after sliding', () => {
+      const a = edgeArrow(-3, -1.5, false, W, H, I, K)!; // down-left, into the gun block
+      const plain = edgeArrow(-3, -1.5, false, W, H, I)!;
+      expect(a.angle).toBeCloseTo(plain.angle, 9);
+      expect(a.x === plain.x && a.y === plain.y).toBe(false);
+    });
+
+    it('the shipped config clears the HUD blocks the same way', () => {
+      expect(CONFIG.hud.arrowInsets.top).toBeGreaterThanOrEqual(100);
+      expect(CONFIG.hud.arrowKeepOut.bottomLeft[1]).toBeGreaterThan(CONFIG.hud.arrowInsets.bottom);
+    });
   });
 });

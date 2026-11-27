@@ -434,8 +434,21 @@ export const CONFIG = {
   hud: {
     /** How long "DANGER CLOSE" stays up after a close impact (seconds). */
     dangerCloseSeconds: 2.5,
-    /** Off-screen friendly arrows (M8): distance from the screen edge (CSS px). */
-    arrowMargin: 36,
+    /**
+     * Off-screen friendly arrows: how far inside each screen edge they run (CSS px). M10: the top
+     * inset clears the three-line top text row (telemetry, objective, timers: ~88 px), the bottom
+     * one the coordinates line; before, arrow labels sat on top of that text.
+     */
+    arrowInsets: { top: 108, right: 36, bottom: 56, left: 36 },
+    /**
+     * Corner HUD blocks the arrows slide out of, [width, height] px from the corner (M10): the gun
+     * and health block bottom-left, FOV and clock bottom-right, and room for a label at top-right.
+     */
+    arrowKeepOut: {
+      topRight: [200, 0] as const,
+      bottomLeft: [440, 250] as const,
+      bottomRight: [190, 84] as const,
+    },
   },
 
   /**

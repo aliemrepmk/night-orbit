@@ -827,7 +827,8 @@ export class Game {
         behind,
         window.innerWidth,
         window.innerHeight,
-        CONFIG.hud.arrowMargin,
+        CONFIG.hud.arrowInsets,
+        CONFIG.hud.arrowKeepOut,
       );
       if (!a) return;
       const d = Math.hypot(p.x - this.sensor.aim.x, p.z - this.sensor.aim.z);
