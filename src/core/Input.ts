@@ -147,6 +147,14 @@ export class Input {
     this.pressed.clear();
   }
 
+  /**
+   * Forgets key presses not consumed yet (M10+): a soft key pressed on a screen (`[1] RESUME`)
+   * must not also act in flight (select the 25 mm) when that press starts play.
+   */
+  dropPresses(): void {
+    this.pressed.clear();
+  }
+
   private lockFailed(): void {
     if (this.everLocked) this.onLockRefused();
     else this.enableDragMode();

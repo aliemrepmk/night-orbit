@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { MAP } from '../world/MapData';
 import type { ZoneId } from '../world/mapTypes';
-import { briefingMap, briefingSvg, fitViewBox, ZONE_LABELS } from './briefingMap';
+import {
+  briefingMap,
+  briefingSvg,
+  fitViewBox,
+  gridLetter,
+  gridRef,
+  ZONE_LABELS,
+} from './briefingMap';
 
 describe('briefing map sketch', () => {
   const m = briefingMap(MAP);
@@ -76,5 +83,35 @@ describe('briefing map fills its frame (M8+ Phase A: map and text the same heigh
     const svg = briefingSvg(m);
     for (const cls of ['building', 'field', 'trees', 'walls'])
       expect(svg).toContain(`class="${cls}"`);
+  });
+});
+
+describe('briefing map grid (M10+)', () => {
+  const m = briefingMap(MAP);
+  const g = m.grid;
+
+  it('has square cells and covers every zone', () => {
+    expect(g.box.w / g.cols).toBeCloseTo(g.box.h / g.rows, 6);
+    for (const z of m.zones) {
+      expect(z.x).toBeGreaterThanOrEqual(g.box.x);
+      expect(z.x).toBeLessThanOrEqual(g.box.x + g.box.w);
+      expect(z.y).toBeGreaterThanOrEqual(g.box.y);
+      expect(z.y).toBeLessThanOrEqual(g.box.y + g.box.h);
+    }
+  });
+
+  it('names squares by column letter (no I or O) and row number, clamped onto the grid', () => {
+    expect(gridRef(g, g.box.x + 1, g.box.y + 1)).toBe('A1');
+    expect(gridRef(g, g.box.x + g.cell * 8.5, g.box.y + g.cell * 2.5)).toBe('J3');
+    expect(gridRef(g, -1e6, 1e6)).toBe(`A${g.rows}`);
+    expect(gridLetter(8)).toBe('J');
+  });
+
+  it('tags the start point, the three phase lines and the LZ', () => {
+    expect(m.marks.map((k) => k.text).sort()).toEqual(['LZ', 'PL1', 'PL2', 'PL3', 'SP']);
+    const svg = briefingSvg(m);
+    expect(svg).toContain('class="grid"');
+    expect(svg.match(/class="grid-label"/g)).toHaveLength(g.cols + g.rows);
+    expect(svg.match(/class="mark"/g)).toHaveLength(5);
   });
 });

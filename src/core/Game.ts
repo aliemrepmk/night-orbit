@@ -25,7 +25,6 @@ import {
 import { WEAPONS, WEAPON_ORDER, type WeaponId } from '../gunship/weaponDefs';
 import { HUD } from '../ui/HUD';
 import {
-  failReasonText,
   flareLine,
   hullLine,
   kestrelLine,
@@ -47,11 +46,20 @@ import {
 } from '../mission/twists';
 import { fogEnvelope } from '../render/thermalMath';
 import { shakeFor } from '../combat/Explosions';
-import { rateMission, summaryRows, type MissionStats } from '../mission/stats';
+import { rateMission, ratingBreakdown, type MissionStats } from '../mission/stats';
+import { briefingMap, gridRef, type MapGrid } from '../ui/briefingMap';
+import {
+  afterAction,
+  holdStatus,
+  incidentReport,
+  missionTime,
+  recordRows,
+  timeline,
+} from '../ui/reports';
 import { edgeArrow } from '../ui/edgeArrow';
 import type { FriendlyArrow } from '../ui/HUD';
 import { ScreenFlow, type ScreenAction } from '../ui/screenFlow';
-import { Screens, type ScreenButton } from '../ui/Screens';
+import { Screens, type CommsLine, type ScreenButton } from '../ui/Screens';
 import { browserStorage, loadSettings, saveSettings, type Settings } from '../ui/settings';
 import { DebugOverlay } from '../debug/DebugOverlay';
 import { formatPlacement, mapOverlay, nextTourStop } from '../debug/mapOverlay';
@@ -88,7 +96,8 @@ const BURN_SPOTS: readonly (readonly [number, number])[] = [
  */
 export class Game {
   /** The screen state machine (M8): title → briefing → playing ⇄ paused → failed | complete. */
-  readonly flow = new ScreenFlow();
+  /** Starts on the mission computer's self test (M10+), then the title. */
+  readonly flow = new ScreenFlow('boot');
 
   private readonly renderer: Renderer;
   // The handcrafted map (PLAN.md §7.12): terrain, houses, collision, cover. Built once.
@@ -164,6 +173,12 @@ export class Game {
   private lastFrame = performance.now();
   private debug = new URLSearchParams(location.search).has('debug');
   private fps = 60;
+  /** M10+ screens: when each phase began, Ridgeback's lowest health, the last radio lines. */
+  private phaseLog: { id: string; at: number }[] = [];
+  private teamLowest = 1;
+  private comms: CommsLine[] = [];
+  /** The briefing map's grid, for grid references on the incident report. */
+  private readonly grid: MapGrid = briefingMap(MAP).grid;
   /** Smoothed CPU time of one frame (simulation + render submission + HUD), ms, for F1 (M10). */
   private cpuMs = 0;
 
@@ -196,6 +211,7 @@ export class Game {
     this.screens = new Screens(screenRoot, MAP, this.settings);
     this.screens.onButton = (b) => this.button(b);
     this.screens.onSettings = (s) => this.applySettings(s, true);
+    this.screens.onFocusMove = () => this.audio.beep(1700, 0.018, 0.035);
     this.applySettings(this.settings, false);
 
     window.addEventListener('resize', () => this.resize());
@@ -223,6 +239,13 @@ export class Game {
     this.vehicles = b.vehicles;
     this.host = b.host;
     this.stats = b.stats;
+    this.phaseLog = [];
+    this.teamLowest = 1;
+    this.comms = [];
+    b.host.radio.onLine = (l) => {
+      this.comms.push({ time: missionTime(this.missionClock), speaker: l.speaker, text: l.text });
+      if (this.comms.length > CONFIG.ui.commsLines) this.comms.shift();
+    };
     this.depot = b.depot;
     this.airDefense = b.airDefense;
     this.units.plane = this.gunship; // MANPADS teams launch at the gunship
@@ -318,11 +341,25 @@ export class Game {
         this.screens.setLockHint('');
         this.input.requestLock();
         break;
+      case 'continue':
+        this.go('continue');
+        break;
       case 'settings':
         this.go('openSettings');
         break;
+      case 'controls':
+        this.go('openControls');
+        break;
       case 'back':
-        this.go('closeSettings');
+        this.go(this.flow.state === 'controls' ? 'closeControls' : 'closeSettings');
+        break;
+      case 'quit':
+        // Back to the title: this run is thrown away, the next deploy is a fresh one.
+        if (this.flow.state !== 'briefing') {
+          this.newRun(true);
+          this.deployed = false;
+        }
+        this.go('quit');
         break;
     }
   }
@@ -378,7 +415,8 @@ export class Game {
   /** One fixed simulation step (PLAN.md §6 update order). */
   private update(dt: number): void {
     // Paused (or in settings from the pause menu): the world holds still.
-    if (this.deployed && (this.flow.state === 'paused' || this.flow.state === 'settings')) return;
+    const held = this.flow.state;
+    if (this.deployed && (held === 'paused' || held === 'settings' || held === 'controls')) return;
     // Behind the title and end screens the orbit keeps drifting, but nobody fights.
     const playing = this.flow.playing;
     this.gunship.update(dt);
@@ -415,6 +453,7 @@ export class Game {
     }
     if (playing) {
       this.host.update(dt, this.sensor.aim);
+      this.logPhase();
       this.units.update(dt);
       this.vehicles.update(dt);
       this.airDefense.update(dt, this.gunship, (from, to, n) => {
@@ -685,7 +724,23 @@ export class Game {
   private complete(): void {
     if (this.flow.ended) return;
     const s = this.stats.summary(this.units.team.taken, this.missionClock, this.host.bonuses);
-    this.screens.setComplete(rateMission(s), summaryRows(s), this.eventsLine());
+    const st = this.stats;
+    const report = afterAction({
+      summary: s,
+      rating: rateMission(s),
+      breakdown: ratingBreakdown(s),
+      killsBy: st.killsBy,
+      shots: st.shots,
+      strikes: st.strikes,
+      teamLowest: this.teamLowest,
+      hull: this.airDefense.hull / CONFIG.airDefense.hull,
+    });
+    const line = timeline(this.phaseLog, {
+      at: this.missionClock,
+      text: 'RIDGEBACK ABOARD · WHEELS UP',
+      tone: 'go',
+    });
+    this.screens.setComplete(report, s.kills, line, this.events(), String(this.seed));
     this.go('complete');
     if (document.pointerLockElement) document.exitPointerLock();
   }
@@ -895,22 +950,64 @@ export class Game {
   private fail(reason: FailReason): void {
     if (this.flow.ended) return;
     const s = this.stats.summary(this.units.team.taken, this.missionClock, this.host.bonuses);
-    this.screens.setFailed(failReasonText(reason), summaryRows(s), this.eventsLine());
+    const team = this.units.teamPosition;
+    const last = this.comms[this.comms.length - 1];
+    const report = incidentReport({
+      reason,
+      phase: this.host.mission.phase?.id,
+      grid: gridRef(this.grid, team.x, team.z),
+      seconds: this.missionClock,
+      team: this.units.team.value / this.units.team.max,
+      lastCall: last ? { speaker: last.speaker, text: last.text } : null,
+    });
+    this.screens.setFailed(report, recordRows(s), this.events(), String(this.seed));
     this.go('fail');
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
-  /** The run's events and seed for the end screens (M8+ Phase F). */
-  private eventsLine(): string {
-    return `EVENTS: ${describeRoll(this.roll)}  ·  SEED ${this.seed}`;
+  /** The run's events for the end screens (M8+ Phase F). */
+  private events(): string[] {
+    return describeRoll(this.roll).split(' · ');
+  }
+
+  /** Per step (M10+): note a new phase's start, and Ridgeback's lowest health. */
+  private logPhase(): void {
+    const id = this.host.mission.phase?.id;
+    if (id && this.phaseLog[this.phaseLog.length - 1]?.id !== id)
+      this.phaseLog.push({ id, at: this.missionClock });
+    const team = this.units.team;
+    this.teamLowest = Math.min(this.teamLowest, team.value / team.max);
+  }
+
+  /** The HOLD screen's status card, from the running game. */
+  private holdSnapshot() {
+    const gun = (id: WeaponId) => {
+      const g = this.weapons.guns[id];
+      return { status: g.status, heat: g.heat, rounds: g.rounds, capacity: g.def.capacity };
+    };
+    return holdStatus({
+      objective: this.host.mission.objective,
+      phase: this.host.mission.phase?.id,
+      seconds: this.missionClock,
+      team: this.units.team.value / this.units.team.max,
+      hull: this.airDefense.hull / CONFIG.airDefense.hull,
+      guns: { '25': gun('25'), '40': gun('40'), '105': gun('105') },
+      flares: this.airDefense.flares,
+      strikeCooldown: {
+        gunrun: this.air.cooldownLeft('gunrun'),
+        bomb: this.air.cooldownLeft('bomb'),
+      },
+    });
   }
 
   /** Feeds the screen state machine and shows whatever screen it lands on. */
   private go(action: ScreenAction): void {
     const state = this.flow.dispatch(action);
     if (state === 'playing') this.deployed = true;
-    // The HUD shows from the first deploy on (behind pause, settings and the end screens).
-    this.hud.show(this.deployed && state !== 'title' && state !== 'briefing', state !== 'playing');
+    // M10+: the screens carry their own status (HOLD card, reports), so the HUD shows only in flight.
+    this.hud.show(state === 'playing');
+    this.screens.setMissionTime(this.deployed ? this.missionClock : null);
+    if (state === 'paused') this.screens.setHold(this.holdSnapshot(), this.comms);
     this.screens.show(state);
     // The engine drone: silent on the title and briefing, full in the air, muffled behind menus.
     this.audio.setEngineMode(
@@ -918,6 +1015,7 @@ export class Game {
     );
     this.audio.radioAllowed = state === 'playing';
     this.input.consumeMouse(); // drop movement made while not aiming
+    this.input.dropPresses(); // a screen's soft key (e.g. [1] RESUME) is not a flight key
     this.input.consumeFireClicks(); // the click that starts / resumes the game isn't a shot
     this.fireClicks = 0;
     this.fireHeld = false;

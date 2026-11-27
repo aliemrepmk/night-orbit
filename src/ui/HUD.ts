@@ -141,10 +141,9 @@ export class HUD {
     }
   }
 
-  /** `behindScreen`: a menu is on top, so the middle of the view (reticle, alerts, subtitles) hides. */
-  show(visible: boolean, behindScreen = false): void {
+  /** The HUD shows only in flight (M10+: every screen carries its own status). */
+  show(visible: boolean): void {
     this.root.classList.toggle('hidden', !visible);
-    this.root.classList.toggle('behind-screen', behindScreen);
   }
 
   update(d: HudData): void {

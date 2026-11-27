@@ -49,4 +49,13 @@ describe('Input focus loss (M10 regression: drag-to-aim kept playing in a hidden
     expect(lost).toHaveBeenCalledTimes(1);
     expect(hidden).toHaveBeenLastCalledWith(false);
   });
+
+  it('drops a key pressed on a screen, so [1] RESUME does not also select the 25 mm (M10+ regression)', () => {
+    const { i } = input();
+    win.dispatchEvent(Object.assign(new Event('keydown'), { code: 'Digit1', repeat: false }));
+    i.dropPresses();
+    expect(i.wasPressed('Digit1')).toBe(false);
+    win.dispatchEvent(Object.assign(new Event('keydown'), { code: 'Digit2', repeat: false }));
+    expect(i.wasPressed('Digit2')).toBe(true); // later presses still count
+  });
 });

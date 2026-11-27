@@ -1,4 +1,11 @@
+// M10+ fonts, bundled (SIL Open Font Licence; no network): Plex Mono for data, Chakra Petch for headings.
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
+import '@fontsource/chakra-petch/latin-600.css';
+import '@fontsource/chakra-petch/latin-700.css';
 import './ui/hud.css';
+import './ui/screens.css';
 import { Game } from './core/Game';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;

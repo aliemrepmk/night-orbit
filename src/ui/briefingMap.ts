@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import type { MapData, Vec2, ZoneId } from '../world/mapTypes';
 
 /** An axis-aligned box in map units (x east, y = map z south). */
@@ -27,7 +28,55 @@ export interface BriefingMap {
   readonly walls: readonly string[];
   /** Forest outlines (M8+ Phase D). */
   readonly forests: readonly string[];
+  /** M10+: the lettered grid over the sketch, and the start point / phase line / LZ tags. */
+  readonly grid: MapGrid;
+  readonly marks: readonly { text: string; x: number; y: number }[];
 }
+
+/**
+ * The briefing grid (M10+): `cols` lettered columns (A, B, …) × `rows` numbered rows of square
+ * cells, centered on the sketch's bounds and just big enough to cover them. Grid references in
+ * the briefing text ("LZ QUARRY · H5") come from the same grid, so text and map always agree.
+ */
+export interface MapGrid {
+  readonly box: Box;
+  readonly cols: number;
+  readonly rows: number;
+  /** Cell size in map meters. */
+  readonly cell: number;
+}
+
+export function mapGrid(
+  bounds: Box,
+  cols: number = CONFIG.ui.gridCols,
+  rows: number = CONFIG.ui.gridRows,
+): MapGrid {
+  const box = fitViewBox(bounds, cols / rows);
+  return { box, cols, rows, cell: box.w / cols };
+}
+
+const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (read as 1 and 0)
+
+/** The grid square of map point (x, z), e.g. `E4` (clamped onto the grid). */
+export function gridRef(g: MapGrid, x: number, z: number): string {
+  const c = Math.min(g.cols - 1, Math.max(0, Math.floor((x - g.box.x) / g.cell)));
+  const r = Math.min(g.rows - 1, Math.max(0, Math.floor((z - g.box.y) / g.cell)));
+  return `${LETTERS[c]}${r + 1}`;
+}
+
+/** Column letter `i` of the grid (0 = A; no I or O). */
+export function gridLetter(i: number): string {
+  return LETTERS[i];
+}
+
+/** The tags on the briefing map: start point, phase lines, landing zone (M10+, PLAN.md §8). */
+export const PHASE_MARKS: Readonly<Partial<Record<ZoneId, string>>> = {
+  op: 'SP',
+  fields: 'PL1',
+  village: 'PL2',
+  crossroads: 'PL3',
+  lz: 'LZ',
+};
 
 export const ZONE_LABELS: Readonly<Record<ZoneId, string>> = {
   op: 'OP',
@@ -136,6 +185,14 @@ export function briefingMap(map: MapData): BriefingMap {
     trees: map.treeLines.map((t) => path(t.points)),
     walls: map.walls.map((w) => path(w.points)),
     forests: map.forests.map((f) => polygon(f.polygon)),
+    grid: mapGrid(bounds),
+    marks: ids
+      .filter((id) => PHASE_MARKS[id])
+      .map((id) => ({
+        text: PHASE_MARKS[id]!,
+        x: map.zones[id].center[0],
+        y: map.zones[id].center[1],
+      })),
   };
 }
 
@@ -164,6 +221,40 @@ export function briefingSvg(m: BriefingMap): string {
     many('walls', m.walls) +
     `<path class="stream" d="${m.stream}"/>${roads}` +
     many('building', m.buildings) +
-    `${zones}<path class="route" d="${m.route}"/>${clinic}</svg>`
+    `${zones}<path class="route" d="${m.route}"/>${clinic}${gridSvg(m.grid)}${marksSvg(m.marks)}</svg>`
   );
+}
+
+/** The grid's lines and edge labels (M10+), drawn over the sketch. */
+function gridSvg(g: MapGrid): string {
+  const { x, y, w, h } = g.box;
+  const r = (v: number) => Math.round(v);
+  const lines: string[] = [];
+  for (let i = 0; i <= g.cols; i++) lines.push(`M${r(x + i * g.cell)} ${r(y)} v${r(h)}`);
+  for (let j = 0; j <= g.rows; j++) lines.push(`M${r(x)} ${r(y + j * g.cell)} h${r(w)}`);
+  const labels: string[] = [];
+  for (let i = 0; i < g.cols; i++)
+    labels.push(
+      `<text class="grid-label" x="${r(x + (i + 0.5) * g.cell)}" y="${r(y + g.cell * 0.22)}">${gridLetter(i)}</text>`,
+    );
+  for (let j = 0; j < g.rows; j++)
+    labels.push(
+      `<text class="grid-label" x="${r(x + g.cell * 0.12)}" y="${r(y + (j + 0.55) * g.cell)}">${j + 1}</text>`,
+    );
+  return `<path class="grid" d="${lines.join(' ')}"/>${labels.join('')}`;
+}
+
+/** Start point / phase line / LZ tags, just below each zone's center (M10+). */
+function marksSvg(marks: readonly { text: string; x: number; y: number }[]): string {
+  return marks
+    .map((k) => {
+      const w = 22 + k.text.length * 22;
+      const x = Math.round(k.x - w / 2);
+      const y = Math.round(k.y + 18);
+      return (
+        `<g class="mark"><rect x="${x}" y="${y}" width="${w}" height="40"/>` +
+        `<text x="${Math.round(k.x)}" y="${y + 30}">${k.text}</text></g>`
+      );
+    })
+    .join('');
 }
