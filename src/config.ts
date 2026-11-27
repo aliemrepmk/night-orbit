@@ -113,6 +113,8 @@ export const CONFIG = {
      * supersamples a little. The grainy thermal look hides the difference.
      */
     maxPixelRatio: 1.5,
+    /** The lowest ratio the RENDER RESOLUTION setting can reach (M10), whatever the screen. */
+    minPixelRatio: 0.5,
     /**
      * Render-target MSAA samples. Off: on a half-float target it was the single biggest cost
      * (~10 ms/frame at 2×), and grain + bloom hide aliasing. The canvas' own antialias flag
@@ -473,6 +475,11 @@ export const CONFIG = {
     sfxVolume: { default: 1, min: 0, max: 1, step: 0.05 },
     /** Radio squelch and beeps (M9), under the master volume. */
     radioVolume: { default: 0.8, min: 0, max: 1, step: 0.05 },
+    /**
+     * M10 (PLAN.md §11): the share of the capped pixel ratio the game renders at. 75 % roughly
+     * halves the GPU cost (pixels go with the square), for integrated laptop GPUs.
+     */
+    renderScale: { default: 1, min: 0.5, max: 1, step: 0.25 },
   },
 
   /**

@@ -13,6 +13,8 @@ export interface Settings {
   sfxVolume: number;
   /** Radio squelch and beeps 0–1, under the master volume (M9). */
   radioVolume: number;
+  /** Render resolution as a share of the capped pixel ratio, 0.5–1 (M10). */
+  renderScale: number;
   /** Camera shake from impacts and 105 mm recoil. */
   screenShake: boolean;
   /** Radio subtitles low in the view. */
@@ -32,6 +34,7 @@ export function defaultSettings(cfg: SettingsConfig = CONFIG.settings): Settings
     engineVolume: cfg.engineVolume.default,
     sfxVolume: cfg.sfxVolume.default,
     radioVolume: cfg.radioVolume.default,
+    renderScale: cfg.renderScale.default,
     screenShake: true,
     subtitles: true,
   };
@@ -58,6 +61,7 @@ export function sanitizeSettings(raw: unknown, cfg: SettingsConfig = CONFIG.sett
     engineVolume: number(r.engineVolume, cfg.engineVolume),
     sfxVolume: number(r.sfxVolume, cfg.sfxVolume),
     radioVolume: number(r.radioVolume, cfg.radioVolume),
+    renderScale: number(r.renderScale, cfg.renderScale),
     screenShake: flag(r.screenShake, d.screenShake),
     subtitles: flag(r.subtitles, d.subtitles),
   };

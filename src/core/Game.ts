@@ -329,6 +329,7 @@ export class Game {
     this.settings = s;
     this.sensor.sensitivityScale = s.sensitivity;
     this.sensor.shakeScale = s.screenShake ? 1 : 0;
+    this.renderer.setRenderScale(s.renderScale);
     this.audio.setVolumes(s);
     if (save && !saveSettings(browserStorage, s)) {
       this.screens.setStorageHint(
@@ -936,6 +937,8 @@ export class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.viewportHeight = h;
+    // A move to a screen with another pixel ratio changes the render ratio too.
+    this.renderer.setRenderScale(this.settings.renderScale);
     this.renderer.setSize(w, h);
     this.sensor.setAspect(w / h);
     this.canvas.style.width = `${w}px`;

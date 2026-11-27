@@ -12,6 +12,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { CONFIG } from '../config';
 import { GpuTimer } from './GpuTimer';
+import { renderPixelRatio } from './pixelRatio';
 import { ThermalMaterial } from './ThermalMaterial';
 import { ThermalPass, type ThermalFrame } from './ThermalPass';
 
@@ -38,7 +39,7 @@ export class Renderer {
       antialias: false,
       powerPreference: 'high-performance',
     });
-    this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, r.maxPixelRatio));
+    this.webgl.setPixelRatio(renderPixelRatio(window.devicePixelRatio, 1));
     // Several passes render per frame; count them all for the F1 stats.
     this.webgl.info.autoReset = false;
     this.gpuTimer = new GpuTimer(this.webgl.getContext() as WebGL2RenderingContext);
@@ -55,7 +56,20 @@ export class Renderer {
     this.composer.addPass(this.thermal);
   }
 
+  private width = 1;
+  private height = 1;
+
+  /** The RENDER RESOLUTION setting (M10): re-sizes every pass at the new pixel ratio. */
+  setRenderScale(scale: number): void {
+    const ratio = renderPixelRatio(window.devicePixelRatio, scale);
+    if (ratio === this.webgl.getPixelRatio()) return;
+    this.webgl.setPixelRatio(ratio);
+    this.setSize(this.width, this.height);
+  }
+
   setSize(width: number, height: number): void {
+    this.width = width;
+    this.height = height;
     const ratio = this.webgl.getPixelRatio();
     this.webgl.setSize(width, height, false);
     this.composer.setPixelRatio(ratio);

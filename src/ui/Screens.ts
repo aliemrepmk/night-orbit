@@ -72,6 +72,7 @@ export class Screens {
           ${slider('sfxVolume', 'EFFECTS')}
           ${slider('radioVolume', 'RADIO')}
           ${slider('engineVolume', 'ENGINE')}
+          ${slider('renderScale', 'RENDER RESOLUTION')}
           ${toggle('screenShake', 'SCREEN SHAKE')}
           ${toggle('subtitles', 'RADIO SUBTITLES')}
         </div>
@@ -180,7 +181,7 @@ export class Screens {
       else input.value = String(v);
     }
     this.text('sensitivityValue', `${s.sensitivity.toFixed(2)}×`);
-    for (const k of VOLUME_SLIDERS) this.text(`${k}Value`, `${Math.round(s[k] * 100)}%`);
+    for (const k of PERCENT_SLIDERS) this.text(`${k}Value`, `${Math.round(s[k] * 100)}%`);
   }
 
   private el(k: string): HTMLElement {
@@ -195,10 +196,12 @@ export class Screens {
 
 /** The volume sliders (master, then the mixer's buses, M9). */
 const VOLUME_SLIDERS = ['volume', 'sfxVolume', 'radioVolume', 'engineVolume'] as const;
-type SliderKey = 'sensitivity' | (typeof VOLUME_SLIDERS)[number];
+/** Every slider shown as a percentage (the volumes, and the render resolution, M10). */
+const PERCENT_SLIDERS = [...VOLUME_SLIDERS, 'renderScale'] as const;
+type SliderKey = 'sensitivity' | (typeof PERCENT_SLIDERS)[number];
 
 function isSlider(key: keyof Settings): key is SliderKey {
-  return key === 'sensitivity' || (VOLUME_SLIDERS as readonly string[]).includes(key);
+  return key === 'sensitivity' || (PERCENT_SLIDERS as readonly string[]).includes(key);
 }
 
 function slider(key: SliderKey, label: string): string {
