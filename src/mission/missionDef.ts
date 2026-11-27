@@ -499,8 +499,8 @@ export function buildMission(roll: TwistRoll): MissionDef {
           ...(roll.extraction === 'kestrelAbort'
             ? [say('NAV', 'Kestrel 6 is two minutes out.'), startTimer('kestrel', 120, 'KESTREL 6')]
             : [
-                say('NAV', 'Kestrel 6 is three minutes out.'),
-                startTimer('kestrel', 180, 'KESTREL 6'),
+                say('NAV', 'Kestrel 6 is two and a half minutes out.'),
+                startTimer('kestrel', 150, 'KESTREL 6'),
               ]),
           spawnWave('lz_ne', 8),
           activateAA('aa_lz'), // M8+ Phase E
@@ -562,10 +562,10 @@ export function buildMission(roll: TwistRoll): MissionDef {
                     note: 'kestrel delayed',
                     when: timerBelow('kestrel', 45),
                     do: [
-                      startTimer('kestrel', 135, 'KESTREL 6'),
+                      startTimer('kestrel', 105, 'KESTREL 6'),
                       say(
                         'KESTREL',
-                        'Lantern, Kestrel 6. We are held up, ninety seconds more. Hold that LZ.',
+                        'Lantern, Kestrel 6. We are held up, one more minute. Hold that LZ.',
                         2,
                       ),
                       spawnConvoy('lz_technical', ['apc'], 'lz_apc'),
@@ -697,10 +697,10 @@ function forestPhase(roll: TwistRoll): Phase {
         do: [
           teamHold(),
           setObjective('Hold LZ SAWMILL until Kestrel 6 lands'),
-          startTimer('kestrel', 75, 'KESTREL 6'),
+          startTimer('kestrel', 60, 'KESTREL 6'),
           spawnWave('forest_north', 10),
           spawnWave('forest_west', 8),
-          say('NAV', 'Kestrel 6 is coming back for the sawmill. Seventy-five seconds.'),
+          say('NAV', 'Kestrel 6 is coming back for the sawmill. Sixty seconds.'),
         ],
       },
       {

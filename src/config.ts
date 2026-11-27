@@ -245,7 +245,9 @@ export const CONFIG = {
     regenPerSecond: 1,
     quietTime: 4,
     /** Squad walking speed along its route, and how long it holds at each waypoint. */
-    speed: 2.65, // 20 % quicker (M8+ Phase F: less waiting for Ridgeback to walk; was 2.2)
+    // M8+ Phase F: 2.2 → 2.65 (less waiting for Ridgeback to walk). M10: → 3.0, the gunner-bot
+    // balance runs had the mission at 17–22 min against the 12–17 min target (PLAN.md §8).
+    speed: 3.0,
     holdTime: 18,
     /** Distance between members in the diamond formation. */
     spacing: 5,

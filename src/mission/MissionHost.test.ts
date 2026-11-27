@@ -179,13 +179,13 @@ describe('MissionHost: script actions on the real systems', () => {
   });
 
   it(
-    'the extraction ("hold the line"): Kestrel 6 is delayed 90 s, then lands, Ridgeback boards, mission complete',
+    'the extraction ("hold the line"): Kestrel 6 is delayed a minute, then lands, Ridgeback boards, mission complete',
     { timeout: 60_000 },
     () => {
       const g = headlessGame();
       g.units.team.invulnerable = true;
       g.host.start('extraction');
-      expect(g.host.mission.timer('kestrel')?.left).toBe(180);
+      expect(g.host.mission.timer('kestrel')?.left).toBe(150);
       let t = 0;
       let landedAt = -1;
       while (t < 450 && g.host.mission.status === 'running') {
@@ -195,9 +195,10 @@ describe('MissionHost: script actions on the real systems', () => {
         g.vehicles.destroyAll();
         if (landedAt < 0 && g.host.helicopter.state === 'landed') landedAt = t;
       }
-      // Delayed at 45 s left to 135 s more: it shows up in the last 30 s of that (~270 s).
-      expect(landedAt).toBeGreaterThan(240);
-      expect(landedAt).toBeLessThanOrEqual(275);
+      // Delayed at 45 s left (t = 105 s) to 105 s more (M10, was 180 + 135): it shows up in
+      // the last 30 s of that (~210 s).
+      expect(landedAt).toBeGreaterThan(180);
+      expect(landedAt).toBeLessThanOrEqual(215);
       expect(g.units.boarded).toBe(true);
       expect(g.host.mission.status).toBe('complete');
       const pad = g.host.helicopter.padPosition;

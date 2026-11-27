@@ -1,5 +1,6 @@
 import { PROMPT_FLAGS } from './headlessGame';
 import { describe, expect, it } from 'vitest';
+import { CONFIG } from '../config';
 import { createRng } from '../core/rng';
 import { WaveSpawner } from '../units/spawning';
 import { VEHICLES } from '../units/vehicleDefs';
@@ -121,7 +122,13 @@ for (const roll of VARIANTS)
 
     it('timeouts on walks scale with the route length', () => {
       expect(walkTimeout('route_crossroads_lz')).toBeGreaterThan(walkTimeout('route_op_fields'));
-      expect(walkTimeout('route_crossroads_lz')).toBeGreaterThan(300);
+      // At least twice the walk itself (the team stops to fight), whatever the walking speed.
+      for (const [id, pts] of Object.entries(MAP.friendlyRoutes)) {
+        let len = 0;
+        for (let i = 1; i < pts.length; i++)
+          len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        expect(walkTimeout(id)).toBeGreaterThanOrEqual((2 * len) / CONFIG.ridgeback.speed);
+      }
     });
 
     it('the helicopter pads: on the quarry floor, and in the sawmill clearing', () => {
