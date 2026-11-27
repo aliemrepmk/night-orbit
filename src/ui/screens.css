@@ -1069,11 +1069,17 @@
   transform: rotate(-4deg);
 }
 
+.stamp-row > div:last-child {
+  min-width: 0;
+}
+
+/* Long one-word labels (OUTSTANDING) must fit beside the stamp in the narrow rating panel. */
 .grade-label {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 24px;
-  letter-spacing: 0.1em;
+  font-size: clamp(18px, 1.5vw, 24px);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 
 .extracted {
