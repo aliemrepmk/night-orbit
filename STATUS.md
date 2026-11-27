@@ -33,7 +33,7 @@ tests skipped unless `npm run balance`). `npm run build` works (≈813 kB JS, 22
 per page load, latin only). A GitHub Actions
 workflow (`.github/workflows/ci.yml`) runs check + build on every push to `main` (checked in a clean clone).
 
-**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). M0–M7 are pushed (M7 committed and pushed 2026-11-08 after its play test passed). M8, M8+ Phases A–F, M9 (2026-11-09) and M10 Phases A–D and the M10+ UI (2026-11-27) are committed locally, **not pushed yet** (the user pushes manually). Commit-message rules are in `CLAUDE.md`.
+**Git:** `https://github.com/aliemrepmk/night-orbit` (`main`). Everything through the GitHub Pages setup was pushed by the user on 2026-11-27 (Pages turned on, first deploy run). The README with screenshots and the grade-label fix are committed locally, **not pushed yet** (the user pushes manually; each push to `main` redeploys). Commit-message rules are in `CLAUDE.md`.
 
 **Visual verification:** M1, M2 and NV signed off by the user on 2026-11-03. M3 checked by Claude
 in Chrome (all three guns fired, tracers, impacts, burning wreck, both polarities; GPU ~7–8 ms,
@@ -51,6 +51,8 @@ M6 and its feedback fixes checked by Claude in Chrome (zone tour in all sensors,
 ## 2. What exists (file map)
 
 ```
+README.md                  the repo's front page: the game, screenshots, controls, how it is built
+docs/screenshots/          README screenshots (captured in Chrome, 2026-11-27)
 PLAN.md                    full implementation plan (design, milestones, tests per milestone)
 STATUS.md                  this file
 CLAUDE.md                  short instructions auto-loaded by Claude Code sessions
@@ -574,12 +576,13 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **Deploy to GitHub Pages** (M10 Phase E): set up 2026-11-27, not live yet. The user turns Pages
-   on once (repo Settings → Pages → Build and deployment → Source: **GitHub Actions**), then pushes
-   `main`; the `deploy` job in `ci.yml` publishes every green push to
+2. **Deploy to GitHub Pages** (M10 Phase E): set up 2026-11-27; the user turned Pages on (Source:
+   **GitHub Actions**) and pushed, and the first deploy was running at the time of writing; the `deploy` job in `ci.yml` publishes every green push to
    https://aliemrepmk.github.io/night-orbit/ (§5, "Deploy (M10)").
-3. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
-   runs on the first push).
+3. Small HUD issue (seen 2026-11-27): when a friendly is off-screen near the top-right, its edge
+   arrow label overlaps the top-right telemetry (WHT HOT / RNG). Keep edge arrows clear of the
+   corner text blocks.
+4. The README commit is local; the user pushes manually (each green push to `main` redeploys).
 
 ---
 
@@ -1030,6 +1033,7 @@ _(Fill in after testing.)_
 | 2026-11-27 | M10+ UI (Claude, Chrome) | Boot → title → settings (keyboard: tabs, rows, values) → briefing (all six tabs, grid A–K × 1–6 fully visible after a fit fix) → deploy (drag mode under automation) → Esc → HOLD (live status, radio log) → controls → quit with confirm → title → new run; MISSION ABORTED from a real clinic hit and a friendly-fire hit; AFTER-ACTION REPORT from counted events | Fixed: map cut off the outer grid columns; `[1] RESUME` also selected the 25 mm (regression test); HUD showing through HOLD (now hidden behind screens); SHOTS row reworded |
 | 2026-11-27 | M10+ UI test (user) | "UI test went well" | None; M10+ signed off |
 | 2026-11-27 | Pages build (Claude, Chrome) | `dist/` served from a `/night-orbit/` subfolder: boot → title → briefing → flight, fonts and the OFL texts load, no console errors, dev hook stripped | Ready to deploy once Pages is on |
+| 2026-11-27 | README screenshots (Claude, Chrome) | Captured boot, title, briefing, white-hot village, black-hot convoy, NV gun-run preview, HOLD and the after-action report | Fixed: the grade label OUTSTANDING ran into the rating panel's border. Seen, not fixed: an off-screen friendly arrow at the top edge ("RIDGEBACK 294 M") overlaps the top-right telemetry |
 
 ## 7. How to resume in a new session
 
