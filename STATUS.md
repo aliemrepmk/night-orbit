@@ -544,9 +544,12 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
+2. **M10+ mission-systems UI** (PLAN.md §10, M10+): design plan written 2026-11-27, waiting for the
+   user's go-ahead and answers to its four open questions. Known bug it fixes: on MISSION FAILED
+   the two-line EVENTS text overlaps the RETRY button.
+3. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
    user's choice of host.
-3. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
+4. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
    runs on the first push).
 
 ---

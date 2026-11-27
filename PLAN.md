@@ -703,6 +703,7 @@ HTML/CSS overlay, monospace font, pure white/black to match the feed.
 - **Telemetry** (heading, altitude, range, sensor angles) uses real values from the simulation, making the feed look alive.
 - **Friendly indicators:** when Ridgeback is off-screen, a small arrow on the screen edge points toward them.
 - **Screens:** Title (game name, "Click to start" which requests pointer lock and starts audio), Briefing (map sketch + text), Pause (resume, settings, restart), Failed (reason + retry), Complete (stats + rating: kills, accuracy, friendly damage taken, danger-close count, time).
+- **Planned restyle (M10+, §10):** the screens become mission-computer pages: console frame, soft-key menus, a five-paragraph briefing, a HOLD status card and an after-action report.
 
 ### 7.17 Audio
 
@@ -1118,6 +1119,155 @@ the forest read clearly in every sensor at 60 FPS.
 - **E. Deploy:** after the play test (host to be chosen).
 - 🧪 **Tests:** add regression tests for every bug found in playtesting; CI workflow green.
 - ✅ **Done when:** the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun.
+
+### M10+ — Mission-systems UI (planned 2026-11-27; awaits the user's go-ahead)
+
+**Goal:** the menus and screens should read like the gunship's own mission computer and the
+crew's paperwork, not like a web page: framed console panels, soft-key menus, a
+military-format briefing and an after-action report. **Original design** (PLAN.md §2): our own
+callsigns, unit names and layout; no real classification markings, insignia or another game's
+menus.
+
+**What stays:** the HUD in flight (already signed off), `ScreenFlow` (the state machine), the
+buttons' meanings in `Game`, the briefing map sketch, every setting. This is a skin and layout
+change, plus two small new screens (boot and controls).
+
+#### Design language
+
+| Element | Today                         | Planned                                                                                                                                              |
+| ------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frame   | centered text on the dim feed | every screen is a **console page**: a top system bar, a bottom soft-key bar, content in panels with corner brackets, on a darker, scanlined backdrop |
+| Type    | system monospace, spaced caps | the same monospace for data; headings heavier, tighter, with a section number (`1. SITUATION`); labels small, dim, in brackets (`[ROE]`)             |
+| Color   | white, one green CTA          | monochrome white (matches the feed) + **status colors only for meaning**: green = go/ready, amber = caution, red = fail/abort                        |
+| Buttons | outlined boxes                | **soft keys** with a key cap: `[1] DEPLOY`, `[ESC] BACK`; selected key gets a filled bar and a `▶`; keyboard first (number keys, arrows, Enter)      |
+| Values  | sliders, checkboxes           | segmented bars like the HUD gauges (`▮▮▮▮▮▮▯▯▯▯ 60%`), `ON / OFF` toggles; still real `<input>`s underneath for mouse, keyboard and screen readers   |
+| Motion  | blinking CTA only             | a short scanline wipe between screens (~150 ms), text "types in" on the boot and briefing (fast, skippable); all off with `prefers-reduced-motion`   |
+| Sound   | menu click                    | the existing click; a soft tick on focus change; the cockpit beep on DEPLOY                                                                          |
+
+The shared frame (all screens):
+
+```
+┌─ LANTERN 2-1 // MISSION SYSTEMS ──────────── OP NIGHT ORBIT ──── 02:14:07Z ─┐
+│                                                                             │
+│   (screen content: one or two panels with ┌ ┐ └ ┘ corner brackets)           │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [1] DEPLOY      [2] SETTINGS      [3] CONTROLS                   SYS ● NOMINAL │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Screens
+
+**1. Boot → Title.** On first load, ~1.5 s of system start-up lines (any key or click skips),
+then the title. Clicking anywhere still begins (and unlocks audio, as now).
+
+```
+ MISSION COMPUTER ............ OK          ┌──────────────────────────────────┐
+ SENSOR TURRET (IR / NV) ..... OK          │   N I G H T   O R B I T          │
+ FIRE CONTROL  25 / 40 / 105 . OK          │   GUNSHIP OVERWATCH · VARESH     │
+ DATALINK  RIDGEBACK ......... SYNC        │                                  │
+ COUNTERMEASURES  FLARES x6 .. ARMED       │   ▶ PRESS ANY KEY TO CONNECT      │
+                                           └──────────────────────────────────┘
+                                            [1] BEGIN  [2] SETTINGS  [3] CONTROLS
+```
+
+**2. Briefing** as a short five-paragraph order: the same facts as today, sorted into the
+headings players expect from the genre. The map gets a grid (columns A–H, rows 1–6) and the
+callouts use it ("LZ QUARRY · G4"); phase lines PL 1–4 mark the route legs.
+
+```
+┌ OPORD · OPERATION NIGHT ORBIT ────────────────────────────────────────────────┐
+│ ┌ MAP · VARESH VALLEY ───────────────┐  1. SITUATION    Ridgeback lost the OP… │
+│ │  A    B    C    D    E    F    G   │  2. MISSION      Keep them alive to…    │
+│ │1 ·  BLACK PINE                     │  3. EXECUTION    PL1 FIELDS → PL2 …     │
+│ │2    ·  OP ─ ─ FIELDS ─ ─ VILLAGE   │  4. SUPPORT      HAMMER 1-1 gun run…    │
+│ │3          ─ ─ CROSSROADS ─ ─ LZ ◎  │  5. SIGNAL       LANTERN 2-1 · RIDGEBACK │
+│ └────────────────────────────────────┘     ┌ ROE ───────────────────────────┐  │
+│  CALLSIGNS  LANTERN 2-1 (you) · RIDGEBACK  │ ! Strobes = friendly. Never.   │  │
+│  KESTREL 6 (extraction) · HAMMER 1-1       │ ! Clinic is protected.         │  │
+│                                            └────────────────────────────────┘  │
+├────────────────────────────────────────────────────────────────────────────────┤
+│ [ENTER] ACKNOWLEDGE & DEPLOY                         [3] CONTROLS                │
+```
+
+**3. Pause = "HOLD".** The feed stays visible behind (dimmed); left: soft-key menu; right: a
+live status card (objective, phase, mission time, Ridgeback, hull, guns, flares, strikes), so
+pausing also answers "how am I doing".
+
+```
+┌ HOLD · FIRE CONTROL SAFE ─────────────────────────────────────────┐
+│ ▶ [1] RESUME          ┌ STATUS ──────────────────────────────────┐ │
+│   [2] RESTART         │ OBJ    COVER RIDGEBACK THROUGH VILLAGE    │ │
+│   [3] SETTINGS        │ PHASE  2/5 VILLAGE        T+ 06:41        │ │
+│   [4] CONTROLS        │ RIDGEBACK ▮▮▮▮▮▮▮▮▯▯ 82%  HULL ▮▮▮▮▮▮▮▮▮▮  │ │
+│                       │ 105 READY · 40 ▮▮▮▮▯ · FLR 4 · BOMB 0:42  │ │
+│                       └───────────────────────────────────────────┘ │
+```
+
+**4. Settings** split into three tabs: **CONTROLS** (sensitivity, invert Y), **AUDIO** (volume,
+effects, radio, engine), **DISPLAY** (render resolution, screen shake, subtitles). Left/right
+change a value, up/down move, each row shows its segmented bar and number.
+
+**5. Controls** gets its own page (today it is squeezed under the pause menu): a key-cap layout
+grouped by GUNNERY / SENSOR / SUPPORT / SYSTEM.
+
+**6. Mission failed = "MISSION ABORTED"** as an incident card: a red status line with the cause
+in plain words ("RIDGEBACK OVERRUN · VILLAGE · T+ 06:41"), the stats so far, the run's events,
+`[ENTER] RETRY` (same seed) and `[2] NEW RUN`. Fixes today's overlap of the EVENTS line and the
+RETRY button.
+
+**7. Mission complete = "AFTER-ACTION REPORT"**: a large grade stamp in a box, the score line,
+then a two-column report: ENGAGEMENT (kills by weapon, shots, accuracy, strikes) and OUTCOME
+(Ridgeback damage, danger close, time vs par 15:00, bonuses), and the run's events as a short
+timeline.
+
+```
+┌ AFTER-ACTION REPORT · OP NIGHT ORBIT ───────────────────────────────┐
+│  ┌─────┐   RIDGEBACK EXTRACTED · KESTREL 6 · T+ 16:52                │
+│  │  B  │   SCORE 81 · SOLID OVERWATCH                                │
+│  └─────┘                                                             │
+│  ENGAGEMENT                       OUTCOME                            │
+│  KILLS  212  (25 ▸ 61 40 ▸ 88 …)  RIDGEBACK DMG   54                 │
+│  ACCURACY  38 %                   DANGER CLOSE    1                  │
+│  STRIKES   3 RUN · 1 BOMB         TIME  16:52 (PAR 15:00)            │
+│  EVENTS  Kestrel abort → sawmill · Clinic assault · Mortar           │
+├─────────────────────────────────────────────────────────────────────┤
+│ [ENTER] NEW RUN      [2] REPLAY SAME RUN                             │
+```
+
+#### How it is built
+
+- Plain DOM + CSS, as now (no framework). One stylesheet section of **design tokens** (colors,
+  spacing, frame, type) at the top of `hud.css`; the screens move to their own `screens.css`.
+- **Pure, tested builders** for every piece of text: boot lines, the five paragraphs, the grid
+  labels on the map, the status card, the AAR rows (kills by weapon needs a small `MissionStats`
+  addition), the incident line. `Screens.ts` only places them.
+- **Soft-key navigation** as a pure model (`softKeys.ts`: keys, focus, wrap, which key does
+  what) with tests; `Screens.ts` wires it to the DOM and keyboard. Mouse still works everywhere.
+- **Fonts:** the system monospace (no download, nothing new to license). Optional later: one
+  bundled open-licence font for headings.
+- Every new number (wipe length, typing speed, boot timing) in `CONFIG.ui`.
+
+#### Phases
+
+1. **UI-A Frame & tokens:** console frame, panels, soft keys, keyboard model, transitions.
+2. **UI-B Boot & title.**
+3. **UI-C Briefing:** five paragraphs, map grid and phase lines, callsign roster, ROE box.
+4. **UI-D Hold & settings & controls:** status card, tabs, segmented values, controls page.
+5. **UI-E Aborted & after-action report:** incident card, AAR, grade stamp; kills by weapon.
+6. Chrome check of every screen at 1470×800 and a narrow window, keyboard-only run-through.
+
+- 🧪 **Tests:** builders (boot lines, briefing sections, grid labels, status card, AAR rows,
+  incident line), the soft-key model (focus, wrap, shortcuts, disabled keys), kills by weapon,
+  settings tabs map to the same settings; regression test for the overlapping EVENTS line.
+- ✅ **Done when:** each screen looks like part of the aircraft's systems, the whole game can be
+  started, paused, set up and restarted from the keyboard alone, and nothing overlaps at
+  common window sizes.
+
+**Open questions for the user:** (1) the boot sequence: yes, or straight to the title? (2) the
+accent for "go" states: phosphor green (today's CTA) or amber? (3) a five-paragraph briefing, or
+keep today's two sections with the new frame? (4) system monospace only, or one bundled heading
+font?
 
 **Total estimate:** about 3–4 weeks of focused part-time work.
 
