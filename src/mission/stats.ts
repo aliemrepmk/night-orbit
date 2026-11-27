@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import type { EventBus } from '../core/EventBus';
 import type { GameEvents } from '../core/events';
-import { WEAPON_ORDER } from '../gunship/weaponDefs';
+import { WEAPON_ORDER, type OrdnanceId, type StrikeId, type WeaponId } from '../gunship/weaponDefs';
 
 /** What the fail and complete screens show (PLAN.md §7.16). */
 export interface MissionSummary {
@@ -43,11 +43,19 @@ export class MissionStats {
   impacts = 0;
   hits = 0;
   dangerClose = 0;
+  /** M10+ (after-action report): kills per gun and strike, rounds fired per gun, strikes called. */
+  readonly killsBy: Record<OrdnanceId, number> = { '25': 0, '40': 0, '105': 0, gunrun: 0, bomb: 0 };
+  readonly shots: Record<WeaponId, number> = { '25': 0, '40': 0, '105': 0 };
+  readonly strikes: Record<StrikeId, number> = { gunrun: 0, bomb: 0 };
 
   constructor(bus: EventBus<GameEvents>) {
     bus.on('unitKilled', (e) => {
-      if (e.by !== 'team') this.kills++;
+      if (e.by === 'team') return;
+      this.kills++;
+      this.killsBy[e.by]++;
     });
+    bus.on('shotFired', (e) => this.shots[e.weapon]++);
+    bus.on('strikeCalled', (e) => this.strikes[e.strike]++);
     bus.on('impact', (e) => {
       if (!GUNS.has(e.weapon)) return;
       this.impacts++;
@@ -70,9 +78,27 @@ export class MissionStats {
   }
 }
 
-/** The score (0–100, rounded) and grade for a completed mission. */
-export function rateMission(s: MissionSummary, cfg: RatingConfig = CONFIG.rating): Rating {
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/**
+ * Where the score comes from (M10+, the after-action report): 100, minus damage, danger close
+ * and lateness, plus (or minus) accuracy and bonuses. Each part is a positive number of points
+ * taken (`damage`, `danger`, `time`) or signed points given (`accuracy`, `bonus`).
+ */
+export interface RatingBreakdown {
+  readonly damage: number;
+  readonly danger: number;
+  readonly time: number;
+  readonly accuracy: number;
+  readonly bonus: number;
+  /** The final score, 0–100, rounded. */
+  readonly score: number;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+export function ratingBreakdown(
+  s: MissionSummary,
+  cfg: RatingConfig = CONFIG.rating,
+): RatingBreakdown {
   const damage = Math.min(cfg.damageMax, s.damageTaken * cfg.damagePerPoint);
   const danger = Math.min(cfg.dangerCloseMax, s.dangerClose * cfg.perDangerClose);
   const accuracy =
@@ -83,6 +109,12 @@ export function rateMission(s: MissionSummary, cfg: RatingConfig = CONFIG.rating
   const time = Math.min(cfg.timeMax, late * cfg.perMinuteOver);
   const bonus = (s.bonuses?.length ?? 0) * CONFIG.twists.bonusPoints;
   const score = Math.round(clamp(100 - damage - danger - time + accuracy + bonus, 0, 100));
+  return { damage, danger, time, accuracy, bonus, score };
+}
+
+/** The score (0–100, rounded) and grade for a completed mission. */
+export function rateMission(s: MissionSummary, cfg: RatingConfig = CONFIG.rating): Rating {
+  const { score } = ratingBreakdown(s, cfg);
   const g = cfg.grades.find((x) => score >= x.min) ?? cfg.grades[cfg.grades.length - 1];
   return { score, grade: g.grade, label: g.label };
 }

@@ -7,6 +7,7 @@ import {
   formatDuration,
   MissionStats,
   rateMission,
+  ratingBreakdown,
   summaryRows,
   type MissionSummary,
 } from './stats';
@@ -52,6 +53,46 @@ describe('MissionStats', () => {
     const s = new MissionStats(new EventBus<GameEvents>());
     expect(s.summary(0, 1).accuracy).toBe(0);
     expect(summaryRows(s.summary(0, 1))).toContainEqual(['ACCURACY', '--']);
+  });
+});
+
+describe('MissionStats per weapon (M10+ after-action report)', () => {
+  it('counts kills per gun and strike, rounds per gun and strikes called', () => {
+    const bus = new EventBus<GameEvents>();
+    const st = new MissionStats(bus);
+    bus.emit('unitKilled', { kind: 'infantry', by: '25' });
+    bus.emit('unitKilled', { kind: 'infantry', by: '105' });
+    bus.emit('unitKilled', { kind: 'infantry', by: '105' });
+    bus.emit('unitKilled', { kind: 'vehicle', by: 'bomb' });
+    bus.emit('unitKilled', { kind: 'infantry', by: 'team' });
+    for (let i = 0; i < 3; i++) bus.emit('shotFired', { weapon: '40' });
+    bus.emit('strikeCalled', { strike: 'gunrun', x: 0, z: 0, danger: false });
+    expect(st.killsBy).toEqual({ '25': 1, '40': 0, '105': 2, gunrun: 0, bomb: 1 });
+    expect(st.kills).toBe(4); // Ridgeback's own kills are not the player's
+    expect(st.shots).toEqual({ '25': 0, '40': 3, '105': 0 });
+    expect(st.strikes).toEqual({ gunrun: 1, bomb: 0 });
+  });
+});
+
+describe('ratingBreakdown', () => {
+  it('adds up to the score rateMission gives', () => {
+    const s = {
+      kills: 100,
+      impacts: 200,
+      hits: 90,
+      accuracy: 0.45,
+      damageTaken: 60,
+      dangerClose: 2,
+      seconds: 17 * 60,
+      bonuses: ['pilot'],
+    };
+    const b = ratingBreakdown(s);
+    const raw = 100 - b.damage - b.danger - b.time + b.accuracy + b.bonus;
+    expect(b.score).toBe(Math.round(Math.min(100, Math.max(0, raw))));
+    expect(rateMission(s).score).toBe(b.score);
+    expect(b.damage).toBeGreaterThan(0);
+    expect(b.time).toBeGreaterThan(0);
+    expect(b.bonus).toBe(CONFIG.twists.bonusPoints);
   });
 });
 
