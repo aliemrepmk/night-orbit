@@ -117,7 +117,8 @@ body {
 
 .hud-debug {
   position: absolute;
-  top: 50%;
+  /* Under the top-right telemetry, clear of the reticle (the line grew long enough to reach it). */
+  top: 104px;
   right: 24px;
   color: var(--hud);
   white-space: pre;

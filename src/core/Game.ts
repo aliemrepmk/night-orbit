@@ -164,6 +164,8 @@ export class Game {
   private lastFrame = performance.now();
   private debug = new URLSearchParams(location.search).has('debug');
   private fps = 60;
+  /** Smoothed CPU time of one frame (simulation + render submission + HUD), ms, for F1 (M10). */
+  private cpuMs = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -344,6 +346,7 @@ export class Game {
   }
 
   private frame(now: number): void {
+    const cpuStart = performance.now();
     const elapsed = (now - this.lastFrame) / 1000;
     this.lastFrame = now;
     if (elapsed > 0) this.fps += (1 / elapsed - this.fps) * 0.05;
@@ -366,6 +369,7 @@ export class Game {
     }
     this.overlay?.render(this.sensor.camera, window.innerWidth, window.innerHeight);
     this.input.endFrame();
+    this.cpuMs += (performance.now() - cpuStart - this.cpuMs) * 0.05;
   }
 
   /** One fixed simulation step (PLAN.md §6 update order). */
@@ -744,6 +748,7 @@ export class Game {
       debug: this.debug
         ? {
             fps: this.fps,
+            cpuMs: this.cpuMs,
             gpuMs: this.renderer.gpuMs,
             calls: this.renderer.drawCalls,
             triangles: this.renderer.triangles,

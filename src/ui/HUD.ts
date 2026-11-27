@@ -57,6 +57,8 @@ export interface HudData {
   /** `gpuMs` is null when the browser doesn't expose GPU timers. */
   debug?: {
     fps: number;
+    /** JS time per frame (simulation, render submission, HUD), ms. */
+    cpuMs: number;
     gpuMs: number | null;
     calls: number;
     triangles: number;
@@ -191,7 +193,7 @@ export class HUD {
     this.set(
       'debug',
       d.debug
-        ? `FPS ${d.debug.fps.toFixed(0)}  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}\n${d.debug.mission}  ${d.debug.cheats}`
+        ? `FPS ${d.debug.fps.toFixed(0)}  CPU ${d.debug.cpuMs.toFixed(1)} MS  GPU ${d.debug.gpuMs === null ? '--' : d.debug.gpuMs.toFixed(1)} MS  CALLS ${d.debug.calls}  TRIS ${(d.debug.triangles / 1000).toFixed(0)}K  KIA ${d.debug.kills}  EN ${d.debug.enemies}  VEH ${d.debug.vehicles}\n${d.debug.mission}  ${d.debug.cheats}`
         : '',
     );
   }
