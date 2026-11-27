@@ -8,7 +8,7 @@ import { CONFIG } from '../config';
 import { Effects } from '../fx/Effects';
 import { AirSupport, footprint, footprintDistance } from '../gunship/AirSupport';
 import { STRIKE_ORDER, STRIKES } from '../gunship/airSupportDefs';
-import { flightTime, muzzlePosition, offsetAcrossView, sampleDisc } from '../gunship/ballistics';
+import { ShotPlanner } from '../gunship/shot';
 import { Gunship } from '../gunship/Gunship';
 import { Projectiles } from '../gunship/Projectiles';
 import { Sensor } from '../gunship/Sensor';
@@ -479,32 +479,20 @@ export class Game {
     }
   }
 
-  // Scratch vectors (no per-shot allocations in the hot path).
-  private readonly dir = new Vector3();
-  private readonly spreadPoint = new Vector3();
-  private readonly muzzle = new Vector3();
+  /** Aims every shell (shared with the headless gunner bot, M10). */
+  private readonly shots = new ShotPlanner(this.w.collision);
 
-  /**
-   * Fires one shell (PLAN.md §7.6): raycast the sensor's line of sight (roofs before ground),
-   * scatter within the weapon's spread across the view, then fly for distance / speed seconds.
-   */
+  /** Fires one shell (PLAN.md §7.6): see `ShotPlanner` for the aiming and flight time. */
   private fire(id: WeaponId): void {
-    const w = WEAPONS[id];
-    const eye = this.gunship.position;
-    this.dir.subVectors(this.sensor.aim, eye).normalize();
-    const aimed = this.collision.raycast(eye, this.dir);
-    const aimPoint = aimed ? aimed.point : this.sensor.aim;
-
-    const [dx, dy] = sampleDisc(this.spreadRng, w.spread);
-    offsetAcrossView(eye, aimPoint, dx, dy, this.spreadPoint);
-    this.dir.subVectors(this.spreadPoint, eye).normalize();
-    const hit = this.collision.raycast(eye, this.dir) ?? aimed;
-    if (!hit) return;
-
-    const g = CONFIG.gunnery;
-    muzzlePosition(eye, this.gunship.center, g.muzzleDrop, g.muzzleSide, this.muzzle);
-    const duration = flightTime(this.muzzle.distanceTo(hit.point), w.shellSpeed);
-    this.projectiles.fire(id, this.muzzle, hit.point, duration, hit.kind, hit.box);
+    const shot = this.shots.plan(
+      id,
+      this.gunship.position,
+      this.gunship.center,
+      this.sensor.aim,
+      this.spreadRng,
+    );
+    if (!shot) return;
+    this.projectiles.fire(id, shot.from, shot.to, shot.duration, shot.kind, shot.box);
 
     if (id === '105') this.sensor.addShake(CONFIG.sensor.recoilDeg); // the whole aircraft kicks
     this.bus.emit('shotFired', { weapon: id });
