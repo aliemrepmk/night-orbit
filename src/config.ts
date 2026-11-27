@@ -467,6 +467,20 @@ export const CONFIG = {
   },
 
   /** Player settings (M8): defaults and ranges; saved in localStorage when it is available. */
+  /** M10+: the mission-systems screens (PLAN.md §10 M10+). */
+  ui: {
+    /** Briefing map grid: lettered columns × numbered rows of square cells over the sketch. */
+    gridCols: 10,
+    gridRows: 6,
+    /** Boot sequence: one status line every `bootLineSeconds`; it ends `bootHoldSeconds` later. */
+    bootLineSeconds: 0.22,
+    bootHoldSeconds: 0.4,
+    /** The scanline wipe when a screen changes (ms; off with prefers-reduced-motion). */
+    wipeMs: 160,
+    /** Radio lines kept for the HOLD screen's comms log. */
+    commsLines: 4,
+  },
+
   settings: {
     storageKey: 'night-orbit.settings.v1',
     sensitivity: { default: 1, min: 0.25, max: 3, step: 0.05 },

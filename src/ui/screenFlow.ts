@@ -1,8 +1,21 @@
-/** Every full-screen state of the game (PLAN.md §6: Title → Briefing → Playing ⇄ Paused → Failed | Complete). */
+/**
+ * Every full-screen state of the game (PLAN.md §6: Title → Briefing → Playing ⇄ Paused → Failed |
+ * Complete; M10+ adds the start-up `boot` before the title and a `controls` page).
+ */
 export type Screen =
-  'title' | 'briefing' | 'playing' | 'paused' | 'settings' | 'failed' | 'complete';
+  | 'boot'
+  | 'title'
+  | 'briefing'
+  | 'playing'
+  | 'paused'
+  | 'settings'
+  | 'controls'
+  | 'failed'
+  | 'complete';
 
 export type ScreenAction =
+  /** Boot: the self test finished, or the player skipped it. */
+  | 'continue'
   /** Title: the player clicked to begin. */
   | 'begin'
   /** Pointer lock (or drag-mode aiming) started / stopped. */
@@ -10,6 +23,11 @@ export type ScreenAction =
   | 'lockLost'
   | 'openSettings'
   | 'closeSettings'
+  /** The controls page (M10+), from the title, the briefing or the pause screen. */
+  | 'openControls'
+  | 'closeControls'
+  /** Back to the title from the briefing, pause or end screens (the run is thrown away). */
+  | 'quit'
   /** A fresh run was set up (pause / fail / complete screens); it waits paused until aiming starts. */
   | 'restart'
   | 'fail'
@@ -21,13 +39,20 @@ export type ScreenAction =
  * lock (Esc) pauses. A restart lands on `paused` so a refused lock still leaves a RESUME button.
  */
 export class ScreenFlow {
-  state: Screen = 'title';
   /** Where `closeSettings` goes back to. */
   private settingsFrom: Screen = 'title';
+  /** Where `closeControls` goes back to. */
+  private controlsFrom: Screen = 'title';
+
+  /** `boot` for the game's first screen (M10+); the tests start on the title. */
+  constructor(public state: Screen = 'title') {}
 
   dispatch(action: ScreenAction): Screen {
     const s = this.state;
     switch (action) {
+      case 'continue':
+        if (s === 'boot') this.state = 'title';
+        break;
       case 'begin':
         if (s === 'title') this.state = 'briefing';
         break;
@@ -45,6 +70,19 @@ export class ScreenFlow {
         break;
       case 'closeSettings':
         if (s === 'settings') this.state = this.settingsFrom;
+        break;
+      case 'openControls':
+        if (s === 'title' || s === 'briefing' || s === 'paused') {
+          this.controlsFrom = s;
+          this.state = 'controls';
+        }
+        break;
+      case 'closeControls':
+        if (s === 'controls') this.state = this.controlsFrom;
+        break;
+      case 'quit':
+        if (s === 'briefing' || s === 'paused' || s === 'failed' || s === 'complete')
+          this.state = 'title';
         break;
       case 'restart':
         if (s === 'paused' || s === 'failed' || s === 'complete') this.state = 'paused';

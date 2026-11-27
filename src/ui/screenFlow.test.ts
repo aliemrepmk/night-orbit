@@ -54,4 +54,30 @@ describe('ScreenFlow', () => {
     expect(run('begin', 'lockGained', 'fail', 'complete').state).toBe('failed');
     expect(run('begin', 'lockGained', 'complete', 'fail').state).toBe('complete');
   });
+
+  it('boot (M10+) continues to the title, and nothing else leaves it', () => {
+    const f = new ScreenFlow('boot');
+    for (const a of ['begin', 'lockGained', 'openSettings', 'quit'] as const) f.dispatch(a);
+    expect(f.state).toBe('boot');
+    expect(f.dispatch('continue')).toBe('title');
+    expect(f.dispatch('continue')).toBe('title'); // only from boot
+  });
+
+  it('controls (M10+) opens from the title, briefing or pause and returns there', () => {
+    expect(run('openControls', 'closeControls').state).toBe('title');
+    expect(run('begin', 'openControls', 'closeControls').state).toBe('briefing');
+    expect(
+      run('begin', 'lockGained', 'lockLost', 'openControls', 'lockGained', 'closeControls').state,
+    ).toBe('paused'); // a lock change on the controls page is ignored
+    expect(run('begin', 'lockGained', 'openControls').state).toBe('playing'); // not mid-flight
+  });
+
+  it('quit (M10+) goes back to the title from the briefing, pause and end screens only', () => {
+    expect(run('begin', 'lockGained', 'lockLost', 'quit').state).toBe('title');
+    expect(run('begin', 'lockGained', 'fail', 'quit').state).toBe('title');
+    expect(run('begin', 'lockGained', 'complete', 'quit').state).toBe('title');
+    expect(run('begin', 'lockGained', 'quit').state).toBe('playing');
+    expect(run('begin', 'quit').state).toBe('title');
+    expect(run('openSettings', 'quit').state).toBe('settings');
+  });
 });
