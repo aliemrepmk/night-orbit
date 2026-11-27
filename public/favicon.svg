@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- NIGHT ORBIT: the 105 mm reticle's corner brackets (phosphor green) and crosshair, on the console black. -->
+  <rect width="64" height="64" rx="12" fill="#070b08"/>
+  <path d="M13 26V13h13M38 13h13v13M51 38v13H38M26 51H13V38" fill="none" stroke="#5cff7a" stroke-width="6"/>
+  <path d="M32 21v7M32 36v7M21 32h7M36 32h7" stroke="#f2f2f2" stroke-width="4"/>
+  <rect x="30" y="30" width="4" height="4" fill="#f2f2f2"/>
+</svg>

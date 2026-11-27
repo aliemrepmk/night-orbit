@@ -59,6 +59,8 @@ STATUS.md                  this file
 CLAUDE.md                  short instructions auto-loaded by Claude Code sessions
 index.html                 canvas, HUD root, screen root (starts on the boot screen)
 public/licenses/           M10+: the bundled fonts' SIL OFL licence texts (shipped in dist/)
+public/favicon.svg         the tab icon: the 105 mm reticle brackets (green) and crosshair on console black;
+                           favicon-32.png and apple-touch-icon.png (180 px, square) rendered from it
 .github/workflows/ci.yml   M10: CI on every push / PR: npm ci, npm run check, npm run build
 .npmrc                     legacy-peer-deps=true (see §5, decision 1)
 src/
