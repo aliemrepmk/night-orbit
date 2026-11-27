@@ -544,8 +544,9 @@ Write findings in §6 below (or tell Claude at the start of the next session).
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **M10+ mission-systems UI** (PLAN.md §10, M10+): design plan written 2026-11-27, waiting for the
-   user's go-ahead and answers to its four open questions. Known bug it fixes: on MISSION FAILED
+2. **M10+ mission-systems UI** (PLAN.md §10, M10+): plan written and its four questions answered
+   (2026-11-27); a clickable mockup of all eight screens is made, waiting for the user's review
+   before the build. Known bug it fixes: on MISSION FAILED
    the two-line EVENTS text overlaps the RETRY button.
 3. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
    user's choice of host.

@@ -1120,7 +1120,7 @@ the forest read clearly in every sensor at 60 FPS.
 - 🧪 **Tests:** add regression tests for every bug found in playtesting; CI workflow green.
 - ✅ **Done when:** the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun.
 
-### M10+ — Mission-systems UI (planned 2026-11-27; awaits the user's go-ahead)
+### M10+ — Mission-systems UI (planned 2026-11-27; mockup made, awaits the user's review)
 
 **Goal:** the menus and screens should read like the gunship's own mission computer and the
 crew's paperwork, not like a web page: framed console panels, soft-key menus, a
@@ -1244,8 +1244,8 @@ timeline.
   addition), the incident line. `Screens.ts` only places them.
 - **Soft-key navigation** as a pure model (`softKeys.ts`: keys, focus, wrap, which key does
   what) with tests; `Screens.ts` wires it to the DOM and keyboard. Mouse still works everywhere.
-- **Fonts:** the system monospace (no download, nothing new to license). Optional later: one
-  bundled open-licence font for headings.
+- **Fonts:** Chakra Petch + IBM Plex Mono as bundled `woff2` files (OFL; licence text shipped
+  beside them), with the system monospace as the fallback.
 - Every new number (wipe length, typing speed, boot timing) in `CONFIG.ui`.
 
 #### Phases
@@ -1264,10 +1264,13 @@ timeline.
   started, paused, set up and restarted from the keyboard alone, and nothing overlaps at
   common window sizes.
 
-**Open questions for the user:** (1) the boot sequence: yes, or straight to the title? (2) the
-accent for "go" states: phosphor green (today's CTA) or amber? (3) a five-paragraph briefing, or
-keep today's two sections with the new frame? (4) system monospace only, or one bundled heading
-font?
+**Decided (user, 2026-11-27):** keep the boot sequence; "go" states in phosphor green (#5cff7a);
+the briefing is a five-paragraph order (SITUATION, MISSION, EXECUTION, SUPPORT, COMMAND & SIGNAL,
+plus an ROE tab) on a lettered map grid (A–J × 1–6, 195 m squares); fonts **Chakra Petch**
+(headings) and **IBM Plex Mono** (data), both SIL Open Font Licence, to be bundled with the game
+(no network fonts). A clickable mockup of all eight screens exists as a private design canvas
+(boot, title, briefing, controls, hold, settings, aborted, after-action report); the build waits
+for the user's review of it.
 
 **Total estimate:** about 3–4 weeks of focused part-time work.
 
