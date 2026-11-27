@@ -25,6 +25,13 @@ export class Input {
   onLockChange: (locked: boolean) => void = () => {};
   /** Pointer lock was refused after it had worked before (Chrome's ~1 s cooldown after Esc). */
   onLockRefused: () => void = () => {};
+  /**
+   * The window lost focus or the tab was hidden (M10). Pointer lock already drops then, but the
+   * drag-to-aim fallback has no lock to lose, so the game pauses on this too.
+   */
+  onFocusLost: () => void = () => {};
+  /** The tab was hidden (true) or shown again (false). */
+  onHidden: (hidden: boolean) => void = () => {};
   /** Lock has worked at least once: a later refusal is a cooldown, not a missing feature. */
   private everLocked = false;
 
@@ -77,6 +84,11 @@ export class Input {
       this.held.clear();
       this.fireHeld = false;
       this.aimDragHeld = false;
+      this.onFocusLost();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.onFocusLost();
+      this.onHidden(document.hidden);
     });
   }
 

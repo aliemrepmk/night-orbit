@@ -115,6 +115,15 @@ export class AudioEngine {
     engine.pan?.pan.setTargetAtTime(t.pan, now, 0.3);
   }
 
+  /**
+   * Hidden tab (M10): stop all sound while the page can't be seen, and pick up where it was when
+   * it comes back. Before the first `unlock` there is no context and nothing to do.
+   */
+  setHidden(hidden: boolean): void {
+    if (!this.ctx) return;
+    void (hidden ? this.ctx.suspend() : this.ctx.resume());
+  }
+
   unlock(): void {
     if (this.ctx) {
       void this.ctx.resume();

@@ -188,6 +188,8 @@ export class Game {
     }
     this.input = new Input(canvas);
     this.input.onLockChange = (locked) => this.go(locked ? 'lockGained' : 'lockLost');
+    this.input.onFocusLost = () => this.go('lockLost');
+    this.input.onHidden = (hidden) => this.audio.setHidden(hidden);
     this.input.onLockRefused = () =>
       this.screens.setLockHint('The browser needs a moment after Esc: click RESUME again.');
 
