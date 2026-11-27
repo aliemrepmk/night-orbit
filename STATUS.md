@@ -26,7 +26,7 @@ every session.
 | **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
 | **M9** Audio                            | ✅ Signed off (listen test passed, user, 2026-11-27)                      |
 | **M10** Polish, balance & performance   | 🟨 Phases A–D done (2026-11-27); **user play test pending (§3.0)**        |
-| **M10+** Mission-systems UI             | 🟨 Built (2026-11-27); **user look-and-use test pending (§3.0)**          |
+| **M10+** Mission-systems UI             | ✅ Signed off (UI test passed, user, 2026-11-27)                          |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **690 tests in 83 files**, 3 balance
 tests skipped unless `npm run balance`). `npm run build` works (≈813 kB JS, 227 kB gzipped; fonts ≈30 kB woff2
@@ -244,7 +244,7 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M10+ UI test (pending): "each screen looks like part of the aircraft's systems; the whole game can be started, paused, set up and restarted from the keyboard alone"
+### 3.0 M10+ UI test (passed 2026-11-27): "each screen looks like part of the aircraft's systems; the whole game can be started, paused, set up and restarted from the keyboard alone"
 
 Run `npm run dev`:
 
@@ -570,16 +570,15 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M10 play test by the user** (§3.0), then tune from the feedback (`npm run balance` after
+1. **M10 play test by the user** (§3.0a), then tune from the feedback (`npm run balance` after
    any balance change). Open questions for the user: shorten the sawmill ending (it comes up
    80 % of the time and is the longest phase), make `holdTheLine` more common, and/or add an
    optional EASY difficulty for weaker players (the rookie bot rarely wins).
-2. **M10+ mission-systems UI** (PLAN.md §10, M10+): built 2026-11-27 from the approved mockup;
-   waiting for the user's test (§3.0). It also fixed the old MISSION FAILED overlap of the EVENTS
-   line and RETRY.
-3. **Deploy** (GitHub Pages / Netlify / Vercel), the last M10 item: not started; waits for the
-   user's choice of host.
-4. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
+2. **Deploy to GitHub Pages** (M10 Phase E): set up 2026-11-27, not live yet. The user turns Pages
+   on once (repo Settings → Pages → Build and deployment → Source: **GitHub Actions**), then pushes
+   `main`; the `deploy` job in `ci.yml` publishes every green push to
+   https://aliemrepmk.github.io/night-orbit/ (§5, "Deploy (M10)").
+3. M8 → M10 work is committed locally, not pushed; the user pushes manually (the CI workflow
    runs on the first push).
 
 ---
@@ -956,6 +955,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
     NEW RUN on the fail screen, kills per weapon and the score breakdown on the report.
 83. **Focus loss (M10).** The window losing focus or the tab hiding now pauses (pointer lock already
     did; drag-to-aim mode kept playing), and the AudioContext is suspended while the tab is hidden.
+84. **Deploy (M10).** GitHub Pages through Actions: `ci.yml`'s `check` job also uploads `dist/` on a
+    push to `main`, and a `deploy` job (`actions/deploy-pages`) publishes it, only after typecheck,
+    lint, tests and build pass. Pull requests never deploy. `vite.config.ts` builds with `base: './'`
+    (relative URLs), so the same build runs at `/night-orbit/`, at a root, or opened from a folder.
+    Production builds keep `?debug=1` cheats/stats but not `window.nightOrbit`.
 
 ---
 
@@ -1024,6 +1028,8 @@ _(Fill in after testing.)_
 | 2026-11-27 | M10 focus / browser (Claude, Chrome) | Drag-to-aim kept playing after the window lost focus; after the fix: blur → paused, clock frozen, resume works; no console errors in a vehicles run. Window resize could not be driven from the extension (window stayed maximized) | Fix + regression test (`Input.test.ts`); resize left to the user's play test |
 | 2026-11-27 | M10 balance (Claude, headless bot) | Before: 17–22 min; average bot hit the clinic twice (bot margin bug, fixed in the bot); rookie mostly overrun in the vehicles phase. After the pace changes: see §5 decision 79–80 | Walk 3.0 m/s, shorter Kestrel timers; difficulty unchanged |
 | 2026-11-27 | M10+ UI (Claude, Chrome) | Boot → title → settings (keyboard: tabs, rows, values) → briefing (all six tabs, grid A–K × 1–6 fully visible after a fit fix) → deploy (drag mode under automation) → Esc → HOLD (live status, radio log) → controls → quit with confirm → title → new run; MISSION ABORTED from a real clinic hit and a friendly-fire hit; AFTER-ACTION REPORT from counted events | Fixed: map cut off the outer grid columns; `[1] RESUME` also selected the 25 mm (regression test); HUD showing through HOLD (now hidden behind screens); SHOTS row reworded |
+| 2026-11-27 | M10+ UI test (user) | "UI test went well" | None; M10+ signed off |
+| 2026-11-27 | Pages build (Claude, Chrome) | `dist/` served from a `/night-orbit/` subfolder: boot → title → briefing → flight, fonts and the OFL texts load, no console errors, dev hook stripped | Ready to deploy once Pages is on |
 
 ## 7. How to resume in a new session
 

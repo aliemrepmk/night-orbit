@@ -1116,11 +1116,11 @@ the forest read clearly in every sensor at 60 FPS.
   average one ≥ 90 % (B–C). Tuned: Ridgeback walks faster, shorter Kestrel timers.
 - **C. Polish:** browser checks (§12.3), fix what they find.
 - **D. CI:** GitHub Actions runs check + build on every push.
-- **E. Deploy:** after the play test (host to be chosen).
+- **E. Deploy:** GitHub Pages via Actions (`ci.yml` `deploy` job on every green push to `main`), at https://aliemrepmk.github.io/night-orbit/.
 - 🧪 **Tests:** add regression tests for every bug found in playtesting; CI workflow green.
 - ✅ **Done when:** the target duration is met, no critical bugs, 60 FPS on a mid-range laptop, and it's fun.
 
-### M10+ — Mission-systems UI (built 2026-11-27; awaits the user's test)
+### M10+ — Mission-systems UI — ✅ signed off (2026-11-27)
 
 **Goal:** the menus and screens should read like the gunship's own mission computer and the
 crew's paperwork, not like a web page: framed console panels, soft-key menus, a
