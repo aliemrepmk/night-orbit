@@ -1099,7 +1099,7 @@ _F3. Radio (more varied lines; commands are in the backlog, §14):_
 different; AA and missiles are a threat you manage (and can lose to); the soldiers, jets and
 the forest read clearly in every sensor at 60 FPS.
 
-### M9 — Audio (1–2 days) — code-complete 2026-11-09; awaits the user's listen test
+### M9 — Audio (1–2 days) — ✅ signed off (2026-11-27)
 
 - Synth engine drone, weapons, delayed impacts, squelch, UI sounds; volume buses wired to settings.
 - 🧪 **Tests:** volume bus math; sound-event mapping (each event triggers the right sound id). Audio output itself is checked manually.

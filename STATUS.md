@@ -1,6 +1,6 @@
 # NIGHT ORBIT — Project Status & Handoff
 
-_Last updated: 2026-11-14_
+_Last updated: 2026-11-27_
 
 This file says **where the project is right now**, **what needs testing**, and **what comes next**.
 The full design and milestone list are in [`PLAN.md`](PLAN.md). Update this file at the end of
@@ -24,8 +24,8 @@ every session.
 | **M7** Mission scripting & dialogue     | ✅ Signed off (play test passed, user, 2026-11-08)                        |
 | **M8** UI screens & settings            | ✅ Signed off (user, 2026-11-09, with the M8+ A + B play test); committed |
 | **M8+** Content & threat expansion      | ✅ Signed off (C–F play test passed, user, 2026-11-09); committed         |
-| **M9** Audio                            | 🟨 Code-complete (2026-11-09); **user listen test pending (§3.0)**        |
-| M10                                     | ⬜ Not started                                                            |
+| **M9** Audio                            | ✅ Signed off (listen test passed, user, 2026-11-27)                      |
+| **M10** Polish, balance & performance   | 🟨 Started 2026-11-27                                                     |
 
 **Automated checks (last run):** `npm run check` all green (typecheck, lint, **640 tests in 73 files**).
 `npm run build` works (≈780 kB JS, 216 kB gzipped).
@@ -221,7 +221,7 @@ starts at that phase. F1 also shows the mission phase/step and active cheats.
 
 ## 3. Manual checklists
 
-### 3.0 M9 listen test (pending): "playing with eyes closed, you can tell which weapon is firing and when shells land"
+### 3.0 M9 listen test (passed 2026-11-27): "playing with eyes closed, you can tell which weapon is firing and when shells land"
 
 Run `npm run dev`, use headphones or decent speakers, and check:
 
@@ -511,14 +511,11 @@ Write findings in §6 below (or tell Claude at the start of the next session).
 
 ## 4. Next steps
 
-1. **M9 listen test by the user** (§3.0): M9 is code-complete and committed (2026-11-09, not
-   pushed). Tune levels from the feedback (all in `src/audio/sounds.ts` and `CONFIG.mix`),
-   then sign off M9.
-2. Then **M10** (polish, balance, performance, deploy). Carry over from M8+: the air-defense
+1. **M10** (polish, balance, performance, deploy). Carry over from M8+: the air-defense
    numbers in `CONFIG.airDefense` and the twist mix were only played once; tune them in M10
    play sessions.
-3. M8+ A–F are committed locally (2026-11-09), not pushed; the user pushes manually.
-4. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
+2. M8+ A–F and M9 are committed locally (2026-11-09), not pushed; the user pushes manually.
+3. Consider adding the GitHub Actions CI workflow from PLAN.md §12.1 (`npm run check` +
    `npm run build` on every push) now that the repo is on GitHub.
 
 ---
@@ -926,11 +923,12 @@ _(Fill in after testing.)_
 
 | 2026-11-09 | M8+ C–F play test (user) | One full run played; it went well | None; M8+ signed off. AA/missile numbers and twist mix to be revisited in M10 play sessions |
 | 2026-11-09 | M9 audio check (Claude, Chrome) | Every sound rendered offline and measured: 25 mm shot peaked at 0.025 and its hit at 0.007 (too quiet), squelch and clicks also faint. In game: firing, landing, the 105 mm breech and ready beep, the select beep, flares, intercom clicks, outside-net squelch and static all played; pause and settings muted the static and resume restored it; the RADIO slider set the radio bus to 0 and saved | Raised the band-passed sounds about 3× (`fix(audio)` commit); listening is left to the user (§3.0) |
+| 2026-11-27 | M9 listen test (user) | "Listen test seems ok for now" | None; M9 signed off. Levels can be revisited in M10 play sessions |
 
 ## 7. How to resume in a new session
 
 Start Claude Code in this folder and say something like:
 
-> "Read STATUS.md and PLAN.md. Let's continue (M9 listen test feedback, then M10)."
+> "Read STATUS.md and PLAN.md. Let's continue (M10: polish, balance, performance)."
 
 `CLAUDE.md` already tells Claude to read these files and follow the testing rules.
